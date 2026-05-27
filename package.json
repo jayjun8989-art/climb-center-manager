@@ -1,0 +1,42 @@
+{
+  "name": "climb-center-manager",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "클라이밍 센터 회원관리 프로그램",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "desktop:shortcut": "powershell -ExecutionPolicy Bypass -File scripts/create-desktop-shortcut.ps1",
+    "desktop:deploy": "powershell -ExecutionPolicy Bypass -File scripts/deploy-desktop.ps1",
+    "icon:generate": "powershell -ExecutionPolicy Bypass -File scripts/prepare-app-icon.ps1 && npm run tauri icon app-icon.png"
+  },
+  "dependencies": {
+    "@tanstack/react-virtual": "^3.13.25",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
+    "@tauri-apps/plugin-opener": "^2",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.3.0",
+    "lucide-react": "^1.16.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.0",
+    "@tauri-apps/cli": "^2",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "tailwindcss": "^4.3.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

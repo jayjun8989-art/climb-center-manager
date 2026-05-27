@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/tauri.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>클라이밍 센터 회원관리</title>
+    <style>
+      html,
+      body,
+      #root {
+        min-height: 100%;
+        margin: 0;
+      }
+
+      body {
+        background: #f4f7fb;
+        color: #0f172a;
+        font-family: "Malgun Gothic", "Segoe UI", "Apple SD Gothic Neo", sans-serif;
+      }
+
+      #root:empty::before {
+        content: "클라이밍 센터 회원관리 불러오는 중…";
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        color: #64748b;
+        font-size: 0.95rem;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #060b16;
+          color: #e2e8f0;
+        }
+
+        #root:empty::before {
+          color: #94a3b8;
+        }
+      }
+    </style>
+  </head>
+  <body lang="ko">
+    <noscript>
+      <div style="padding: 2rem; font-family: 'Malgun Gothic', 'Segoe UI', sans-serif">
+        이 프로그램을 사용하려면 JavaScript가 필요합니다.
+      </div>
+    </noscript>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
