@@ -2,36 +2,22 @@ import { X } from "lucide-react";
 
 import { useEffect, useMemo, useState } from "react";
 
-import type { Center, Member, MemberInput, MembershipCategory } from "../types";
-
+import type { Center, MemberInput, MemberListItem, MembershipCategory } from "../types";
 import {
-
   calcMonthlyEndDate,
-
   calcSessionEndDate,
-
+  dbMembershipToLegacy,
+  getJuniorCountFromItem,
   getMonthlyDuration,
-
-  getJuniorCount,
-
-  isMonthlyType,
-
   JUNIOR_COUNTS,
-
   monthlyTypeFromDuration,
-
   normalizePhoneInput,
-
+  resolveCategory,
   SESSION_TOTAL_COUNT,
-
   SESSION_VALIDITY_MONTHS,
-
   todayString,
-
   type JuniorCount,
-
   type MonthlyDuration,
-
 } from "../utils/member";
 
 
@@ -42,7 +28,7 @@ interface MemberFormModalProps {
 
   center: Center;
 
-  member?: Member | null;
+  member?: MemberListItem | null;
 
   onClose: () => void;
 
@@ -68,14 +54,8 @@ const monthlyDurations: MonthlyDuration[] = [1, 3, 6];
 
 
 
-function resolveCategory(type: Member["membership_type"]): MembershipCategory {
-
-  if (isMonthlyType(type)) return "monthly";
-
-  if (type === "session") return "session";
-
-  return "junior";
-
+function resolveCategoryFromItem(type: MemberListItem["membership_type"]): MembershipCategory {
+  return resolveCategory(type ?? undefined);
 }
 
 
@@ -145,25 +125,16 @@ export function MemberFormModal({
 
 
     if (member) {
-
+      const legacyType = dbMembershipToLegacy(member.membership_type);
       setName(member.name);
-
       setPhone(member.phone ?? "");
-
-      setCategory(resolveCategory(member.membership_type));
-
-      setMonthlyDuration(getMonthlyDuration(member.membership_type) ?? 1);
-
-      setJuniorCount(getJuniorCount(member));
-
-      setStartDate(member.start_date);
-
+      setCategory(resolveCategoryFromItem(member.membership_type));
+      setMonthlyDuration(getMonthlyDuration(legacyType) ?? 1);
+      setJuniorCount(getJuniorCountFromItem(member));
+      setStartDate(member.start_date ?? todayString());
       setEndDate(member.end_date ?? "");
-
-      setNotes(member.notes ?? "");
-
+      setNotes(member.memo ?? "");
       return;
-
     }
 
 
@@ -258,7 +229,7 @@ export function MemberFormModal({
 
       totalSessions = SESSION_TOTAL_COUNT;
 
-      remainingSessions = member?.remaining_sessions ?? SESSION_TOTAL_COUNT;
+      remainingSessions = member?.remaining_count ?? SESSION_TOTAL_COUNT;
 
     } else {
 
@@ -266,7 +237,7 @@ export function MemberFormModal({
 
       totalSessions = juniorCount;
 
-      remainingSessions = member?.remaining_sessions ?? juniorCount;
+      remainingSessions = member?.remaining_count ?? juniorCount;
 
     }
 

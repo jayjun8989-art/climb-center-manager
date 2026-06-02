@@ -8,7 +8,7 @@ import { MemberFormModal } from "./components/MemberFormModal";
 import { MemberList } from "./components/MemberList";
 import { PaginationBar } from "./components/PaginationBar";
 import { useTheme } from "./hooks/useTheme";
-import type { Center, DashboardStats, Member, MemberGroupFilter, MemberInput, MemberStatusFilter, BackupInfo, StorageInfo } from "./types";
+import type { Center, DashboardStats, MemberGroupFilter, MemberInput, MemberListItem, MemberStatusFilter, BackupInfo, StorageInfo } from "./types";
 
 function showMutationToast(
   setToast: (value: string) => void,
@@ -40,14 +40,14 @@ export default function App() {
   const debouncedSearch = useDebouncedValue(search, 200);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
-  const [members, setMembers] = useState<Member[]>([]);
+  const [members, setMembers] = useState<MemberListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [expiringMembers, setExpiringMembers] = useState<Member[]>([]);
-  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [expiringMembers, setExpiringMembers] = useState<MemberListItem[]>([]);
+  const [selectedMember, setSelectedMember] = useState<MemberListItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [editingMember, setEditingMember] = useState<MemberListItem | null>(null);
   const [toast, setToast] = useState("");
   const [backupInfo, setBackupInfo] = useState<BackupInfo | null>(null);
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
@@ -152,7 +152,7 @@ export default function App() {
     }
   }
 
-  async function handleDeleteMember(member: Member) {
+  async function handleDeleteMember(member: MemberListItem) {
     const confirmed = window.confirm(`${member.name} 회원을 삭제하시겠습니까?`);
     if (!confirmed) return;
     try {
@@ -165,7 +165,7 @@ export default function App() {
     }
   }
 
-  async function handleAttendance(member: Member) {
+  async function handleAttendance(member: MemberListItem) {
     try {
       const result = await api.recordAttendance(member.id);
       setSelectedMember(result.data);
@@ -308,7 +308,16 @@ export default function App() {
           </div>
 
           <div className="space-y-5">
-            <MemberDetailPanel member={selectedMember} onAttendance={handleAttendance} />
+            <MemberDetailPanel
+              member={selectedMember}
+              onAttendance={handleAttendance}
+              onUpdated={(updated) => {
+                setSelectedMember(updated);
+                setMembers((current) =>
+                  current.map((item) => (item.id === updated.id ? updated : item)),
+                );
+              }}
+            />
             <ExpiringPanel members={expiringMembers} />
           </div>
         </div>

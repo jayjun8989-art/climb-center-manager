@@ -1,9 +1,9 @@
 import { AlertTriangle } from "lucide-react";
-import type { Member } from "../types";
-import { getExpiryText, formatMembershipLabel } from "../utils/member";
+import type { MemberListItem } from "../types";
+import { formatMembershipLabel, getExpiryText } from "../utils/member";
 
 interface ExpiringPanelProps {
-  members: Member[];
+  members: MemberListItem[];
 }
 
 export function ExpiringPanel({ members }: ExpiringPanelProps) {

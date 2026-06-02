@@ -1,11 +1,12 @@
 use crate::backup::{create_backup, get_backup_info, restore_backup};
 use crate::db::{
     check_attendance, create_member, delete_member, get_attendance, get_dashboard_stats,
-    get_expiring_members, get_member, list_members, update_member, AppState,
+    get_expiring_members, get_member_detail, get_pause_logs, get_payments, list_members,
+    pause_membership, resume_membership, update_member, AppState,
 };
 use crate::models::{
-    AttendanceRecord, BackupInfo, BackupResult, DashboardStats, Member, MemberInput,
-    MutationResult, PaginatedMembers, StorageInfo,
+    BackupInfo, BackupResult, DashboardStats, MemberDetail, MemberInput, MemberListItem,
+    MutationResult, PaginatedMembers, PauseLog, Payment, StorageInfo,
 };
 use tauri::State;
 
@@ -52,8 +53,8 @@ pub fn get_members(
 }
 
 #[tauri::command]
-pub fn get_member_by_id(state: State<'_, AppState>, id: i64) -> Result<Member, String> {
-    get_member(&state, id)
+pub fn get_member_by_id(state: State<'_, AppState>, id: i64) -> Result<MemberDetail, String> {
+    get_member_detail(&state, id)
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "회원을 찾을 수 없습니다.".to_string())
 }
@@ -62,7 +63,7 @@ pub fn get_member_by_id(state: State<'_, AppState>, id: i64) -> Result<Member, S
 pub fn add_member(
     state: State<'_, AppState>,
     input: MemberInput,
-) -> Result<MutationResult<Member>, String> {
+) -> Result<MutationResult<MemberListItem>, String> {
     let member = create_member(&state, input).map_err(|e| e.to_string())?;
     Ok(MutationResult {
         backup_warning: backup_best_effort(&state),
@@ -75,7 +76,7 @@ pub fn edit_member(
     state: State<'_, AppState>,
     id: i64,
     input: MemberInput,
-) -> Result<MutationResult<Member>, String> {
+) -> Result<MutationResult<MemberListItem>, String> {
     let member = update_member(&state, id, input).map_err(|e| e.to_string())?;
     Ok(MutationResult {
         backup_warning: backup_best_effort(&state),
@@ -99,7 +100,7 @@ pub fn remove_member(
 pub fn record_attendance(
     state: State<'_, AppState>,
     member_id: i64,
-) -> Result<MutationResult<Member>, String> {
+) -> Result<MutationResult<MemberListItem>, String> {
     let member = check_attendance(&state, member_id).map_err(|e| e.to_string())?;
     Ok(MutationResult {
         backup_warning: backup_best_effort(&state),
@@ -112,8 +113,35 @@ pub fn fetch_attendance(
     state: State<'_, AppState>,
     member_id: i64,
     limit: Option<i64>,
-) -> Result<Vec<AttendanceRecord>, String> {
+) -> Result<Vec<crate::models::AttendanceLog>, String> {
     get_attendance(&state, member_id, limit.unwrap_or(20)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn fetch_payments(state: State<'_, AppState>, member_id: i64) -> Result<Vec<Payment>, String> {
+    get_payments(&state, member_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn fetch_pause_logs(state: State<'_, AppState>, member_id: i64) -> Result<Vec<PauseLog>, String> {
+    get_pause_logs(&state, member_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn pause_membership_command(
+    state: State<'_, AppState>,
+    membership_id: i64,
+    reason: Option<String>,
+) -> Result<MemberListItem, String> {
+    pause_membership(&state, membership_id, reason).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn resume_membership_command(
+    state: State<'_, AppState>,
+    membership_id: i64,
+) -> Result<MemberListItem, String> {
+    resume_membership(&state, membership_id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -129,7 +157,7 @@ pub fn fetch_expiring_members(
     state: State<'_, AppState>,
     center: String,
     days: Option<i64>,
-) -> Result<Vec<Member>, String> {
+) -> Result<Vec<MemberListItem>, String> {
     get_expiring_members(&state, &center, days.unwrap_or(7)).map_err(|e| e.to_string())
 }
 

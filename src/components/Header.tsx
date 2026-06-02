@@ -150,7 +150,7 @@ export function Header({
           icon={<AlertTriangle size={18} />}
           label="7일 내 만료"
           value={stats?.expiring_soon ?? 0}
-          hint="만료 예정 회원"
+          hint={`정지 ${stats?.paused_members ?? 0} · 체험 ${stats?.trial_members ?? 0}`}
           accent="warning"
         />
         <StatCard

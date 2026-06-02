@@ -1,16 +1,19 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
-  AttendanceRecord,
+  AttendanceLog,
   BackupInfo,
   BackupResult,
   Center,
   DashboardStats,
-  Member,
+  MemberDetail,
   MemberGroupFilter,
   MemberInput,
+  MemberListItem,
   MemberStatusFilter,
   MutationResult,
   PaginatedMembers,
+  PauseLog,
+  Payment,
   StorageInfo,
 } from "../types";
 import { formatAppError } from "../utils/errors";
@@ -45,15 +48,15 @@ export const api = {
     });
   },
 
-  getMember(id: number): Promise<Member> {
+  getMemberDetail(id: number): Promise<MemberDetail> {
     return invokeCommand("get_member_by_id", { id });
   },
 
-  addMember(input: MemberInput): Promise<MutationResult<Member>> {
+  addMember(input: MemberInput): Promise<MutationResult<MemberListItem>> {
     return invokeCommand("add_member", { input });
   },
 
-  editMember(id: number, input: MemberInput): Promise<MutationResult<Member>> {
+  editMember(id: number, input: MemberInput): Promise<MutationResult<MemberListItem>> {
     return invokeCommand("edit_member", { id, input });
   },
 
@@ -61,19 +64,38 @@ export const api = {
     return invokeCommand("remove_member", { id });
   },
 
-  recordAttendance(memberId: number): Promise<MutationResult<Member>> {
+  recordAttendance(memberId: number): Promise<MutationResult<MemberListItem>> {
     return invokeCommand("record_attendance", { member_id: memberId });
   },
 
-  fetchAttendance(memberId: number, limit = 20): Promise<AttendanceRecord[]> {
+  fetchAttendance(memberId: number, limit = 20): Promise<AttendanceLog[]> {
     return invokeCommand("fetch_attendance", { member_id: memberId, limit });
+  },
+
+  fetchPayments(memberId: number): Promise<Payment[]> {
+    return invokeCommand("fetch_payments", { member_id: memberId });
+  },
+
+  fetchPauseLogs(memberId: number): Promise<PauseLog[]> {
+    return invokeCommand("fetch_pause_logs", { member_id: memberId });
+  },
+
+  pauseMembership(membershipId: number, reason?: string): Promise<MemberListItem> {
+    return invokeCommand("pause_membership_command", {
+      membership_id: membershipId,
+      reason: reason ?? null,
+    });
+  },
+
+  resumeMembership(membershipId: number): Promise<MemberListItem> {
+    return invokeCommand("resume_membership_command", { membership_id: membershipId });
   },
 
   fetchDashboardStats(center: Center): Promise<DashboardStats> {
     return invokeCommand("fetch_dashboard_stats", { center });
   },
 
-  fetchExpiringMembers(center: Center, days = 7): Promise<Member[]> {
+  fetchExpiringMembers(center: Center, days = 7): Promise<MemberListItem[]> {
     return invokeCommand("fetch_expiring_members", { center, days });
   },
 

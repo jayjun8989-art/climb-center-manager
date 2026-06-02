@@ -1,4 +1,4 @@
-use crate::db::{export_all_data, restore_all_data, AppState, DbError};
+use crate::db::{export_all_data, AppState, DbError};
 use chrono::Local;
 use std::fs;
 use std::io::Write;
@@ -65,21 +65,7 @@ pub fn restore_backup(state: &AppState, path: &Path) -> Result<(), DbError> {
     let data: serde_json::Value = serde_json::from_str(&json)
         .map_err(|e| DbError::Message(format!("백업 JSON 형식이 올바르지 않습니다: {e}")))?;
 
-    let members: Vec<crate::models::Member> = serde_json::from_value(
-        data.get("members")
-            .cloned()
-            .ok_or_else(|| DbError::Message("백업 파일에 members 데이터가 없습니다.".into()))?,
-    )
-    .map_err(|e| DbError::Message(format!("회원 데이터 복원 준비 실패: {e}")))?;
-
-    let attendance: Vec<crate::models::AttendanceRecord> = serde_json::from_value(
-        data.get("attendance")
-            .cloned()
-            .ok_or_else(|| DbError::Message("백업 파일에 attendance 데이터가 없습니다.".into()))?,
-    )
-    .map_err(|e| DbError::Message(format!("출석 데이터 복원 준비 실패: {e}")))?;
-
-    restore_all_data(state, members, attendance)?;
+    crate::db::restore_all_data(state, data).map_err(|e| DbError::Message(e.to_string()))?;
     create_backup(state).ok();
     Ok(())
 }
