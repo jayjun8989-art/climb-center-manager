@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Center } from "../types";
 import { isSupabaseConfigured } from "../lib/supabase/config";
-import { checkOnline, getSyncStatus, runSync } from "../sync/engine";
+import { checkOnline, getSyncStatus, pushSyncQueue } from "../sync/engine";
 import type { SyncPhase, SyncRunResult, SyncStatus } from "../sync/types";
 
 const SYNC_INTERVAL_MS = 60_000;
 
-export function useSync(center: Center, enabled: boolean) {
+export function useSync(enabled: boolean) {
   const [configured] = useState(isSupabaseConfigured());
   const [online, setOnline] = useState(false);
   const [status, setStatus] = useState<SyncStatus | null>(null);
@@ -23,33 +22,48 @@ export function useSync(center: Center, enabled: boolean) {
   }, []);
 
   const syncNow = useCallback(async () => {
-    if (!configured || !enabled || runningRef.current) return null;
+    if (!configured || runningRef.current) return null;
+    if (!enabled) {
+      return {
+        pushed: 0,
+        failed: 0,
+        skipped: 0,
+        errors: [],
+        message: "Supabase ???? ?????.",
+      } satisfies SyncRunResult;
+    }
+
     runningRef.current = true;
     setPhase("pushing");
     try {
-      const result = await runSync(center);
+      const result = await pushSyncQueue();
       setLastResult(result);
-      if (result.failed > 0) {
-        setPhase("error");
-      } else {
-        setPhase("idle");
-      }
+      setPhase(result.failed > 0 ? "error" : "idle");
       await refreshStatus();
       return result;
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const result: SyncRunResult = {
+        pushed: 0,
+        failed: 1,
+        skipped: 0,
+        errors: [message],
+        message,
+      };
+      setLastResult(result);
       setPhase("error");
-      return null;
+      return result;
     } finally {
       runningRef.current = false;
     }
-  }, [center, configured, enabled, refreshStatus]);
+  }, [configured, enabled, refreshStatus]);
 
   useEffect(() => {
     refreshStatus().catch(() => undefined);
     const timer = window.setInterval(() => {
       refreshStatus()
-        .then(({ nextOnline }) => {
-          if (nextOnline && enabled) {
+        .then(({ nextOnline, nextStatus }) => {
+          if (nextOnline && enabled && (nextStatus.pending_count ?? 0) > 0) {
             syncNow().catch(() => undefined);
           }
         })

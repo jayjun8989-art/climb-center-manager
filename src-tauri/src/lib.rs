@@ -83,6 +83,7 @@ pub fn run() {
             commands::fail_sync_queue_item,
             commands::update_sync_state,
             commands::map_remote_id,
+            commands::complete_member_sync_push,
             commands::fetch_remote_id,
             commands::enqueue_sync,
         ])

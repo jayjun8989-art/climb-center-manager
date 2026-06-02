@@ -34,4 +34,6 @@ export default defineConfig(async () => ({
     },
   },
   envPrefix: ["VITE_", "TAURI_"],
+  // Supabase secrets: only VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY (anon key).
+  // Never expose service_role via VITE_* — it would ship inside the desktop bundle.
 }));

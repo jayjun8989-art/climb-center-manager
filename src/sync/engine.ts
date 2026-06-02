@@ -1,23 +1,22 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { Center } from "../types";
+import type { Center, MemberInput } from "../types";
 import { getSession } from "../lib/supabase/auth";
 import { getSupabaseClient } from "../lib/supabase/client";
 import { isSupabaseConfigured } from "../lib/supabase/config";
 import { centerIdForCode } from "../lib/supabase/centers";
+import { formatSyncError } from "./errors";
 import type { SyncQueueItem, SyncRunResult, SyncStatus } from "./types";
 
 const DEVICE_ID_KEY = "device_id";
+
+type MemberSyncPayload = MemberInput & { center: Center };
 
 async function fetchLocalSyncStatus(): Promise<SyncStatus> {
   return invoke<SyncStatus>("fetch_sync_status");
 }
 
-async function fetchLocalQueue(limit = 50): Promise<SyncQueueItem[]> {
+async function fetchLocalQueue(limit = 100): Promise<SyncQueueItem[]> {
   return invoke<SyncQueueItem[]>("fetch_sync_queue", { limit });
-}
-
-async function completeQueueItem(id: number) {
-  return invoke("complete_sync_queue_item", { id });
 }
 
 async function failQueueItem(id: number, error: string) {
@@ -26,14 +25,6 @@ async function failQueueItem(id: number, error: string) {
 
 async function updateSyncState(key: string, value: string) {
   return invoke("update_sync_state", { key, value });
-}
-
-async function mapRemoteId(entityType: string, localId: number, remoteId: string) {
-  return invoke("map_remote_id", {
-    entity_type: entityType,
-    local_id: localId,
-    remote_id: remoteId,
-  });
 }
 
 async function fetchRemoteId(entityType: string, localId: number): Promise<string | null> {
@@ -47,8 +38,42 @@ async function fetchRemoteId(entityType: string, localId: number): Promise<strin
   }
 }
 
+async function completeMemberPush(
+  queueId: number,
+  localMemberId: number,
+  remoteId: string,
+  remoteUpdatedAt?: string | null,
+) {
+  return invoke("complete_member_sync_push", {
+    queue_id: queueId,
+    local_member_id: localMemberId,
+    remote_id: remoteId,
+    remote_updated_at: remoteUpdatedAt ?? null,
+  });
+}
+
 function nowIso() {
   return new Date().toISOString();
+}
+
+function parseMemberPayload(payloadJson: string): MemberSyncPayload {
+  const payload = JSON.parse(payloadJson) as MemberSyncPayload;
+  if (!payload.center || !payload.name?.trim()) {
+    throw new Error("??? payload? ?? ?? ?? ??? ????.");
+  }
+  return payload;
+}
+
+function memberRowFromPayload(payload: MemberSyncPayload, centerId: string) {
+  return {
+    center_id: centerId,
+    name: payload.name.trim(),
+    phone: payload.phone?.trim() || null,
+    member_type: payload.member_type ?? "general",
+    parent_name: payload.parent_name ?? null,
+    parent_phone: payload.parent_phone ?? null,
+    memo: payload.notes ?? null,
+  };
 }
 
 async function ensureDeviceId(status: SyncStatus): Promise<string> {
@@ -70,124 +95,161 @@ export async function checkOnline(): Promise<boolean> {
   }
 }
 
-export async function runSync(center: Center): Promise<SyncRunResult> {
+async function pushMemberQueueItem(
+  item: SyncQueueItem,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return { ok: false, error: "Supabase ?????? ????? ?????." };
+  }
+
+  const payload = parseMemberPayload(item.payload_json);
+  const centerId = centerIdForCode(payload.center);
+  const row = memberRowFromPayload(payload, centerId);
+
+  try {
+    if (item.operation === "insert") {
+      const { data, error } = await supabase
+        .from("members")
+        .insert(row)
+        .select("id, updated_at")
+        .single();
+      if (error) throw error;
+      await completeMemberPush(item.id, item.entity_local_id, data.id, data.updated_at);
+      return { ok: true };
+    }
+
+    if (item.operation === "update") {
+      let remoteId = await fetchRemoteId("member", item.entity_local_id);
+
+      if (!remoteId) {
+        const { data, error } = await supabase
+          .from("members")
+          .insert(row)
+          .select("id, updated_at")
+          .single();
+        if (error) throw error;
+        remoteId = data.id;
+        await completeMemberPush(item.id, item.entity_local_id, data.id, data.updated_at);
+        return { ok: true };
+      }
+
+      const { data, error } = await supabase
+        .from("members")
+        .update(row)
+        .eq("id", remoteId)
+        .select("id, updated_at")
+        .single();
+      if (error) throw error;
+      await completeMemberPush(item.id, item.entity_local_id, data.id, data.updated_at);
+      return { ok: true };
+    }
+
+    if (item.operation === "soft_delete") {
+      const remoteId = await fetchRemoteId("member", item.entity_local_id);
+      if (!remoteId) {
+        return { ok: false, error: "??? ?? ?? ID ??? ????." };
+      }
+
+      const deletedAt = nowIso();
+      const { data, error } = await supabase
+        .from("members")
+        .update({ deleted_at: deletedAt, status: "inactive" })
+        .eq("id", remoteId)
+        .select("id, updated_at")
+        .single();
+      if (error) throw error;
+      await completeMemberPush(item.id, item.entity_local_id, data.id, data.updated_at);
+      return { ok: true };
+    }
+
+    return { ok: false, error: `???? ?? ??? ?????: ${item.operation}` };
+  } catch (error) {
+    return { ok: false, error: formatSyncError(error) };
+  }
+}
+
+/** Push local sync_queue to Supabase (members only — no pull merge). */
+export async function pushSyncQueue(): Promise<SyncRunResult> {
   if (!isSupabaseConfigured()) {
-    return { pulled: 0, pushed: 0, failed: 0, message: "Supabase ???" };
+    return {
+      pushed: 0,
+      failed: 0,
+      skipped: 0,
+      errors: [],
+      message: "Supabase? ???? ?????. .env ??? ?????.",
+    };
   }
 
   const session = await getSession();
   if (!session) {
-    return { pulled: 0, pushed: 0, failed: 0, message: "??? ??" };
+    return {
+      pushed: 0,
+      failed: 0,
+      skipped: 0,
+      errors: [],
+      message: "Supabase ???? ?????.",
+    };
   }
 
   const supabase = getSupabaseClient();
   if (!supabase) {
-    return { pulled: 0, pushed: 0, failed: 0, message: "Supabase ????? ??" };
+    return {
+      pushed: 0,
+      failed: 0,
+      skipped: 0,
+      errors: [],
+      message: "Supabase ?????? ????? ?????.",
+    };
   }
 
   const status = await fetchLocalSyncStatus();
   await ensureDeviceId(status);
-  const centerId = centerIdForCode(center);
-
-  let pulled = 0;
-  let pushed = 0;
-  let failed = 0;
-
-  const since = status.last_pull_at ?? "1970-01-01T00:00:00.000Z";
-  const { data: remoteMembers, error: pullError } = await supabase
-    .from("members")
-    .select("id, name, phone, member_type, memo, status, updated_at, center_id")
-    .eq("center_id", centerId)
-    .gt("updated_at", since)
-    .is("deleted_at", null)
-    .order("updated_at", { ascending: true })
-    .limit(200);
-
-  if (pullError) {
-    return { pulled, pushed, failed: 1, message: pullError.message };
-  }
-
-  pulled = remoteMembers?.length ?? 0;
-  await updateSyncState("last_pull_at", nowIso());
 
   const queue = await fetchLocalQueue(100);
+  let pushed = 0;
+  let failed = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+
   for (const item of queue) {
-    try {
-      if (item.entity_type === "attendance") {
-        const payload = JSON.parse(item.payload_json) as { member_id: number };
-        const remoteId = await fetchRemoteId("member", payload.member_id);
-
-        if (!remoteId) {
-          await failQueueItem(item.id, "?? ?? ID ?? ??");
-          failed += 1;
-          continue;
-        }
-
-        const { error } = await supabase.rpc("rpc_record_attendance", {
-          p_member_id: remoteId,
-        });
-        if (error) throw error;
-      } else if (item.entity_type === "member") {
-        const payload = JSON.parse(item.payload_json) as Record<string, unknown>;
-        const base = {
-          center_id: centerId,
-          name: payload.name,
-          phone: payload.phone ?? null,
-          member_type: payload.member_type ?? "general",
-          parent_name: payload.parent_name ?? null,
-          parent_phone: payload.parent_phone ?? null,
-          memo: payload.notes ?? null,
-        };
-
-        if (item.operation === "insert") {
-          const { data, error } = await supabase
-            .from("members")
-            .insert(base)
-            .select("id")
-            .single();
-          if (error) throw error;
-          await mapRemoteId("member", item.entity_local_id, data.id);
-        } else if (item.operation === "update") {
-          const remoteId = await fetchRemoteId("member", item.entity_local_id);
-
-          if (!remoteId) {
-            const { data, error } = await supabase
-              .from("members")
-              .insert(base)
-              .select("id")
-              .single();
-            if (error) throw error;
-            await mapRemoteId("member", item.entity_local_id, data.id);
-          } else {
-            const { error } = await supabase.from("members").update(base).eq("id", remoteId);
-            if (error) throw error;
-          }
-        } else if (item.operation === "soft_delete") {
-          const remoteId = await fetchRemoteId("member", item.entity_local_id);
-          if (remoteId) {
-            const { error } = await supabase
-              .from("members")
-              .update({ deleted_at: nowIso(), status: "inactive" })
-              .eq("id", remoteId);
-            if (error) throw error;
-          }
-        }
-      }
-
-      await completeQueueItem(item.id);
-      pushed += 1;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      await failQueueItem(item.id, message);
-      failed += 1;
+    if (item.entity_type !== "member") {
+      skipped += 1;
+      continue;
     }
+
+    const result = await pushMemberQueueItem(item);
+    if (result.ok) {
+      pushed += 1;
+      continue;
+    }
+
+    await failQueueItem(item.id, result.error);
+    failed += 1;
+    errors.push(`?? #${item.entity_local_id}: ${result.error}`);
   }
 
   if (pushed > 0) {
     await updateSyncState("last_push_at", nowIso());
   }
 
-  return { pulled, pushed, failed };
+  let message: string | undefined;
+  if (pushed > 0 && failed === 0) {
+    message = `??? ??: ${pushed}? ???`;
+  } else if (failed > 0) {
+    message = errors[0] ?? `??? ?? ${failed}?`;
+  } else if (queue.length === 0) {
+    message = "???? ?? ??? ????.";
+  } else if (skipped > 0 && pushed === 0 && failed === 0) {
+    message = "?? ??? ?? ??? ????. (?? ?? ?? push ???)";
+  }
+
+  return { pushed, failed, skipped, errors, message };
+}
+
+/** @deprecated Use pushSyncQueue — pull merge is not implemented yet. */
+export async function runSync(_center?: Center): Promise<SyncRunResult> {
+  return pushSyncQueue();
 }
 
 export async function getSyncStatus(): Promise<SyncStatus> {

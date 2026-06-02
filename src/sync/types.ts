@@ -19,8 +19,9 @@ export interface SyncStatus {
 export type SyncPhase = "idle" | "pulling" | "pushing" | "error";
 
 export interface SyncRunResult {
-  pulled: number;
   pushed: number;
   failed: number;
+  skipped: number;
+  errors: string[];
   message?: string;
 }

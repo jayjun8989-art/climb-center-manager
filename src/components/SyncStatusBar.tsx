@@ -30,7 +30,7 @@ export function SyncStatusBar({
     );
   }
 
-  const busy = phase === "pulling" || phase === "pushing";
+  const busy = phase === "pushing";
   const pending = status?.pending_count ?? 0;
 
   return (
@@ -43,7 +43,7 @@ export function SyncStatusBar({
             <CloudOff size={16} className="text-amber-500" />
           )}
           <span className="font-semibold">
-            {online ? "???" : "????"} · ?? ??
+            {online ? "???" : "????"} · ?? ?? · push?
           </span>
           <span className="text-xs text-[var(--muted)]">
             ?? {pending}?
@@ -59,7 +59,7 @@ export function SyncStatusBar({
           )}
           <button
             className="btn btn-secondary text-xs"
-            disabled={!online || !authenticated || busy}
+            disabled={!online || !authenticated || busy || pending === 0}
             onClick={onSync}
           >
             {busy ? <LoaderCircle size={14} className="animate-spin" /> : <RefreshCw size={14} />}
@@ -69,12 +69,21 @@ export function SyncStatusBar({
       </div>
 
       {lastResult?.message && (
-        <p className="mt-2 text-xs text-amber-600">{lastResult.message}</p>
-      )}
-      {phase === "error" && lastResult && lastResult.failed > 0 && (
-        <p className="mt-2 text-xs text-red-500">
-          ??? ?? {lastResult.failed}? · ?? ???? ?????.
+        <p
+          className={`mt-2 text-xs ${
+            lastResult.failed > 0 ? "text-red-500" : "text-emerald-600"
+          }`}
+        >
+          {lastResult.message}
         </p>
+      )}
+
+      {lastResult && lastResult.errors.length > 1 && (
+        <ul className="mt-2 list-inside list-disc text-xs text-red-500">
+          {lastResult.errors.slice(1, 4).map((error) => (
+            <li key={error}>{error}</li>
+          ))}
+        </ul>
       )}
     </div>
   );

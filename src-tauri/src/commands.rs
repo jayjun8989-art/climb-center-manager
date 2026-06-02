@@ -1,10 +1,10 @@
 use crate::backup::{create_backup, get_backup_info, restore_backup};
 use crate::db::{
-    check_attendance, create_member, delete_member, enqueue_sync_item, get_attendance,
-    get_dashboard_stats, get_expiring_members, get_member_detail, get_pause_logs, get_payments,
-    get_remote_id, list_members, list_sync_queue, mark_sync_queue_error, pause_membership,
-    remove_sync_queue_item, resume_membership, set_sync_state, update_member, upsert_id_map,
-    AppState, SyncQueueItem, SyncStatus,
+    check_attendance, complete_member_push, create_member, delete_member, enqueue_sync_item,
+    get_attendance, get_dashboard_stats, get_expiring_members, get_member_detail, get_pause_logs,
+    get_payments, get_remote_id, list_members, list_sync_queue, mark_sync_queue_error,
+    pause_membership, remove_sync_queue_item, resume_membership, set_sync_state, update_member,
+    upsert_id_map, AppState, SyncQueueItem, SyncStatus,
 };
 use crate::models::{
     BackupInfo, BackupResult, DashboardStats, MemberDetail, MemberInput, MemberListItem,
@@ -245,6 +245,24 @@ pub fn map_remote_id(
     remote_id: String,
 ) -> Result<(), String> {
     upsert_id_map(&state, &entity_type, local_id, &remote_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn complete_member_sync_push(
+    state: State<'_, AppState>,
+    queue_id: i64,
+    local_member_id: i64,
+    remote_id: String,
+    remote_updated_at: Option<String>,
+) -> Result<(), String> {
+    complete_member_push(
+        &state,
+        queue_id,
+        local_member_id,
+        &remote_id,
+        remote_updated_at.as_deref(),
+    )
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

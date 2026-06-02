@@ -71,12 +71,12 @@ begin
   returning * into v_membership;
 
   insert into public.pause_logs (
-    membership_id, member_id, center_id, pause_start, reason, created_by
+    member_id, membership_id, center_id, pause_start_date, reason, created_by
   ) values (
-    v_membership.id,
     v_membership.member_id,
+    v_membership.id,
     v_membership.center_id,
-    now(),
+    current_date,
     p_reason,
     auth.uid()
   );
@@ -117,13 +117,13 @@ begin
 
   select * into v_pause
   from public.pause_logs
-  where membership_id = p_membership_id and pause_end is null
-  order by pause_start desc
+  where membership_id = p_membership_id and pause_end_date is null
+  order by pause_start_date desc
   limit 1;
 
   if found then
     update public.pause_logs
-    set pause_end = now(), updated_at = now()
+    set pause_end_date = current_date, updated_at = now()
     where id = v_pause.id;
   end if;
 

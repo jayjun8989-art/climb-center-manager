@@ -205,12 +205,86 @@ pub fn remove_sync_queue_item(state: &AppState, id: i64) -> Result<(), DbError> 
     })
 }
 
+pub fn get_remote_id(
+    state: &AppState,
+    entity_type: &str,
+    local_id: i64,
+) -> Result<Option<String>, DbError> {
+    state.with_conn(|conn| {
+        if entity_type == "member" {
+            if let Some(remote_id) = conn
+                .query_row(
+                    "SELECT remote_id FROM members WHERE id = ?1 AND remote_id IS NOT NULL",
+                    [local_id],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()?
+            {
+                return Ok(Some(remote_id));
+            }
+        }
+
+        conn.query_row(
+            "SELECT remote_id FROM id_map WHERE entity_type = ?1 AND local_id = ?2",
+            rusqlite::params![entity_type, local_id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(DbError::from)
+    })
+}
+
+pub fn complete_member_push(
+    state: &AppState,
+    queue_id: i64,
+    local_member_id: i64,
+    remote_id: &str,
+    remote_updated_at: Option<&str>,
+) -> Result<(), DbError> {
+    state.with_conn(|conn| {
+        let now = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        let updated_at = remote_updated_at.unwrap_or(&now);
+        let tx = conn.transaction()?;
+
+        tx.execute(
+            "UPDATE members
+             SET remote_id = ?1, sync_status = 'synced', remote_updated_at = ?2, updated_at = updated_at
+             WHERE id = ?3",
+            rusqlite::params![remote_id, updated_at, local_member_id],
+        )?;
+
+        tx.execute(
+            "INSERT INTO id_map (entity_type, local_id, remote_id) VALUES ('member', ?1, ?2)
+             ON CONFLICT(entity_type, local_id) DO UPDATE SET remote_id = excluded.remote_id",
+            rusqlite::params![local_member_id, remote_id],
+        )?;
+
+        tx.execute("DELETE FROM sync_queue WHERE id = ?1", [queue_id])?;
+        tx.commit()?;
+        Ok(())
+    })
+}
+
 pub fn mark_sync_queue_error(state: &AppState, id: i64, error: &str) -> Result<(), DbError> {
     state.with_conn(|conn| {
+        let (entity_type, entity_local_id): (String, i64) = conn.query_row(
+            "SELECT entity_type, entity_local_id FROM sync_queue WHERE id = ?1",
+            [id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+
         conn.execute(
             "UPDATE sync_queue SET retry_count = retry_count + 1, last_error = ?1 WHERE id = ?2",
             rusqlite::params![error, id],
         )?;
+
+        if entity_type == "member" {
+            conn.execute(
+                "UPDATE members SET sync_status = 'error' WHERE id = ?1",
+                [entity_local_id],
+            )?;
+        }
+
         Ok(())
     })
 }
@@ -239,21 +313,5 @@ pub fn upsert_id_map(
             rusqlite::params![entity_type, local_id, remote_id],
         )?;
         Ok(())
-    })
-}
-
-pub fn get_remote_id(
-    state: &AppState,
-    entity_type: &str,
-    local_id: i64,
-) -> Result<Option<String>, DbError> {
-    state.with_conn(|conn| {
-        conn.query_row(
-            "SELECT remote_id FROM id_map WHERE entity_type = ?1 AND local_id = ?2",
-            rusqlite::params![entity_type, local_id],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(DbError::from)
     })
 }

@@ -59,7 +59,7 @@ export default function App() {
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
   const [startupError, setStartupError] = useState("");
 
-  const sync = useSync(center, auth.isAuthenticated);
+  const sync = useSync(auth.isAuthenticated);
 
   const refreshStorageInfo = useCallback(async () => {
     const info = await api.fetchStorageInfo();
@@ -154,7 +154,12 @@ export default function App() {
         showMutationToast(setToast, "새 회원이 등록되었습니다.", result);
       }
       await Promise.all([refreshMembers(), refreshDashboard(), refreshBackupInfo(), refreshStorageInfo()]);
-      sync.syncNow().catch(() => undefined);
+      const syncResult = await sync.syncNow();
+      if (syncResult && syncResult.pushed > 0) {
+        setToast(`저장 완료 · Supabase 업로드 ${syncResult.pushed}건`);
+      } else if (syncResult && syncResult.failed > 0 && syncResult.message) {
+        setToast(`저장 완료 · ${syncResult.message}`);
+      }
     } catch (error) {
       setToast(String(error));
       throw error;
@@ -291,7 +296,12 @@ export default function App() {
           phase={sync.phase}
           lastResult={sync.lastResult}
           onSync={() => {
-            sync.syncNow().catch((error) => setToast(String(error)));
+            sync
+              .syncNow()
+              .then((result) => {
+                if (result?.message) setToast(result.message);
+              })
+              .catch((error) => setToast(String(error)));
           }}
           onLogin={() => setLoginOpen(true)}
         />
@@ -362,7 +372,8 @@ export default function App() {
         onSubmit={async (email, password) => {
           await auth.login(email, password);
           setToast("Supabase 로그인 완료");
-          await sync.syncNow();
+          const result = await sync.syncNow();
+          if (result?.message) setToast(result.message);
         }}
       />
 
