@@ -138,6 +138,11 @@ pub fn create_v2_schema(conn: &Connection) -> SqlResult<()> {
 }
 
 pub fn migrate_to_v2(conn: &Connection) -> SqlResult<()> {
+    let version = current_schema_version(conn)?;
+    if version >= 2 {
+        return Ok(());
+    }
+
     let members_schema: String = conn
         .query_row(
             "SELECT IFNULL(sql, '') FROM sqlite_master WHERE type='table' AND name='members'",

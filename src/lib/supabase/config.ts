@@ -11,16 +11,18 @@ function decodeJwtRole(token: string): string | null {
   }
 }
 
-/** Reject service_role keys and other non-anon JWT roles in client config. */
+/** Reject server keys; allow anon JWT or Supabase publishable keys. */
 export function isClientSafeSupabaseKey(key: string): boolean {
   const trimmed = key.trim();
   if (!trimmed || trimmed === "your-anon-key") return false;
   if (/service[_-]?role/i.test(trimmed)) return false;
+  if (trimmed.startsWith("sb_secret_")) return false;
+  if (trimmed.startsWith("sb_publishable_")) return true;
 
   const role = decodeJwtRole(trimmed);
   if (role && role !== "anon") return false;
 
-  return true;
+  return trimmed.startsWith("eyJ");
 }
 
 export function isSupabaseConfigured(): boolean {
@@ -40,7 +42,7 @@ export function getSupabaseConfig() {
 
   if (anonKey && !isClientSafeSupabaseKey(anonKey)) {
     throw new Error(
-      "Supabase ?? ?????? ??? ? ????. anon public key? .env? ????. service_role? ?? ???? ???.",
+      "Supabase 키가 클라이언트에 사용할 수 없습니다. publishable/anon key만 .env에 넣으세요.",
     );
   }
 
