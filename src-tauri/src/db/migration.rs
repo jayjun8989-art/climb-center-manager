@@ -155,6 +155,12 @@ pub fn migrate_to_v2(conn: &Connection) -> SqlResult<()> {
     Ok(())
 }
 
+pub fn migrate_all(conn: &Connection) -> SqlResult<()> {
+    migrate_to_v2(conn)?;
+    crate::db::sync_local::migrate_to_v3(conn)?;
+    Ok(())
+}
+
 fn migrate_legacy_flat_schema(conn: &Connection) -> SqlResult<()> {
     conn.execute_batch(
         "

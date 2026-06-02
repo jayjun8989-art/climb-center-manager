@@ -122,4 +122,12 @@ export const api = {
   openDataFolder(): Promise<void> {
     return invokeCommand("open_data_folder");
   },
+
+  fetchSyncStatus(): Promise<import("../types").SyncStatus> {
+    return invokeCommand("fetch_sync_status");
+  },
+
+  fetchSyncQueue(limit = 50): Promise<import("../types").SyncQueueItem[]> {
+    return invokeCommand("fetch_sync_queue", { limit });
+  },
 };

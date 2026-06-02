@@ -77,6 +77,14 @@ pub fn run() {
             commands::restore_backup_file,
             commands::open_backup_folder,
             commands::open_data_folder,
+            commands::fetch_sync_status,
+            commands::fetch_sync_queue,
+            commands::complete_sync_queue_item,
+            commands::fail_sync_queue_item,
+            commands::update_sync_state,
+            commands::map_remote_id,
+            commands::fetch_remote_id,
+            commands::enqueue_sync,
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|error| {

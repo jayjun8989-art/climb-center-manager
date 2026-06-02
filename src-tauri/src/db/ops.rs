@@ -54,7 +54,7 @@ impl AppState {
         )?;
 
         ensure_legacy_phone_normalized(&conn)?;
-        migration::migrate_to_v2(&conn).map_err(DbError::from)?;
+        migration::migrate_all(&conn).map_err(DbError::from)?;
         refresh_all_statuses(&conn)?;
         verify_db_integrity(&conn)?;
 
@@ -631,6 +631,8 @@ pub fn create_member(state: &AppState, input: MemberInput) -> Result<MemberListI
         Ok(member_id)
     })?;
 
+    let _ = super::sync_local::enqueue_entity_op(state, "member", member_id, "insert", &input);
+
     refresh_member_status(state, member_id)?;
     list_members(state, &input.center, "", "all", "all", 1, 1)?
         .0
@@ -722,6 +724,8 @@ pub fn update_member(state: &AppState, id: i64, input: MemberInput) -> Result<Me
         Ok(())
     })?;
 
+    let _ = super::sync_local::enqueue_entity_op(state, "member", id, "update", &input);
+
     refresh_member_status(state, id)?;
     list_members(state, &input.center, "", "all", "all", 1, 500)?
         .0
@@ -741,7 +745,11 @@ pub fn delete_member(state: &AppState, id: i64) -> Result<(), DbError> {
             return Err(DbError::Message("??? ?? ? ????.".into()));
         }
         Ok(())
-    })
+    })?;
+
+    let payload = serde_json::json!({ "local_id": id });
+    let _ = super::sync_local::enqueue_entity_op(state, "member", id, "soft_delete", &payload);
+    Ok(())
 }
 
 pub fn check_attendance(state: &AppState, member_id: i64) -> Result<MemberListItem, DbError> {
@@ -807,6 +815,15 @@ pub fn check_attendance(state: &AppState, member_id: i64) -> Result<MemberListIt
         tx.commit()?;
         Ok(())
     })?;
+
+    let attendance_payload = serde_json::json!({ "member_id": member_id });
+    let _ = super::sync_local::enqueue_entity_op(
+        state,
+        "attendance",
+        member_id,
+        "insert",
+        &attendance_payload,
+    );
 
     refresh_member_status(state, member_id)?;
     list_members(state, &member.center, "", "all", "all", 1, 500)?

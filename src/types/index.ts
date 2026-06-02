@@ -184,6 +184,24 @@ export interface BackupResult {
   created_at: string;
 }
 
+export interface SyncQueueItem {
+  id: number;
+  entity_type: string;
+  entity_local_id: number;
+  operation: string;
+  payload_json: string;
+  created_at: string;
+  retry_count: number;
+  last_error: string | null;
+}
+
+export interface SyncStatus {
+  pending_count: number;
+  last_pull_at: string | null;
+  last_push_at: string | null;
+  device_id: string | null;
+}
+
 export type MemberStatus = "active" | "expiring" | "expired" | "depleted" | "paused";
 
 export type MembershipCategory = "monthly" | "session" | "junior";

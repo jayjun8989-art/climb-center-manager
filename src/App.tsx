@@ -3,10 +3,14 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { api } from "./api/client";
 import { ExpiringPanel } from "./components/ExpiringPanel";
 import { Header } from "./components/Header";
+import { LoginPanel } from "./components/LoginPanel";
 import { MemberDetailPanel } from "./components/MemberDetailPanel";
 import { MemberFormModal } from "./components/MemberFormModal";
 import { MemberList } from "./components/MemberList";
 import { PaginationBar } from "./components/PaginationBar";
+import { SyncStatusBar } from "./components/SyncStatusBar";
+import { useSupabaseAuth } from "./hooks/useSupabaseAuth";
+import { useSync } from "./hooks/useSync";
 import { useTheme } from "./hooks/useTheme";
 import type { Center, DashboardStats, MemberGroupFilter, MemberInput, MemberListItem, MemberStatusFilter, BackupInfo, StorageInfo } from "./types";
 
@@ -33,6 +37,8 @@ function useDebouncedValue<T>(value: T, delay = 300) {
 
 export default function App() {
   const { dark, toggleTheme } = useTheme();
+  const auth = useSupabaseAuth();
+  const [loginOpen, setLoginOpen] = useState(false);
   const [center, setCenter] = useState<Center>("ONCLE");
   const [memberGroup, setMemberGroup] = useState<MemberGroupFilter>("all");
   const [statusFilter, setStatusFilter] = useState<MemberStatusFilter>("all");
@@ -52,6 +58,8 @@ export default function App() {
   const [backupInfo, setBackupInfo] = useState<BackupInfo | null>(null);
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
   const [startupError, setStartupError] = useState("");
+
+  const sync = useSync(center, auth.isAuthenticated);
 
   const refreshStorageInfo = useCallback(async () => {
     const info = await api.fetchStorageInfo();
@@ -146,6 +154,7 @@ export default function App() {
         showMutationToast(setToast, "새 회원이 등록되었습니다.", result);
       }
       await Promise.all([refreshMembers(), refreshDashboard(), refreshBackupInfo(), refreshStorageInfo()]);
+      sync.syncNow().catch(() => undefined);
     } catch (error) {
       setToast(String(error));
       throw error;
@@ -160,6 +169,7 @@ export default function App() {
       if (selectedMember?.id === member.id) setSelectedMember(null);
       showMutationToast(setToast, "회원이 삭제되었습니다.", result);
       await Promise.all([refreshMembers(), refreshDashboard(), refreshBackupInfo()]);
+      sync.syncNow().catch(() => undefined);
     } catch (error) {
       setToast(String(error));
     }
@@ -173,6 +183,7 @@ export default function App() {
         setToast(result.backup_warning);
       }
       await Promise.all([refreshMembers(), refreshDashboard(), refreshBackupInfo()]);
+      sync.syncNow().catch(() => undefined);
       return result.data;
     } catch (error) {
       setToast(String(error));
@@ -272,6 +283,19 @@ export default function App() {
           storageInfo={storageInfo}
         />
 
+        <SyncStatusBar
+          configured={sync.configured}
+          online={sync.online}
+          authenticated={auth.isAuthenticated}
+          status={sync.status}
+          phase={sync.phase}
+          lastResult={sync.lastResult}
+          onSync={() => {
+            sync.syncNow().catch((error) => setToast(String(error)));
+          }}
+          onLogin={() => setLoginOpen(true)}
+        />
+
         {membershipSummary && (
           <p className="px-1 text-sm text-[var(--muted)]">회원권 구성 · {membershipSummary}</p>
         )}
@@ -329,6 +353,17 @@ export default function App() {
         member={editingMember}
         onClose={() => setModalOpen(false)}
         onSubmit={handleSaveMember}
+      />
+
+      <LoginPanel
+        open={loginOpen}
+        onClose={() => setLoginOpen(false)}
+        loading={auth.loading}
+        onSubmit={async (email, password) => {
+          await auth.login(email, password);
+          setToast("Supabase 로그인 완료");
+          await sync.syncNow();
+        }}
       />
 
       {toast && (

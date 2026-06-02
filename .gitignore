@@ -36,3 +36,8 @@ Thumbs.db
 *.db
 *.db-shm
 *.db-wal
+
+# Environment secrets (Supabase keys)
+.env
+.env.*
+!.env.example

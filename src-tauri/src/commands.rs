@@ -1,8 +1,10 @@
 use crate::backup::{create_backup, get_backup_info, restore_backup};
 use crate::db::{
-    check_attendance, create_member, delete_member, get_attendance, get_dashboard_stats,
-    get_expiring_members, get_member_detail, get_pause_logs, get_payments, list_members,
-    pause_membership, resume_membership, update_member, AppState,
+    check_attendance, create_member, delete_member, enqueue_sync_item, get_attendance,
+    get_dashboard_stats, get_expiring_members, get_member_detail, get_pause_logs, get_payments,
+    get_remote_id, list_members, list_sync_queue, mark_sync_queue_error, pause_membership,
+    remove_sync_queue_item, resume_membership, set_sync_state, update_member, upsert_id_map,
+    AppState, SyncQueueItem, SyncStatus,
 };
 use crate::models::{
     BackupInfo, BackupResult, DashboardStats, MemberDetail, MemberInput, MemberListItem,
@@ -200,4 +202,74 @@ pub fn open_data_folder(state: State<'_, AppState>) -> Result<(), String> {
         .ok_or_else(|| "데이터 폴더 경로를 찾을 수 없습니다.".to_string())?;
     tauri_plugin_opener::open_path(data_dir, None::<&str>)
         .map_err(|e| format!("데이터 폴더를 열 수 없습니다: {e}"))
+}
+
+#[tauri::command]
+pub fn fetch_sync_status(state: State<'_, AppState>) -> Result<SyncStatus, String> {
+    crate::db::fetch_sync_status(&state).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn fetch_sync_queue(state: State<'_, AppState>, limit: Option<i64>) -> Result<Vec<SyncQueueItem>, String> {
+    list_sync_queue(&state, limit.unwrap_or(50)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn complete_sync_queue_item(state: State<'_, AppState>, id: i64) -> Result<(), String> {
+    remove_sync_queue_item(&state, id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn fail_sync_queue_item(
+    state: State<'_, AppState>,
+    id: i64,
+    error: String,
+) -> Result<(), String> {
+    mark_sync_queue_error(&state, id, &error).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_sync_state(
+    state: State<'_, AppState>,
+    key: String,
+    value: String,
+) -> Result<(), String> {
+    set_sync_state(&state, &key, &value).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn map_remote_id(
+    state: State<'_, AppState>,
+    entity_type: String,
+    local_id: i64,
+    remote_id: String,
+) -> Result<(), String> {
+    upsert_id_map(&state, &entity_type, local_id, &remote_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn fetch_remote_id(
+    state: State<'_, AppState>,
+    entity_type: String,
+    local_id: i64,
+) -> Result<Option<String>, String> {
+    get_remote_id(&state, &entity_type, local_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn enqueue_sync(
+    state: State<'_, AppState>,
+    entity_type: String,
+    entity_local_id: i64,
+    operation: String,
+    payload_json: String,
+) -> Result<i64, String> {
+    enqueue_sync_item(
+        &state,
+        &entity_type,
+        entity_local_id,
+        &operation,
+        &payload_json,
+    )
+    .map_err(|e| e.to_string())
 }
