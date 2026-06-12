@@ -1,7 +1,6 @@
 import { X } from "lucide-react";
-
 import { useEffect, useMemo, useState } from "react";
-
+import { api } from "../api/client";
 import type { Center, MemberInput, MemberListItem, MembershipCategory } from "../types";
 import {
   calcMonthlyEndDate,
@@ -19,59 +18,36 @@ import {
   type JuniorCount,
   type MonthlyDuration,
 } from "../utils/member";
+import { logAppError } from "../utils/errors";
 
-
-
-interface MemberFormModalProps {
-
-  open: boolean;
-
+type MemberFormModalProps = {
+  isOpen: boolean;
   center: Center;
-
   member?: MemberListItem | null;
-
+  memoOnly?: boolean;
   onClose: () => void;
-
   onSubmit: (input: MemberInput) => Promise<void>;
-
-}
-
-
+};
 
 const categoryOptions: { value: MembershipCategory; label: string }[] = [
-
   { value: "monthly", label: "월권" },
-
   { value: "session", label: "횟수권" },
-
   { value: "junior", label: "주니어" },
-
 ];
 
-
-
 const monthlyDurations: MonthlyDuration[] = [1, 3, 6];
-
-
 
 function resolveCategoryFromItem(type: MemberListItem["membership_type"]): MembershipCategory {
   return resolveCategory(type ?? undefined);
 }
 
-
-
 export function MemberFormModal({
-
-  open,
-
+  isOpen,
   center,
-
   member,
-
+  memoOnly = false,
   onClose,
-
   onSubmit,
-
 }: MemberFormModalProps) {
 
   const [name, setName] = useState("");
@@ -89,6 +65,15 @@ export function MemberFormModal({
   const [endDate, setEndDate] = useState("");
 
   const [notes, setNotes] = useState("");
+  const [address, setAddress] = useState("");
+
+  const [lockerNumber, setLockerNumber] = useState("");
+
+  const [lockerStartDate, setLockerStartDate] = useState("");
+
+  const [lockerEndDate, setLockerEndDate] = useState("");
+
+  const [lockerMemo, setLockerMemo] = useState("");
 
   const [saving, setSaving] = useState(false);
 
@@ -118,7 +103,7 @@ export function MemberFormModal({
 
   useEffect(() => {
 
-    if (!open) return;
+    if (!isOpen) return;
 
     setError("");
 
@@ -134,6 +119,19 @@ export function MemberFormModal({
       setStartDate(member.start_date ?? todayString());
       setEndDate(member.end_date ?? "");
       setNotes(member.memo ?? "");
+      setAddress("");
+      setLockerNumber("");
+      setLockerStartDate("");
+      setLockerEndDate("");
+      setLockerMemo("");
+      api.getMemberDetail(member.id).then((detail) => {
+        const m = detail.member;
+        setAddress(m.address ?? "");
+        setLockerNumber(m.locker_number ?? "");
+        setLockerStartDate(m.locker_start_date?.slice(0, 10) ?? "");
+        setLockerEndDate(m.locker_end_date?.slice(0, 10) ?? "");
+        setLockerMemo(m.locker_memo ?? "");
+      }).catch(() => undefined);
       return;
     }
 
@@ -154,8 +152,17 @@ export function MemberFormModal({
     setEndDate(calcMonthlyEndDate(todayString(), 1));
 
     setNotes("");
+    setAddress("");
 
-  }, [open, member]);
+    setLockerNumber("");
+
+    setLockerStartDate("");
+
+    setLockerEndDate("");
+
+    setLockerMemo("");
+
+  }, [isOpen, member]);
 
 
 
@@ -177,7 +184,7 @@ export function MemberFormModal({
 
 
 
-  if (!open) return null;
+  if (!isOpen) return null;
 
 
 
@@ -204,6 +211,25 @@ export function MemberFormModal({
     }
 
 
+
+    if (memoOnly && member) {
+      const legacyType = dbMembershipToLegacy(member.membership_type);
+      const input: MemberInput = {
+        center,
+        name: member.name,
+        phone: member.phone,
+        membership_type: legacyType,
+        start_date: member.start_date ?? startDate,
+        end_date: member.end_date,
+        total_sessions: member.total_count,
+        remaining_sessions: member.remaining_count,
+        notes: notes.trim() || null,
+        address: address.trim() || null,
+      };
+      await onSubmit(input);
+      onClose();
+      return;
+    }
 
     let membershipType: MemberInput["membership_type"];
 
@@ -251,6 +277,8 @@ export function MemberFormModal({
 
       phone: normalizePhoneInput(phone),
 
+      member_type: category === "junior" ? "junior" : "regular",
+
       membership_type: membershipType,
 
       start_date: startDate,
@@ -262,6 +290,15 @@ export function MemberFormModal({
       remaining_sessions: remainingSessions,
 
       notes: notes.trim() || null,
+      address: address.trim() || null,
+
+      locker_number: lockerNumber.trim() || null,
+
+      locker_start_date: lockerStartDate || null,
+
+      locker_end_date: lockerEndDate || null,
+
+      locker_memo: lockerMemo.trim() || null,
 
     };
 
@@ -275,7 +312,7 @@ export function MemberFormModal({
 
     } catch (submitError) {
 
-      setError(String(submitError));
+      setError(logAppError("회원 등록/수정", submitError));
 
     } finally {
 
@@ -304,16 +341,17 @@ export function MemberFormModal({
   return (
 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
-
-      <div className="glass-panel w-full max-w-xl rounded-[1.5rem] p-6">
-
-        <div className="mb-5 flex items-center justify-between">
+      <div className="glass-panel flex max-h-[92vh] w-full max-w-xl flex-col rounded-[1.5rem]">
+        <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] p-6 pb-4">
 
           <div>
 
             <h2 className="text-xl font-bold">{member ? "회원 수정" : "회원 등록"}</h2>
 
             <p className="text-sm text-[var(--muted)]">{center} 센터</p>
+            {memoOnly && (
+              <p className="mt-1 text-sm text-amber-600">메모만 수정할 수 있습니다.</p>
+            )}
 
           </div>
 
@@ -325,9 +363,8 @@ export function MemberFormModal({
 
         </div>
 
-
-
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSubmit}>
+          <div className="min-h-0 max-h-[min(62vh,560px)] flex-1 space-y-4 overflow-y-auto overscroll-y-contain px-6 py-4">
 
           <div>
 
@@ -338,6 +375,8 @@ export function MemberFormModal({
               className="input"
 
               value={name}
+
+              disabled={memoOnly}
 
               onChange={(e) => setName(e.target.value)}
 
@@ -359,6 +398,8 @@ export function MemberFormModal({
 
               value={phone}
 
+              disabled={memoOnly}
+
               onChange={(e) => setPhone(e.target.value)}
 
               placeholder="010-0000-0000"
@@ -369,6 +410,30 @@ export function MemberFormModal({
 
 
 
+          <div>
+
+            <label className="field-label">주소 (선택)</label>
+
+            <input
+
+              className="input"
+
+              value={address}
+
+              disabled={memoOnly}
+
+              onChange={(e) => setAddress(e.target.value)}
+
+              placeholder="회원 주소"
+
+            />
+
+          </div>
+
+
+
+          {!memoOnly && (
+          <>
           <div>
 
             <label className="field-label">회원권 종류</label>
@@ -566,8 +631,51 @@ export function MemberFormModal({
             )}
 
           </div>
+          </>
+          )}
 
 
+
+          {!memoOnly && (
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="field-label">락카 번호</label>
+              <input
+                className="input"
+                value={lockerNumber}
+                onChange={(e) => setLockerNumber(e.target.value)}
+                placeholder="예: A-12"
+              />
+            </div>
+            <div>
+              <label className="field-label">락카 시작일</label>
+              <input
+                className="input"
+                type="date"
+                value={lockerStartDate}
+                onChange={(e) => setLockerStartDate(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="field-label">락카 만료일</label>
+              <input
+                className="input"
+                type="date"
+                value={lockerEndDate}
+                onChange={(e) => setLockerEndDate(e.target.value)}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="field-label">락카 메모</label>
+              <input
+                className="input"
+                value={lockerMemo}
+                onChange={(e) => setLockerMemo(e.target.value)}
+                placeholder="락카 관련 메모"
+              />
+            </div>
+          </div>
+          )}
 
           <div>
 
@@ -599,9 +707,9 @@ export function MemberFormModal({
 
           )}
 
+          </div>
 
-
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex shrink-0 justify-end gap-3 border-t border-[var(--border)] px-6 py-4">
 
             <button type="button" className="btn btn-secondary" onClick={onClose}>
 

@@ -1,7 +1,10 @@
 export type Center = "ONCLE" | "GRABIT";
+export type CenterRole = "owner" | "admin" | "staff" | "viewer";
+/** Login screen account type: owner (admin tab) vs staff tab. */
+export type LoginAccountKind = "owner" | "staff";
 export type LegacyMembershipType = "monthly_1" | "monthly_3" | "monthly_6" | "session" | "junior";
 export type MembershipType = LegacyMembershipType;
-export type MemberType = "general" | "junior" | "trial";
+export type MemberType = "regular" | "general" | "junior" | "trial";
 export type PassType = "period" | "count";
 export type DbMembershipType =
   | "30days"
@@ -22,10 +25,16 @@ export interface Member {
   parent_name: string | null;
   parent_phone: string | null;
   memo: string | null;
+  address?: string | null;
   status: string;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  locker_number?: string | null;
+  locker_status?: string | null;
+  locker_start_date?: string | null;
+  locker_end_date?: string | null;
+  locker_memo?: string | null;
 }
 
 export interface Membership {
@@ -64,6 +73,11 @@ export interface MemberListItem {
   remaining_text: string;
   last_visit_at: string | null;
   pause_remaining_days: number | null;
+  latest_membership_end_date?: string | null;
+  latest_membership_type?: string | null;
+  days_since_expired?: number | null;
+  is_inactive_30_days?: boolean;
+  pause_start_date?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -75,6 +89,16 @@ export interface MemberDetail {
   attendance: AttendanceLog[];
   payments: Payment[];
   pause_logs: PauseLog[];
+  edit_logs?: MemberEditLog[];
+}
+
+export interface MemberEditLog {
+  id: number;
+  member_id: number;
+  action: "create" | "update" | string;
+  editor: string | null;
+  summary: string;
+  created_at: string;
 }
 
 export interface MemberInput {
@@ -90,10 +114,16 @@ export interface MemberInput {
   total_sessions?: number | null;
   remaining_sessions?: number | null;
   notes?: string | null;
+  address?: string | null;
   price?: number | null;
   payment_method?: string | null;
   payment_date?: string | null;
   payment_memo?: string | null;
+  locker_number?: string | null;
+  locker_start_date?: string | null;
+  locker_end_date?: string | null;
+  locker_memo?: string | null;
+  edited_by?: string | null;
 }
 
 export interface PaginatedMembers {
@@ -113,6 +143,8 @@ export interface AttendanceLog {
   deducted_count: number;
   memo: string | null;
   created_at: string;
+  canceled_at?: string | null;
+  cancel_reason?: string | null;
 }
 
 export interface Payment {
@@ -148,6 +180,8 @@ export interface DashboardStats {
   monthly_count: number;
   session_count: number;
   junior_count: number;
+  regular_members: number;
+  inactive_30_members: number;
 }
 
 export interface BackupInfo {
@@ -166,8 +200,16 @@ export interface BackupInfo {
 export interface StorageInfo {
   db_path: string;
   backup_dir: string;
+  reports_dir: string;
   journal_mode: string;
   integrity_ok: boolean;
+}
+
+export interface ReportInfo {
+  reports_dir: string;
+  last_report_date: string | null;
+  last_report_at: string | null;
+  last_report_path: string | null;
 }
 
 export interface MutationResult<T> {
@@ -175,7 +217,7 @@ export interface MutationResult<T> {
   backup_warning: string | null;
 }
 
-export type MemberGroupFilter = "all" | "general" | "junior";
+export type MemberGroupFilter = "all" | "regular" | "junior" | "inactive_30";
 export type MemberStatusFilter = "all" | "active" | "expired";
 
 export interface BackupResult {
@@ -197,6 +239,7 @@ export interface SyncQueueItem {
 
 export interface SyncStatus {
   pending_count: number;
+  failed_count: number;
   last_pull_at: string | null;
   last_push_at: string | null;
   device_id: string | null;
@@ -204,4 +247,68 @@ export interface SyncStatus {
 
 export type MemberStatus = "active" | "expiring" | "expired" | "depleted" | "paused";
 
+export interface UserCenterRoleRow {
+  id: string;
+  userId: string;
+  centerId: string;
+  center: Center;
+  centerName: string;
+  role: CenterRole;
+  createdAt: string;
+}
+
+export interface StaffRoleAssignment {
+  /** Stable key: userId:centerId */
+  id: string;
+  userId: string;
+  centerId: string;
+  center: Center;
+  centerName: string;
+  role: CenterRole;
+  email: string;
+  createdAt: string;
+}
+
+export interface PermissionSet {
+  role: CenterRole | null;
+  loading: boolean;
+  enforced: boolean;
+  hasCenterAccess: boolean;
+  canCreateMember: boolean;
+  canEditMember: boolean;
+  canEditMemberMemo: boolean;
+  canDeleteMember: boolean;
+  canPauseMembership: boolean;
+  canResumeMembership: boolean;
+  canManageStaff: boolean;
+  canViewStats: boolean;
+  canCheckAttendance: boolean;
+  canCancelAttendance: boolean;
+  canManageLocker: boolean;
+  canEditMembership: boolean;
+  canOpenSettings: boolean;
+  canManageAccount: boolean;
+  canBackupRestore: boolean;
+  canOpenBackupFolder: boolean;
+  canCheckUpdate: boolean;
+  canSyncPush: boolean;
+  canSyncPull: boolean;
+  canViewRoster: boolean;
+  canExportRoster: boolean;
+  denyReason: string;
+}
+
 export type MembershipCategory = "monthly" | "session" | "junior";
+
+export type LockerStatus = "empty" | "active" | "occupied" | "expiring" | "expired";
+export type LockerFilter = "all" | "empty" | "occupied" | "expiring";
+
+export interface LockerListItem {
+  id: number;
+  locker_number: string;
+  locker_status: LockerStatus | string;
+  member_name: string | null;
+  locker_start_date: string | null;
+  locker_end_date: string | null;
+  memo?: string | null;
+}

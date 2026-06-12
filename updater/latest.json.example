@@ -1,0 +1,11 @@
+{
+  "version": "1.0.13",
+  "notes": "회원 명부, 엑셀 자동 저장, 주소 필드 추가",
+  "pub_date": "2026-06-09T00:00:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "PASTE_CONTENT_FROM_ClimbCenterManager_1.0.13_x64-setup.exe.sig",
+      "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.13/ClimbCenterManager_1.0.13_x64-setup.exe"
+    }
+  }
+}

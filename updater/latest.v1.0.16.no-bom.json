@@ -1,0 +1,11 @@
+{
+  "version": "1.0.16",
+  "notes": "?? ?? ??(??/????/??�??/??), ?? export? grabon ?? ??",
+  "pub_date": "2026-05-25T00:00:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVljSmxGaFZJTDN3VUloQXVvK2JtV2R2akpJaGM2QjloRE50TmE1U3JsOE5qQ2VGRnFRc2ZiaHRIRWJaV2xRM1Ztd3JTZk9BL3ZkSDJ5MzZtcUVVQ3dZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMTc1MTYyCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xNl94NjQtc2V0dXAuZXhlCmIxT05yaXkrSzYyM0ZWK1QrS09RUVAzMDFxMGJEbEVSSnlNbWNtczhseUg2WmM3NEFjeEY4MGxUVVVFelNhZ1doR29VSGdmVGtGakljd3B0NStNTkRBPT0K",
+      "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.16/ClimbCenterManager_1.0.16_x64-setup.exe"
+    }
+  }
+}

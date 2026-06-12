@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
+import { isTauriApp } from "../lib/tauri";
 import { getSession, isAuthAvailable, signInWithPassword, signOut } from "../lib/supabase/auth";
-import { getSupabaseClient } from "../lib/supabase/client";
+import { clearPersistedSupabaseAuth, getSupabaseClient, resetSupabaseClient } from "../lib/supabase/client";
 
 export function useSupabaseAuth() {
   const [available] = useState(isAuthAvailable());
@@ -27,9 +28,32 @@ export function useSupabaseAuth() {
   }, [available]);
 
   useEffect(() => {
-    refresh().catch(() => undefined);
+    let cancelled = false;
+
+    async function bootstrapAuth() {
+      if (!available) {
+        setLoading(false);
+        return;
+      }
+
+      if (isTauriApp()) {
+        clearPersistedSupabaseAuth();
+        resetSupabaseClient();
+      }
+
+      if (!cancelled) {
+        await refresh();
+      }
+    }
+
+    void bootstrapAuth();
+
     const supabase = getSupabaseClient();
-    if (!supabase) return;
+    if (!supabase) {
+      return () => {
+        cancelled = true;
+      };
+    }
 
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
@@ -37,17 +61,23 @@ export function useSupabaseAuth() {
     });
 
     return () => {
+      cancelled = true;
       data.subscription.unsubscribe();
     };
-  }, [refresh]);
+  }, [available, refresh]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    await signInWithPassword(email, password);
-    await refresh();
-  }, [refresh]);
+  const login = useCallback(async (loginId: string, password: string) => {
+    const data = await signInWithPassword(loginId, password);
+    setSession(data.session);
+    setUser(data.user);
+    return data.user;
+  }, []);
 
   const logout = useCallback(async () => {
     await signOut();
+    if (isTauriApp()) {
+      clearPersistedSupabaseAuth();
+    }
     setSession(null);
     setUser(null);
   }, []);

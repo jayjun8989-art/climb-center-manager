@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import type {
   AttendanceLog,
   BackupInfo,
@@ -14,18 +13,72 @@ import type {
   PaginatedMembers,
   PauseLog,
   Payment,
+  ReportInfo,
   StorageInfo,
+  SyncQueueItem,
+  SyncStatus,
 } from "../types";
-import { formatAppError } from "../utils/errors";
+import {
+  defaultBackupInfo,
+  defaultDashboardStats,
+  defaultStorageInfo,
+  defaultSyncStatus,
+  fallbackAddMember,
+  fallbackEditMember,
+  fallbackGetMembers,
+  fallbackRecordAttendance,
+  fallbackRemoveMember,
+  fallbackSyncQueue,
+} from "../lib/storageFallback";
+import { invokeCommand, isTauriApp, safeInvoke } from "../lib/tauri";
+import { logAppError } from "../utils/errors";
+import { resolveMemberLocalId } from "../utils/member";
 
-async function invokeCommand<T>(
+export { isTauriApp } from "../lib/tauri";
+
+async function readCommand<T>(
+  command: string,
+  args: Record<string, unknown>,
+  fallback: () => T,
+): Promise<T> {
+  if (!isTauriApp()) {
+    return fallback();
+  }
+
+  const result = await safeInvoke<T>(command, args);
+  return result ?? fallback();
+}
+
+async function writeCommand<T>(
+  command: string,
+  args: Record<string, unknown>,
+  fallback: () => T,
+): Promise<T> {
+  if (!isTauriApp()) {
+    return fallback();
+  }
+
+  try {
+    return await invokeCommand<T>(command, args);
+  } catch (error) {
+    throw new Error(logAppError(`Tauri ${command}`, error));
+  }
+}
+
+async function actionCommand(
   command: string,
   args?: Record<string, unknown>,
-): Promise<T> {
+  fallback?: () => void,
+): Promise<void> {
+  if (!isTauriApp()) {
+    fallback?.();
+    return;
+  }
+
   try {
-    return await invoke<T>(command, args);
+    await invokeCommand<void>(command, args);
   } catch (error) {
-    throw new Error(formatAppError(error));
+    throw new Error(logAppError(`Tauri ${command}`, error));
   }
 }
 
@@ -38,96 +91,183 @@ export const api = {
     page?: number;
     pageSize?: number;
   }): Promise<PaginatedMembers> {
-    return invokeCommand("get_members", {
-      center: params.center,
-      search: params.search ?? "",
-      member_group: params.memberGroup ?? "all",
-      status_filter: params.statusFilter ?? "all",
-      page: params.page ?? 1,
-      page_size: params.pageSize ?? 50,
-    });
+    return readCommand(
+      "get_members",
+      {
+        center: params.center,
+        search: params.search ?? "",
+        member_group: params.memberGroup ?? "all",
+        status_filter: params.statusFilter ?? "all",
+        page: params.page ?? 1,
+        page_size: params.pageSize ?? 50,
+      },
+      () => fallbackGetMembers(params),
+    );
   },
 
   getMemberDetail(id: number): Promise<MemberDetail> {
-    return invokeCommand("get_member_by_id", { id });
-  },
-
-  addMember(input: MemberInput): Promise<MutationResult<MemberListItem>> {
-    return invokeCommand("add_member", { input });
-  },
-
-  editMember(id: number, input: MemberInput): Promise<MutationResult<MemberListItem>> {
-    return invokeCommand("edit_member", { id, input });
-  },
-
-  removeMember(id: number): Promise<MutationResult<boolean>> {
-    return invokeCommand("remove_member", { id });
-  },
-
-  recordAttendance(memberId: number): Promise<MutationResult<MemberListItem>> {
-    return invokeCommand("record_attendance", { member_id: memberId });
-  },
-
-  fetchAttendance(memberId: number, limit = 20): Promise<AttendanceLog[]> {
-    return invokeCommand("fetch_attendance", { member_id: memberId, limit });
-  },
-
-  fetchPayments(memberId: number): Promise<Payment[]> {
-    return invokeCommand("fetch_payments", { member_id: memberId });
-  },
-
-  fetchPauseLogs(memberId: number): Promise<PauseLog[]> {
-    return invokeCommand("fetch_pause_logs", { member_id: memberId });
-  },
-
-  pauseMembership(membershipId: number, reason?: string): Promise<MemberListItem> {
-    return invokeCommand("pause_membership_command", {
-      membership_id: membershipId,
-      reason: reason ?? null,
+    return writeCommand("get_member_by_id", { id }, () => {
+      throw new Error("브라우저 미리보기에서는 회원 상세를 지원하지 않습니다.");
     });
   },
 
+  addMember(
+    input: MemberInput,
+    options?: { enqueueSync?: boolean },
+  ): Promise<MutationResult<MemberListItem>> {
+    return writeCommand(
+      "add_member",
+      { input, enqueue_sync: options?.enqueueSync ?? true },
+      () => fallbackAddMember(input),
+    );
+  },
+
+  editMember(id: number, input: MemberInput): Promise<MutationResult<MemberListItem>> {
+    return writeCommand("edit_member", { id, input }, () => fallbackEditMember(id, input));
+  },
+
+  removeMember(id: number): Promise<MutationResult<boolean>> {
+    return writeCommand("remove_member", { id }, () => fallbackRemoveMember(id));
+  },
+
+  hasAttendanceToday(
+    member: MemberListItem | { id?: number | null; member_id?: number | null },
+  ): Promise<boolean> {
+    const memberId = resolveMemberLocalId(member);
+    return readCommand("has_attendance_today_cmd", { memberId }, () => false);
+  },
+
+  recordAttendance(
+    member: MemberListItem | { id?: number | null; member_id?: number | null; membership_id?: number | null },
+    options?: { membershipId?: number | null; forceDuplicate?: boolean },
+  ): Promise<MutationResult<MemberListItem>> {
+    const memberId = resolveMemberLocalId(member);
+    const membershipId = options?.membershipId ?? member.membership_id ?? null;
+    return writeCommand(
+      "record_attendance",
+      {
+        memberId,
+        membershipId,
+        forceDuplicate: options?.forceDuplicate ?? false,
+      },
+      () => fallbackRecordAttendance(memberId),
+    );
+  },
+
+  cancelAttendance(
+    attendanceId: number,
+    reason?: string,
+  ): Promise<MutationResult<MemberListItem>> {
+    return writeCommand("cancel_attendance_cmd", { attendanceId, reason: reason ?? null }, () => {
+      throw new Error("출석 취소는 데스크톱 앱에서만 지원합니다.");
+    });
+  },
+
+  listLockers(center: Center): Promise<import("../types").LockerListItem[]> {
+    return readCommand("list_lockers", { center }, () => []);
+  },
+
+  fetchAttendance(
+    member: MemberListItem | { id?: number | null; member_id?: number | null },
+    limit = 20,
+  ): Promise<AttendanceLog[]> {
+    const memberId = resolveMemberLocalId(member);
+    return readCommand("fetch_attendance", { memberId, limit }, () => []);
+  },
+
+  fetchPayments(
+    member: MemberListItem | { id?: number | null; member_id?: number | null },
+  ): Promise<Payment[]> {
+    const memberId = resolveMemberLocalId(member);
+    return readCommand("fetch_payments", { memberId }, () => []);
+  },
+
+  fetchPauseLogs(
+    member: MemberListItem | { id?: number | null; member_id?: number | null },
+  ): Promise<PauseLog[]> {
+    const memberId = resolveMemberLocalId(member);
+    return readCommand("fetch_pause_logs", { memberId }, () => []);
+  },
+
+  pauseMembership(membershipId: number, reason?: string): Promise<MemberListItem> {
+    return writeCommand(
+      "pause_membership_command",
+      { membershipId: membershipId, reason: reason ?? null },
+      () => {
+        throw new Error("브라우저 미리보기에서는 정지 기능을 지원하지 않습니다.");
+      },
+    );
+  },
+
   resumeMembership(membershipId: number): Promise<MemberListItem> {
-    return invokeCommand("resume_membership_command", { membership_id: membershipId });
+    return writeCommand("resume_membership_command", { membershipId }, () => {
+      throw new Error("브라우저 미리보기에서는 해제 기능을 지원하지 않습니다.");
+    });
   },
 
   fetchDashboardStats(center: Center): Promise<DashboardStats> {
-    return invokeCommand("fetch_dashboard_stats", { center });
+    return readCommand("fetch_dashboard_stats", { center }, () => {
+      const members = fallbackGetMembers({ center, page: 1, pageSize: 10000 }).members;
+      return defaultDashboardStats(members);
+    });
   },
 
   fetchExpiringMembers(center: Center, days = 7): Promise<MemberListItem[]> {
-    return invokeCommand("fetch_expiring_members", { center, days });
+    return readCommand("fetch_expiring_members", { center, days }, () => []);
   },
 
   manualBackup(): Promise<BackupResult> {
-    return invokeCommand("manual_backup");
+    return writeCommand("manual_backup", {}, () => {
+      throw new Error("브라우저 미리보기에서는 백업을 지원하지 않습니다.");
+    });
   },
 
   fetchBackupInfo(): Promise<BackupInfo> {
-    return invokeCommand("fetch_backup_info");
+    return readCommand("fetch_backup_info", {}, defaultBackupInfo);
   },
 
   fetchStorageInfo(): Promise<StorageInfo> {
-    return invokeCommand("fetch_storage_info");
+    return readCommand("fetch_storage_info", {}, defaultStorageInfo);
   },
 
   restoreBackup(path: string): Promise<void> {
-    return invokeCommand("restore_backup_file", { path });
+    return actionCommand("restore_backup_file", { path });
   },
 
   openBackupFolder(): Promise<void> {
-    return invokeCommand("open_backup_folder");
+    return actionCommand("open_backup_folder");
   },
 
   openDataFolder(): Promise<void> {
-    return invokeCommand("open_data_folder");
+    return actionCommand("open_data_folder");
   },
 
-  fetchSyncStatus(): Promise<import("../types").SyncStatus> {
-    return invokeCommand("fetch_sync_status");
+  fetchReportInfo(): Promise<ReportInfo> {
+    return readCommand("fetch_report_info", {}, () => ({
+      reports_dir: "",
+      last_report_date: null,
+      last_report_at: null,
+      last_report_path: null,
+    }));
   },
 
-  fetchSyncQueue(limit = 50): Promise<import("../types").SyncQueueItem[]> {
-    return invokeCommand("fetch_sync_queue", { limit });
+  openReportsFolder(): Promise<void> {
+    return actionCommand("open_reports_folder");
+  },
+
+  openReportsArchiveFolder(): Promise<void> {
+    return actionCommand("open_reports_archive_folder");
+  },
+
+  openReportFile(relativePath: string): Promise<void> {
+    return actionCommand("open_report_file", { relativePath });
+  },
+
+  fetchSyncStatus(): Promise<SyncStatus> {
+    return readCommand("fetch_sync_status", {}, defaultSyncStatus);
+  },
+
+  fetchSyncQueue(limit = 50): Promise<SyncQueueItem[]> {
+    return readCommand("fetch_sync_queue", { limit }, () => fallbackSyncQueue(limit));
   },
 };

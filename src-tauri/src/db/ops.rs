@@ -5,7 +5,8 @@ use crate::models::{
 };
 use crate::db::status::{
     attendance_type_for_member, compute_member_status, compute_membership_status,
-    display_badge, map_legacy_membership, now_string, remaining_text, today_date, today_string,
+    display_badge, map_legacy_membership, normalize_local_member_type, now_string,
+    remaining_text, today_date, today_string,
 };
 use chrono::NaiveDate;
 use rusqlite::{params, Connection, OptionalExtension, Row};
@@ -18,9 +19,9 @@ use super::status;
 
 #[derive(Error, Debug)]
 pub enum DbError {
-    #[error("?????? ??: {0}")]
+    #[error("\u{B451}\u{C774}\u{D130}\u{BCA0}\u{C774}\u{C2A4} \u{C624}\u{B958}: {0}")]
     Sqlite(#[from] rusqlite::Error),
-    #[error("??????? ?? ????")]
+    #[error("\u{B451}\u{C774}\u{D130}\u{BCA0}\u{C774}\u{C2A4} \u{C0AC}\u{C6A9} \u{C911}\u{C785}\u{B2C8}\u{B2E4}.")]
     Lock,
     #[error("{0}")]
     Message(String),
@@ -30,15 +31,17 @@ pub struct AppState {
     pub conn: Mutex<Connection>,
     pub db_path: PathBuf,
     pub backup_dir: PathBuf,
+    pub reports_dir: PathBuf,
     pub startup_backup_created: Mutex<bool>,
 }
 
 impl AppState {
-    pub fn new(db_path: PathBuf, backup_dir: PathBuf) -> Result<Self, DbError> {
+    pub fn new(db_path: PathBuf, backup_dir: PathBuf, reports_dir: PathBuf) -> Result<Self, DbError> {
         if let Some(parent) = db_path.parent() {
             std::fs::create_dir_all(parent).ok();
         }
         std::fs::create_dir_all(&backup_dir).ok();
+        // reports_dir: created lazily on export (grabon only) — not at app startup
 
         let conn = Connection::open(&db_path)?;
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
@@ -62,6 +65,7 @@ impl AppState {
             conn: Mutex::new(conn),
             db_path,
             backup_dir,
+            reports_dir,
             startup_backup_created: Mutex::new(false),
         })
     }
@@ -89,6 +93,7 @@ impl AppState {
             Ok(crate::models::StorageInfo {
                 db_path: self.db_path.to_string_lossy().to_string(),
                 backup_dir: self.backup_dir.to_string_lossy().to_string(),
+                reports_dir: self.reports_dir.to_string_lossy().to_string(),
                 journal_mode,
                 integrity_ok,
             })
@@ -100,7 +105,7 @@ fn verify_db_integrity(conn: &Connection) -> Result<(), DbError> {
     let result: String = conn.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
     if result.to_ascii_lowercase() != "ok" {
         return Err(DbError::Message(format!(
-            "?????? ??? ?? ??: {result}"
+            "\u{B451}\u{C774}\u{D130}\u{BCA0}\u{C774}\u{C2A4} \u{BB34}\u{ACB0}\u{C131} \u{AC80}\u{C0AC} \u{C2E4}\u{D328}: {result}"
         )));
     }
     Ok(())
@@ -215,7 +220,7 @@ fn assert_phone_unique(
 
     if existing_id.is_some() {
         return Err(DbError::Message(
-            "?? ??? ?? ??? ???????.".into(),
+            "\u{C774}\u{BBF8} \u{B4F1}\u{B85D}\u{B41C} \u{C804}\u{D654}\u{BC88}\u{D638}\u{C785}\u{B2C8}\u{B2E4}.".into(),
         ));
     }
 
@@ -227,11 +232,12 @@ fn map_input_membership(input: &MemberInput) -> Result<(String, String, String, 
     let (membership_type, pass_type, total_count, _, _) =
         map_legacy_membership(legacy_type, input.total_sessions);
 
-    let member_type = if legacy_type == "junior" {
-        "junior".to_string()
+    let raw_member_type = if legacy_type == "junior" {
+        "junior"
     } else {
-        input.member_type.clone().unwrap_or_else(|| "general".to_string())
+        input.member_type.as_deref().unwrap_or("regular")
     };
+    let member_type = normalize_local_member_type(raw_member_type).to_string();
 
     let end_date = input.end_date.clone();
     let remaining_count = if pass_type == "count" {
@@ -260,12 +266,8 @@ fn active_membership_subquery() -> &'static str {
     )"
 }
 
-fn member_group_clause(group: &str) -> &'static str {
-    match group {
-        "general" => " AND m.member_type = 'general'",
-        "junior" => " AND m.member_type = 'junior'",
-        _ => "",
-    }
+fn member_group_clause(group: &str, today: &str) -> String {
+    super::member_filter::member_group_clause(group, today)
 }
 
 fn build_status_clause(status_filter: &str, today: &str) -> String {
@@ -324,6 +326,20 @@ fn map_list_item(row: &Row<'_>, today: NaiveDate) -> Result<MemberListItem, rusq
         today,
     );
 
+    let latest_membership_end_date: Option<String> = row.get(20)?;
+    let latest_membership_type: Option<String> = row.get(21)?;
+    let created_at: String = row.get(18)?;
+    let updated_at: String = row.get(19)?;
+
+    let days_since_expired = latest_membership_end_date
+        .as_ref()
+        .and_then(|value| status::parse_date(value))
+        .map(|end| (today - end).num_days() as i32)
+        .filter(|days| *days >= 0);
+
+    let is_inactive_30_days = latest_membership_end_date.is_none()
+        || days_since_expired.map(|days| days >= 30).unwrap_or(true);
+
     Ok(MemberListItem {
         id: row.get(0)?,
         name: row.get(1)?,
@@ -344,8 +360,13 @@ fn map_list_item(row: &Row<'_>, today: NaiveDate) -> Result<MemberListItem, rusq
         remaining_text: remaining_label,
         last_visit_at: row.get(16)?,
         pause_remaining_days,
-        created_at: row.get(18)?,
-        updated_at: row.get(19)?,
+        latest_membership_end_date,
+        latest_membership_type,
+        days_since_expired,
+        is_inactive_30_days,
+        pause_start_date: row.get(22).ok(),
+        created_at,
+        updated_at,
     })
 }
 
@@ -360,9 +381,33 @@ const LIST_SELECT: &str = "
             WHERE membership_id = ms.id AND pause_end_date IS NULL
             ORDER BY id DESC LIMIT 1
         ),
-        m.created_at, m.updated_at
+        m.created_at, m.updated_at,
+        (SELECT MAX(end_date) FROM memberships WHERE member_id = m.id) AS latest_membership_end_date,
+        (SELECT lm.membership_type FROM memberships lm WHERE lm.member_id = m.id ORDER BY lm.end_date DESC, lm.id DESC LIMIT 1) AS latest_membership_type,
+        (
+            SELECT pause_start_date FROM pause_logs
+            WHERE membership_id = ms.id AND pause_end_date IS NULL
+            ORDER BY id DESC LIMIT 1
+        ) AS pause_start_date
     FROM members m
     LEFT JOIN memberships ms ON ms.id = ";
+
+pub fn get_member_list_item_by_id(
+    state: &AppState,
+    member_id: i64,
+) -> Result<MemberListItem, DbError> {
+    state.with_conn(|conn| {
+        let today_date = today_date();
+        let active_sub = active_membership_subquery();
+        let sql = format!(
+            "{LIST_SELECT}{active_sub}
+             WHERE m.id = ?1 AND m.deleted_at IS NULL"
+        );
+        conn.query_row(&sql, params![member_id], |row| map_list_item(row, today_date))
+            .optional()?
+            .ok_or_else(|| DbError::Message("회원을 찾을 수 없습니다.".into()))
+    })
+}
 
 pub fn list_members(
     state: &AppState,
@@ -374,12 +419,17 @@ pub fn list_members(
     page_size: i64,
 ) -> Result<(Vec<MemberListItem>, i64), DbError> {
     state.with_conn(|conn| {
+        super::ensure_schema::ensure_local_schema(conn).map_err(DbError::from)?;
         let today = today_string();
         let today_date = today_date();
         let trimmed_search = search.trim();
         let has_search = !trimmed_search.is_empty();
-        let group_clause = member_group_clause(member_group);
-        let status_clause = build_status_clause(status_filter, &today);
+        let group_clause = member_group_clause(member_group, &today);
+        let status_clause = if member_group == "inactive_30" {
+            String::new()
+        } else {
+            build_status_clause(status_filter, &today)
+        };
         let active_sub = active_membership_subquery();
 
         let mut search_clause = String::new();
@@ -460,16 +510,23 @@ fn map_member(row: &Row<'_>) -> Result<Member, rusqlite::Error> {
         parent_name: row.get(5)?,
         parent_phone: row.get(6)?,
         memo: row.get(7)?,
-        status: row.get(8)?,
-        created_at: row.get(9)?,
-        updated_at: row.get(10)?,
-        deleted_at: row.get(11)?,
+        address: row.get(8).ok(),
+        status: row.get(9)?,
+        created_at: row.get(10)?,
+        updated_at: row.get(11)?,
+        deleted_at: row.get(12)?,
+        locker_number: row.get(13).ok(),
+        locker_status: row.get(14).ok(),
+        locker_start_date: row.get(15).ok(),
+        locker_end_date: row.get(16).ok(),
+        locker_memo: row.get(17).ok(),
     })
 }
 
 const MEMBER_SELECT: &str = "
-    SELECT id, name, phone, member_type, center, parent_name, parent_phone, memo,
-           status, created_at, updated_at, deleted_at
+    SELECT id, name, phone, member_type, center, parent_name, parent_phone, memo, address,
+           status, created_at, updated_at, deleted_at,
+           locker_number, locker_status, locker_start_date, locker_end_date, locker_memo
     FROM members
 ";
 
@@ -496,6 +553,9 @@ pub fn get_member_detail(state: &AppState, id: i64) -> Result<Option<MemberDetai
     let attendance = get_attendance_logs(state, id, 30)?;
     let payments = get_payments(state, id)?;
     let pause_logs = get_pause_logs(state, id)?;
+    let edit_logs = state.with_conn(|conn| {
+        super::member_edit_log::get_member_edit_logs(conn, id, 50).map_err(DbError::from)
+    })?;
 
     Ok(Some(MemberDetail {
         member,
@@ -504,6 +564,7 @@ pub fn get_member_detail(state: &AppState, id: i64) -> Result<Option<MemberDetai
         attendance,
         payments,
         pause_logs,
+        edit_logs,
     }))
 }
 
@@ -561,7 +622,11 @@ pub fn get_active_membership(
     })
 }
 
-pub fn create_member(state: &AppState, input: MemberInput) -> Result<MemberListItem, DbError> {
+pub fn create_member(
+    state: &AppState,
+    input: MemberInput,
+    enqueue_sync: bool,
+) -> Result<MemberListItem, DbError> {
     validate_member_input(&input)?;
     let phone_normalized = normalize_phone(&input.phone);
     let (membership_type, pass_type, member_type, end_date, total_count, remaining_count, _) =
@@ -575,8 +640,8 @@ pub fn create_member(state: &AppState, input: MemberInput) -> Result<MemberListI
         tx.execute(
             "INSERT INTO members (
                 name, phone, phone_normalized, member_type, center, parent_name, parent_phone,
-                memo, status, created_at, updated_at, deleted_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'active', ?9, ?9, NULL)",
+                memo, address, status, created_at, updated_at, deleted_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'active', ?10, ?10, NULL)",
             params![
                 input.name.trim(),
                 normalize_optional_phone(&input.phone),
@@ -586,6 +651,7 @@ pub fn create_member(state: &AppState, input: MemberInput) -> Result<MemberListI
                 input.parent_name,
                 input.parent_phone,
                 input.notes,
+                input.address,
                 now,
             ],
         )?;
@@ -631,14 +697,44 @@ pub fn create_member(state: &AppState, input: MemberInput) -> Result<MemberListI
         Ok(member_id)
     })?;
 
-    let _ = super::sync_local::enqueue_entity_op(state, "member", member_id, "insert", &input);
+    state.with_conn(|conn| {
+        let summary = super::member_edit_log::summarize_create(&input);
+        super::member_edit_log::insert_member_edit_log(
+            conn,
+            member_id,
+            "create",
+            input.edited_by.as_deref(),
+            &summary,
+        )
+        .map_err(DbError::from)
+    })?;
+
+    state.with_conn(|conn| {
+        super::locker::apply_locker_fields(
+            conn,
+            member_id,
+            &input.center,
+            input.locker_number.as_deref(),
+            input.locker_start_date.as_deref(),
+            input.locker_end_date.as_deref(),
+            input.locker_memo.as_deref(),
+        )
+    })?;
+
+    if enqueue_sync {
+        if let Ok(payload_json) = super::sync_local::build_member_sync_payload_json(state, member_id) {
+            let _ = super::sync_local::enqueue_sync_item(
+                state,
+                "member",
+                member_id,
+                "insert",
+                &payload_json,
+            );
+        }
+    }
 
     refresh_member_status(state, member_id)?;
-    list_members(state, &input.center, "", "all", "all", 1, 1)?
-        .0
-        .into_iter()
-        .find(|item| item.id == member_id)
-        .ok_or_else(|| DbError::Message("?? ?? ? ??? ??????.".into()))
+    get_member_list_item_by_id(state, member_id)
 }
 
 pub fn update_member(state: &AppState, id: i64, input: MemberInput) -> Result<MemberListItem, DbError> {
@@ -646,6 +742,8 @@ pub fn update_member(state: &AppState, id: i64, input: MemberInput) -> Result<Me
     let phone_normalized = normalize_phone(&input.phone);
     let (membership_type, pass_type, member_type, end_date, total_count, remaining_count, _) =
         map_input_membership(&input)?;
+    let before_member = get_member(state, id)?;
+    let before_membership = get_active_membership(state, id)?;
 
     state.with_conn(|conn| {
         assert_phone_unique(conn, &input.center, &phone_normalized, Some(id))?;
@@ -655,8 +753,8 @@ pub fn update_member(state: &AppState, id: i64, input: MemberInput) -> Result<Me
         let updated = tx.execute(
             "UPDATE members SET
                 name = ?1, phone = ?2, phone_normalized = ?3, member_type = ?4, center = ?5,
-                parent_name = ?6, parent_phone = ?7, memo = ?8, updated_at = ?9
-             WHERE id = ?10 AND deleted_at IS NULL",
+                parent_name = ?6, parent_phone = ?7, memo = ?8, address = ?9, updated_at = ?10
+             WHERE id = ?11 AND deleted_at IS NULL",
             params![
                 input.name.trim(),
                 normalize_optional_phone(&input.phone),
@@ -666,12 +764,13 @@ pub fn update_member(state: &AppState, id: i64, input: MemberInput) -> Result<Me
                 input.parent_name,
                 input.parent_phone,
                 input.notes,
+                input.address,
                 now,
                 id,
             ],
         )?;
         if updated == 0 {
-            return Err(DbError::Message("??? ?? ? ????.".into()));
+            return Err(DbError::Message("\u{D68C}\u{C6D0}\u{C744} \u{CC3E}\u{C744} \u{C218} \u{C5C6}\u{C2B5}\u{B2C8}\u{B2E4}.".into()));
         }
 
         if let Some(membership_id) = tx
@@ -724,17 +823,48 @@ pub fn update_member(state: &AppState, id: i64, input: MemberInput) -> Result<Me
         Ok(())
     })?;
 
-    let _ = super::sync_local::enqueue_entity_op(state, "member", id, "update", &input);
+    if let Some(member) = before_member.as_ref() {
+        let summary = super::member_edit_log::summarize_update(
+            member,
+            before_membership.as_ref(),
+            &input,
+            &membership_type,
+        );
+        state.with_conn(|conn| {
+            super::member_edit_log::insert_member_edit_log(
+                conn,
+                id,
+                "update",
+                input.edited_by.as_deref(),
+                &summary,
+            )
+            .map_err(DbError::from)
+        })?;
+    }
+
+    state.with_conn(|conn| {
+        super::locker::apply_locker_fields(
+            conn,
+            id,
+            &input.center,
+            input.locker_number.as_deref(),
+            input.locker_start_date.as_deref(),
+            input.locker_end_date.as_deref(),
+            input.locker_memo.as_deref(),
+        )
+    })?;
+
+    if let Ok(payload_json) = super::sync_local::build_member_sync_payload_json(state, id) {
+        let _ = super::sync_local::enqueue_sync_item(state, "member", id, "update", &payload_json);
+    }
 
     refresh_member_status(state, id)?;
-    list_members(state, &input.center, "", "all", "all", 1, 500)?
-        .0
-        .into_iter()
-        .find(|item| item.id == id)
-        .ok_or_else(|| DbError::Message("?? ?? ? ??? ??????.".into()))
+    get_member_list_item_by_id(state, id)
 }
 
 pub fn delete_member(state: &AppState, id: i64) -> Result<(), DbError> {
+    let delete_payload = super::sync_local::build_member_sync_payload_json(state, id).ok();
+
     state.with_conn(|conn| {
         let now = now_string();
         let updated = conn.execute(
@@ -742,24 +872,33 @@ pub fn delete_member(state: &AppState, id: i64) -> Result<(), DbError> {
             params![now, id],
         )?;
         if updated == 0 {
-            return Err(DbError::Message("??? ?? ? ????.".into()));
+            return Err(DbError::Message("\u{D68C}\u{C6D0}\u{C744} \u{CC3E}\u{C744} \u{C218} \u{C5C6}\u{C2B5}\u{B2C8}\u{B2E4}.".into()));
         }
         Ok(())
     })?;
 
-    let payload = serde_json::json!({ "local_id": id });
-    let _ = super::sync_local::enqueue_entity_op(state, "member", id, "soft_delete", &payload);
+    if let Some(mut payload_json) = delete_payload {
+        if let Ok(mut value) = serde_json::from_str::<serde_json::Value>(&payload_json) {
+            if let Some(obj) = value.as_object_mut() {
+                obj.insert("local_id".to_string(), serde_json::json!(id));
+            }
+            if let Ok(next) = serde_json::to_string(&value) {
+                payload_json = next;
+            }
+        }
+        let _ = super::sync_local::enqueue_sync_item(state, "member", id, "soft_delete", &payload_json);
+    }
     Ok(())
 }
 
 pub fn check_attendance(state: &AppState, member_id: i64) -> Result<MemberListItem, DbError> {
     let member = get_member(state, member_id)?
-        .ok_or_else(|| DbError::Message("??? ?? ? ????.".into()))?;
+        .ok_or_else(|| DbError::Message("\u{D68C}\u{C6D0}\u{C744} \u{CC3E}\u{C744} \u{C218} \u{C5C6}\u{C2B5}\u{B2C8}\u{B2E4}.".into()))?;
     let membership = get_active_membership(state, member_id)?
-        .ok_or_else(|| DbError::Message("?? ??? ???? ????.".into()))?;
+        .ok_or_else(|| DbError::Message("\u{D65C}\u{C131} \u{D68C}\u{C6D0}\u{AD8C}\u{C774} \u{C5C6}\u{C2B5}\u{B2C8}\u{B2E4}.".into()))?;
 
     if membership.status == "paused" || member.status == "paused" {
-        return Err(DbError::Message("?? ?? ??????.".into()));
+        return Err(DbError::Message("\u{C77C}\u{C2DC}\u{C815}\u{C9C0} \u{C911}\u{C785}\u{B2C8}\u{B2E4}.".into()));
     }
 
     let today = today_date();
@@ -772,7 +911,7 @@ pub fn check_attendance(state: &AppState, member_id: i64) -> Result<MemberListIt
     );
     if computed != "active" {
         return Err(DbError::Message(
-            "?????? ?? ?? ??? ?? ?????.".into(),
+            "\u{C774}\u{C6A9} \u{AC00}\u{B2A5}\u{D55C} \u{D68C}\u{C6D0}\u{AD8C}\u{C774} \u{C544}\u{B2D9}\u{B2C8}\u{B2E4}.".into(),
         ));
     }
 
@@ -826,11 +965,7 @@ pub fn check_attendance(state: &AppState, member_id: i64) -> Result<MemberListIt
     );
 
     refresh_member_status(state, member_id)?;
-    list_members(state, &member.center, "", "all", "all", 1, 500)?
-        .0
-        .into_iter()
-        .find(|item| item.id == member_id)
-        .ok_or_else(|| DbError::Message("?? ?? ? ??? ??????.".into()))
+    get_member_list_item_by_id(state, member_id)
 }
 
 pub fn get_attendance_logs(
@@ -841,7 +976,7 @@ pub fn get_attendance_logs(
     state.with_conn(|conn| {
         let mut stmt = conn.prepare(
             "SELECT id, member_id, membership_id, center, checkin_at, attendance_type,
-                    deducted_count, memo, created_at
+                    deducted_count, memo, created_at, canceled_at, cancel_reason
              FROM attendance_logs WHERE member_id = ?1 ORDER BY checkin_at DESC LIMIT ?2",
         )?;
         let rows = stmt.query_map(params![member_id, limit], |row| {
@@ -855,6 +990,8 @@ pub fn get_attendance_logs(
                 deducted_count: row.get(6)?,
                 memo: row.get(7)?,
                 created_at: row.get(8)?,
+                canceled_at: row.get(9).ok(),
+                cancel_reason: row.get(10).ok(),
             })
         })?;
         let mut records = Vec::new();
@@ -924,7 +1061,7 @@ pub fn pause_membership(
     membership_id: i64,
     reason: Option<String>,
 ) -> Result<MemberListItem, DbError> {
-    let (member_id, center) = state.with_conn(|conn| {
+    let (member_id, _center) = state.with_conn(|conn| {
         let now = now_string();
         let today = today_string();
         let tx = conn.transaction()?;
@@ -974,18 +1111,14 @@ pub fn pause_membership(
     })?;
 
     refresh_member_status(state, member_id)?;
-    list_members(state, &center, "", "all", "all", 1, 500)?
-        .0
-        .into_iter()
-        .find(|item| item.id == member_id)
-        .ok_or_else(|| DbError::Message("?? ?? ? ??? ??????.".into()))
+    get_member_list_item_by_id(state, member_id)
 }
 
 pub fn resume_membership(
     state: &AppState,
     membership_id: i64,
 ) -> Result<MemberListItem, DbError> {
-    let (member_id, center, remaining_days) = state.with_conn(|conn| {
+    let (member_id, _center, remaining_days) = state.with_conn(|conn| {
         let now = now_string();
         let today = today_string();
         let tx = conn.transaction()?;
@@ -1029,11 +1162,7 @@ pub fn resume_membership(
 
     let _ = remaining_days;
     refresh_member_status(state, member_id)?;
-    list_members(state, &center, "", "all", "all", 1, 500)?
-        .0
-        .into_iter()
-        .find(|item| item.id == member_id)
-        .ok_or_else(|| DbError::Message("?? ?? ? ??? ??????.".into()))
+    get_member_list_item_by_id(state, member_id)
 }
 
 pub fn get_attendance(
@@ -1124,7 +1253,19 @@ pub fn get_dashboard_stats(
         )?;
 
         let junior_count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM members WHERE center = ?1 AND deleted_at IS NULL AND member_type = 'junior'",
+            &super::member_filter::count_junior_members_sql(),
+            params![center],
+            |r| r.get(0),
+        )?;
+
+        let regular_members: i64 = conn.query_row(
+            &super::member_filter::count_regular_members_sql(),
+            params![center],
+            |r| r.get(0),
+        )?;
+
+        let inactive_30_members: i64 = conn.query_row(
+            &super::member_filter::count_inactive_30_members_sql(&today),
             params![center],
             |r| r.get(0),
         )?;
@@ -1139,6 +1280,8 @@ pub fn get_dashboard_stats(
             monthly_count,
             session_count,
             junior_count,
+            regular_members,
+            inactive_30_members,
         })
     })
 }
@@ -1205,9 +1348,9 @@ fn restore_v1(state: &AppState, payload: serde_json::Value) -> Result<(), DbErro
         payload
             .get("members")
             .cloned()
-            .ok_or_else(|| DbError::Message("?? ??? members ???? ????.".into()))?,
+            .ok_or_else(|| DbError::Message("\u{BC31}\u{C5C5}\u{C5D0} members \u{B370}\u{C774}\u{D130}\u{AC00} \u{C5C6}\u{C2B5}\u{B2C8}\u{B2E4}.".into()))?,
     )
-    .map_err(|e| DbError::Message(format!("?? ??? ?? ?? ??: {e}")))?;
+    .map_err(|e| DbError::Message(format!("\u{BC31}\u{C5C5} \u{BC0D}\u{C774}\u{D130} \u{D30C}\u{C2F1} \u{C2E4}\u{D328}: {e}")))?;
 
     let attendance: Vec<serde_json::Value> = serde_json::from_value(
         payload
@@ -1215,7 +1358,7 @@ fn restore_v1(state: &AppState, payload: serde_json::Value) -> Result<(), DbErro
             .cloned()
             .unwrap_or(serde_json::json!([])),
     )
-    .map_err(|e| DbError::Message(format!("?? ??? ?? ?? ??: {e}")))?;
+    .map_err(|e| DbError::Message(format!("\u{BC31}\u{C5C5} \u{BC0D}\u{C774}\u{D130} \u{D30C}\u{C2F1} \u{C2E4}\u{D328}: {e}")))?;
 
     state.with_conn(|conn| {
         let tx = conn.transaction()?;
@@ -1321,6 +1464,7 @@ fn restore_v2(state: &AppState, payload: serde_json::Value) -> Result<(), DbErro
 }
 
 fn clear_all_tables(conn: &Connection) -> Result<(), DbError> {
+    conn.execute("DELETE FROM member_edit_logs", [])?;
     conn.execute("DELETE FROM attendance_logs", [])?;
     conn.execute("DELETE FROM payments", [])?;
     conn.execute("DELETE FROM pause_logs", [])?;
@@ -1423,6 +1567,8 @@ fn export_attendance(conn: &Connection) -> Result<Vec<AttendanceLog>, DbError> {
             deducted_count: row.get(6)?,
             memo: row.get(7)?,
             created_at: row.get(8)?,
+            canceled_at: None,
+            cancel_reason: None,
         })
     })?;
     let mut items = Vec::new();
@@ -1509,7 +1655,7 @@ fn export_trial_members(conn: &Connection) -> Result<Vec<crate::models::TrialMem
     Ok(items)
 }
 
-fn refresh_member_status(state: &AppState, member_id: i64) -> Result<(), DbError> {
+pub(crate) fn refresh_member_status(state: &AppState, member_id: i64) -> Result<(), DbError> {
     state.with_conn(|conn| refresh_member_status_conn(conn, member_id))
 }
 
@@ -1589,29 +1735,29 @@ pub fn refresh_all_statuses(conn: &Connection) -> Result<(), DbError> {
 
 fn validate_member_input(input: &MemberInput) -> Result<(), DbError> {
     if input.name.trim().is_empty() {
-        return Err(DbError::Message("??? ??????.".into()));
+        return Err(DbError::Message("\u{C774}\u{B984}\u{C744} \u{C785}\u{B825}\u{D574}\u{C8FC}\u{C138}\u{C694}.".into()));
     }
     if input.center != "ONCLE" && input.center != "GRABIT" {
-        return Err(DbError::Message("??? ??????.".into()));
+        return Err(DbError::Message("\u{C13C}\u{D130}\u{B97C} \u{C120}\u{D0DD}\u{D574}\u{C8FC}\u{C138}\u{C694}.".into()));
     }
     match input.membership_type.as_str() {
         "monthly_1" | "monthly_3" | "monthly_6" => {
             if input.end_date.as_ref().map(|s| s.is_empty()).unwrap_or(true) {
-                return Err(DbError::Message("???? ??????.".into()));
+                return Err(DbError::Message("\u{C885}\u{B8CC}\u{C77C}\u{C744} \u{C785}\u{B825}\u{D574}\u{C8FC}\u{C138}\u{C694}.".into()));
             }
         }
         "session" => {
             if input.total_sessions.unwrap_or(0) != 5 {
-                return Err(DbError::Message("???? 5? ?????.".into()));
+                return Err(DbError::Message("\u{D68C}\u{C218}\u{AD8C}\u{C740} 5\u{D68C}\u{B9CC} \u{AC00}\u{B2A5}\u{D569}\u{B2C8}\u{B2E4}.".into()));
             }
         }
         "junior" => {
             let total = input.total_sessions.unwrap_or(0);
             if total != 8 && total != 16 {
-                return Err(DbError::Message("????? 8? ?? 16?? ??? ? ????.".into()));
+                return Err(DbError::Message("\u{C8FC}\u{B2C8}\u{C5B4}\u{AD8C}\u{C740} 8\u{D68C} \u{B610}\u{B294} 16\u{D68C}\u{B9CC} \u{B4F1}\u{B85D}\u{D560} \u{C218} \u{C788}\u{C2B5}\u{B2C8}\u{B2E4}.".into()));
             }
         }
-        _ => return Err(DbError::Message("??? ??? ??????.".into())),
+        _ => return Err(DbError::Message("\u{C9C0}\u{C6D0}\u{D558}\u{C9C0} \u{C54A}\u{B294} \u{D68C}\u{C6D0}\u{AD8C} \u{C885}\u{B958}\u{C785}\u{B2C8}\u{B2E4}.".into())),
     }
     Ok(())
 }

@@ -3,15 +3,15 @@ import {
   CalendarCheck2,
   DatabaseBackup,
   Moon,
-  Mountain,
   Plus,
   Search,
   Sun,
   Users,
 } from "lucide-react";
+import { GrabonLogo, GrabonMark } from "./GrabonLogo";
 import type { ReactNode } from "react";
-import type { Center, DashboardStats, BackupInfo, MemberGroupFilter, MemberStatusFilter, StorageInfo } from "../types";
-import { MEMBER_GROUP_LABELS, MEMBER_STATUS_LABELS } from "../utils/member";
+import type { Center, DashboardStats, BackupInfo, MemberGroupFilter, MemberStatusFilter, PermissionSet } from "../types";
+import { MEMBER_GROUP_LABELS, MEMBER_STATUS_LABELS, getMemberGroupCount } from "../utils/member";
 
 interface HeaderProps {
   center: Center;
@@ -25,13 +25,12 @@ interface HeaderProps {
   dark: boolean;
   onToggleTheme: () => void;
   onAddMember: () => void;
-  onBackup: () => void;
-  onRestoreBackup: () => void;
-  onOpenBackupFolder: () => void;
-  onOpenDataFolder: () => void;
   stats: DashboardStats | null;
   backupInfo: BackupInfo | null;
-  storageInfo: StorageInfo | null;
+  permissions: PermissionSet;
+  accessibleCenters: Center[];
+  showMemberFilters?: boolean;
+  showStats?: boolean;
 }
 
 export function Header({
@@ -46,69 +45,60 @@ export function Header({
   dark,
   onToggleTheme,
   onAddMember,
-  onBackup,
-  onRestoreBackup,
-  onOpenBackupFolder,
-  onOpenDataFolder,
   stats,
   backupInfo,
-  storageInfo,
+  permissions,
+  accessibleCenters,
+  showMemberFilters = true,
+  showStats = true,
 }: HeaderProps) {
   return (
     <header className="glass-panel rounded-[1.5rem] p-5">
       <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex items-start gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-lg shadow-sky-500/30">
-            <Mountain size={28} />
-          </div>
+          <GrabonMark className="h-14 w-14 shrink-0 object-contain" />
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-500">
-              Climb Center Manager
-            </p>
-            <h1 className="mt-1 text-2xl font-bold">클라이밍 센터 회원관리</h1>
+            <GrabonLogo className="h-8 w-auto max-w-[220px] object-contain" />
+            <h1 className="mt-2 text-2xl font-bold">클라이밍 센터 회원관리</h1>
             <p className="mt-1 text-sm text-[var(--muted)]">
-              ONCLE / GRABIT 통합 회원·출석·만료 관리
+              {accessibleCenters.length > 1
+                ? "ONCLE / GRABIT 통합 회원·출석·만료 관리"
+                : `${accessibleCenters[0] ?? center} 회원·출석·만료 관리`}
             </p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {(["ONCLE", "GRABIT"] as Center[]).map((item) => (
-            <button
-              key={item}
-              className={`btn ${center === item ? "btn-primary" : "btn-secondary"}`}
-              onClick={() => onCenterChange(item)}
-            >
-              {item}
-            </button>
-          ))}
+          {accessibleCenters.length > 1 ? (
+            accessibleCenters.map((item) => (
+              <button
+                key={item}
+                className={`btn ${center === item ? "btn-primary" : "btn-secondary"}`}
+                onClick={() => onCenterChange(item)}
+              >
+                {item}
+              </button>
+            ))
+          ) : (
+            <span className="btn btn-primary cursor-default">{center}</span>
+          )}
           <button className="btn btn-secondary" onClick={onToggleTheme}>
             {dark ? <Sun size={18} /> : <Moon size={18} />}
             {dark ? "라이트" : "다크"}
           </button>
-          <button className="btn btn-secondary" onClick={onOpenDataFolder}>
-            <DatabaseBackup size={18} />
-            데이터 폴더
-          </button>
-          <button className="btn btn-secondary" onClick={onOpenBackupFolder}>
-            <DatabaseBackup size={18} />
-            백업 폴더
-          </button>
-          <button className="btn btn-secondary" onClick={onRestoreBackup}>
-            <DatabaseBackup size={18} />
-            복원
-          </button>
-          <button className="btn btn-secondary" onClick={onBackup}>
-            <DatabaseBackup size={18} />
-            수동 백업
-          </button>
-          <button className="btn btn-primary" onClick={onAddMember}>
+          <button
+            className="btn btn-primary"
+            disabled={!permissions.canCreateMember}
+            title={!permissions.canCreateMember ? "권한이 없습니다" : undefined}
+            onClick={onAddMember}
+          >
             <Plus size={18} />
             회원 등록
           </button>
         </div>
       </div>
 
+      {showMemberFilters && (
       <div className="mt-4 flex flex-wrap gap-2">
         {(Object.keys(MEMBER_GROUP_LABELS) as MemberGroupFilter[]).map((group) => (
           <button
@@ -116,11 +106,13 @@ export function Header({
             className={`btn ${memberGroup === group ? "btn-primary" : "btn-secondary"}`}
             onClick={() => onMemberGroupChange(group)}
           >
-            {MEMBER_GROUP_LABELS[group]}
+            {MEMBER_GROUP_LABELS[group]} {getMemberGroupCount(group, stats)}
           </button>
         ))}
       </div>
+      )}
 
+      {showMemberFilters && (
       <div className="mt-3 flex flex-wrap gap-2">
         {(Object.keys(MEMBER_STATUS_LABELS) as MemberStatusFilter[]).map((filter) => (
           <button
@@ -132,7 +124,9 @@ export function Header({
           </button>
         ))}
       </div>
+      )}
 
+      {showStats && permissions.canViewStats && (
       <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           icon={<Users size={18} />}
@@ -165,26 +159,9 @@ export function Header({
           compact
         />
       </div>
-
-      {(backupInfo || storageInfo) && (
-        <div className="mt-4 rounded-[1.2rem] border border-[var(--border)] bg-[var(--panel-strong)] px-4 py-3 text-xs text-[var(--muted)]">
-          <p>
-            <span className="font-semibold text-[var(--text)]">백업 폴더</span>{" "}
-            {backupInfo?.backup_dir ?? storageInfo?.backup_dir ?? "-"}
-          </p>
-          {backupInfo?.last_json_path && (
-            <p className="mt-1 break-all">
-              최근 JSON: {backupInfo.last_json_path}
-            </p>
-          )}
-          {backupInfo?.last_db_path && (
-            <p className="mt-1 break-all">
-              최근 DB: {backupInfo.last_db_path}
-            </p>
-          )}
-        </div>
       )}
 
+      {showMemberFilters && (
       <div className="relative mt-5">
         <Search
           size={18}
@@ -197,6 +174,7 @@ export function Header({
           onChange={(event) => onSearchChange(event.target.value)}
         />
       </div>
+      )}
     </header>
   );
 }

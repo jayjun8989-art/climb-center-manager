@@ -162,8 +162,7 @@ pub fn migrate_to_v2(conn: &Connection) -> SqlResult<()> {
 
 pub fn migrate_all(conn: &Connection) -> SqlResult<()> {
     migrate_to_v2(conn)?;
-    crate::db::sync_local::migrate_to_v3(conn)?;
-    Ok(())
+    crate::db::ensure_schema::ensure_local_schema(conn)
 }
 
 fn migrate_legacy_flat_schema(conn: &Connection) -> SqlResult<()> {

@@ -42,9 +42,89 @@ export const DB_MEMBERSHIP_LABELS: Record<string, string> = {
 
 export const MEMBER_GROUP_LABELS: Record<MemberGroupFilter, string> = {
   all: "전체 회원",
-  general: "일반 회원",
+  regular: "일반 회원",
   junior: "주니어",
+  inactive_30: "1개월 미등록",
 };
+
+export function normalizeMemberType(
+  memberType: string | null | undefined,
+  membershipType?: string | null,
+): "regular" | "junior" | "trial" {
+  const value = String(memberType ?? "").trim().toLowerCase();
+  if (value === "trial") return "trial";
+  if (value === "junior") return "junior";
+  if (value === "regular" || value === "general") return "regular";
+
+  const membership = String(membershipType ?? "").toLowerCase();
+  if (membership === "junior" || membership === "8times" || membership === "16times") {
+    return "junior";
+  }
+  return "regular";
+}
+
+export function memberMatchesGroupFilter(
+  member: Pick<MemberListItem, "member_type" | "membership_type" | "latest_membership_end_date" | "is_inactive_30_days" | "status">,
+  group: MemberGroupFilter,
+): boolean {
+  const normalized = normalizeMemberType(member.member_type, member.membership_type);
+  switch (group) {
+    case "regular":
+      return normalized === "regular";
+    case "junior":
+      return normalized === "junior";
+    case "inactive_30":
+      if (member.status === "paused") return false;
+      if (member.is_inactive_30_days != null) return member.is_inactive_30_days;
+      if (!member.latest_membership_end_date) return true;
+      return (
+        new Date(member.latest_membership_end_date).getTime() <=
+        Date.now() - 30 * 24 * 60 * 60 * 1000
+      );
+    default:
+      return true;
+  }
+}
+
+export function getMemberGroupCount(
+  group: MemberGroupFilter,
+  stats: { total_members: number; regular_members: number; junior_count: number; inactive_30_members: number } | null,
+): number {
+  if (!stats) return 0;
+  switch (group) {
+    case "all":
+      return stats.total_members;
+    case "regular":
+      return stats.regular_members;
+    case "junior":
+      return stats.junior_count;
+    case "inactive_30":
+      return stats.inactive_30_members;
+  }
+}
+
+export function formatLatestMembershipTypeLabel(type: string | null | undefined): string {
+  if (!type) return "없음";
+  const simplified = SUPABASE_MEMBERSHIP_TYPE_LABELS[type];
+  if (simplified) return simplified.split(" 또는")[0];
+  if (type === "30days" || type === "90days" || type === "180days" || type === "monthly") {
+    return "월권";
+  }
+  if (type === "5times" || type === "session") return "횟수권";
+  if (type === "junior" || type === "8times" || type === "16times") return "주니어권";
+  return DB_MEMBERSHIP_LABELS[type] ?? type;
+}
+
+export function formatInactivePeriodText(member: Pick<MemberListItem, "latest_membership_end_date" | "days_since_expired">): string {
+  if (!member.latest_membership_end_date) return "기록 없음";
+  const days = member.days_since_expired ?? 0;
+  return `${Math.max(days, 0)}일 미등록`;
+}
+
+export function formatLatestExpiryLabel(endDate: string | null | undefined): string {
+  if (!endDate) return "-";
+  return `${endDate} 만료`;
+}
 
 export const MEMBER_STATUS_LABELS: Record<MemberStatusFilter, string> = {
   all: "전체 상태",
@@ -54,8 +134,15 @@ export const MEMBER_STATUS_LABELS: Record<MemberStatusFilter, string> = {
 
 export const MEMBER_TYPE_LABELS: Record<string, string> = {
   general: "일반",
+  regular: "일반",
   junior: "주니어",
   trial: "체험",
+};
+
+export const SUPABASE_MEMBERSHIP_TYPE_LABELS: Record<string, string> = {
+  monthly: "월권 또는 기간권",
+  session: "횟수권",
+  junior: "주니어권",
 };
 
 export function normalizePhoneInput(value: string): string | null {
@@ -108,11 +195,30 @@ export function getJuniorCountFromItem(member: Pick<MemberListItem, "membership_
 
 export function formatMembershipLabel(member: Pick<MemberListItem, "membership_type" | "total_count">): string {
   if (!member.membership_type) return "회원권 없음";
+
+  const simplified = SUPABASE_MEMBERSHIP_TYPE_LABELS[member.membership_type];
+  if (simplified) {
+    if (member.membership_type === "junior") {
+      return `주니어권 (${getJuniorCountFromItem(member)}회)`;
+    }
+    return simplified;
+  }
+
   if (member.membership_type === "8times" || member.membership_type === "16times") {
-    return DB_MEMBERSHIP_LABELS[member.membership_type];
+    return `주니어권 (${getJuniorCountFromItem(member)}회)`;
   }
   if (member.membership_type === "junior") {
     return `주니어권 (${getJuniorCountFromItem(member)}회)`;
+  }
+  if (
+    member.membership_type === "30days" ||
+    member.membership_type === "90days" ||
+    member.membership_type === "180days"
+  ) {
+    return "월권 또는 기간권";
+  }
+  if (member.membership_type === "5times") {
+    return "횟수권";
   }
   return DB_MEMBERSHIP_LABELS[member.membership_type] ?? member.membership_type;
 }
@@ -205,4 +311,16 @@ export function paymentMethodLabel(method: string) {
     default:
       return "기타";
   }
+}
+
+/** Local SQLite member PK (Tauri). Supports id or legacy member_id field. */
+export function resolveMemberLocalId(member: {
+  id?: number | null;
+  member_id?: number | null;
+}): number {
+  const memberId = member.id ?? member.member_id;
+  if (memberId == null || memberId === 0) {
+    throw new Error("회원 ID를 찾을 수 없습니다.");
+  }
+  return memberId;
 }

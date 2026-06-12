@@ -1,0 +1,11 @@
+{
+    "platforms":  {
+                      "windows-x86_64":  {
+                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVJuUUtwKyt2VEVWL211U3h6YldZbmM4QXEyR1JQUTJLR2IxcjdYL2VzL3h4d1hiWkhLaExIU3c4bjRiaE1USk8vUktWYU5ZQS93Y2pIdXl1OUhBb2dJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMTg2MDMzCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xOV94NjQtc2V0dXAuZXhlCnNQNEpLdmJZQXdzQ3RwRjBPdHJEWi9YaXNWVU5jQ09SMEZQQ253bndkaHRWRWtnRS9MbW03RkIxbFZrSFlldlhtcFpjN1l1bTNJUXoxaU80MVc5NUJnPT0K",
+                                             "url":  "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.19/ClimbCenterManager_1.0.19_x64-setup.exe"
+                                         }
+                  },
+    "pub_date":  "2026-06-11T13:55:13Z",
+    "version":  "1.0.19",
+    "notes":  "Supabase에서 불러오기 오류 수정. remoteId 누락 문제 보완 및 로컬 DB 불러오기 안정화"
+}

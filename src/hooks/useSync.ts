@@ -1,17 +1,30 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { formatAppError } from "../utils/errors";
 import { isSupabaseConfigured } from "../lib/supabase/config";
-import { checkOnline, getSyncStatus, pushSyncQueue } from "../sync/engine";
-import type { SyncPhase, SyncRunResult, SyncStatus } from "../sync/types";
+import {
+  checkOnline,
+  getSyncStatus,
+  pullFromSupabase,
+  purgeUnsupportedSyncQueue,
+  pushSyncQueue,
+  repairSyncQueue,
+  type SyncErrorContext,
+} from "../sync/engine";
+import type { PullRunResult, SyncPhase, SyncRunResult, SyncStatus } from "../sync/types";
 
 const SYNC_INTERVAL_MS = 60_000;
 
-export function useSync(enabled: boolean) {
+export function useSync(enabled: boolean, syncContext: SyncErrorContext) {
   const [configured] = useState(isSupabaseConfigured());
   const [online, setOnline] = useState(false);
   const [status, setStatus] = useState<SyncStatus | null>(null);
   const [phase, setPhase] = useState<SyncPhase>("idle");
   const [lastResult, setLastResult] = useState<SyncRunResult | null>(null);
+  const [lastPullResult, setLastPullResult] = useState<PullRunResult | null>(null);
   const runningRef = useRef(false);
+  const autoPullAttemptedRef = useRef(false);
+  const syncContextRef = useRef(syncContext);
+  syncContextRef.current = syncContext;
 
   const refreshStatus = useCallback(async () => {
     const nextOnline = await checkOnline();
@@ -29,20 +42,20 @@ export function useSync(enabled: boolean) {
         failed: 0,
         skipped: 0,
         errors: [],
-        message: "Supabase ???? ?????.",
+        message: "로그인이 필요합니다.",
       } satisfies SyncRunResult;
     }
 
     runningRef.current = true;
     setPhase("pushing");
     try {
-      const result = await pushSyncQueue();
+      const result = await pushSyncQueue(syncContextRef.current);
       setLastResult(result);
       setPhase(result.failed > 0 ? "error" : "idle");
       await refreshStatus();
       return result;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = formatAppError(error);
       const result: SyncRunResult = {
         pushed: 0,
         failed: 1,
@@ -58,6 +71,54 @@ export function useSync(enabled: boolean) {
     }
   }, [configured, enabled, refreshStatus]);
 
+  const pullNow = useCallback(
+    async (options?: { onlyIfEmpty?: boolean }) => {
+      if (!configured || runningRef.current) return null;
+      if (!enabled) {
+        return {
+          importedMembers: 0,
+          importedMemberships: 0,
+          importedAttendance: 0,
+          importedLockers: 0,
+          updatedMembers: 0,
+          skipped: 0,
+          errors: [],
+          warnings: [],
+          message: "로그인이 필요합니다.",
+        } satisfies PullRunResult;
+      }
+
+      runningRef.current = true;
+      setPhase("pulling");
+      try {
+        const result = await pullFromSupabase(options);
+        setLastPullResult(result);
+        setPhase(result.errors.length > 0 ? "error" : "idle");
+        await refreshStatus();
+        return result;
+      } catch (error) {
+        const message = formatAppError(error);
+        const result: PullRunResult = {
+          importedMembers: 0,
+          importedMemberships: 0,
+          importedAttendance: 0,
+          importedLockers: 0,
+          updatedMembers: 0,
+          skipped: 0,
+          errors: [message],
+          warnings: [],
+          message,
+        };
+        setLastPullResult(result);
+        setPhase("error");
+        return result;
+      } finally {
+        runningRef.current = false;
+      }
+    },
+    [configured, enabled, refreshStatus],
+  );
+
   useEffect(() => {
     refreshStatus().catch(() => undefined);
     const timer = window.setInterval(() => {
@@ -72,13 +133,50 @@ export function useSync(enabled: boolean) {
     return () => window.clearInterval(timer);
   }, [enabled, refreshStatus, syncNow]);
 
+  useEffect(() => {
+    if (!enabled) {
+      autoPullAttemptedRef.current = false;
+      return;
+    }
+    if (!configured || autoPullAttemptedRef.current) return;
+    autoPullAttemptedRef.current = true;
+    pullNow({ onlyIfEmpty: true })
+      .then((result) => {
+        if (
+          result &&
+          (result.importedMembers > 0 ||
+            result.updatedMembers > 0 ||
+            result.importedMemberships > 0)
+        ) {
+          window.dispatchEvent(new CustomEvent("climb-sync-pull-complete"));
+        }
+      })
+      .catch(() => undefined);
+  }, [configured, enabled, pullNow]);
+
+  const repairQueue = useCallback(async () => {
+    const result = await repairSyncQueue();
+    await refreshStatus();
+    return result;
+  }, [refreshStatus]);
+
+  const purgeUnsupported = useCallback(async () => {
+    const result = await purgeUnsupportedSyncQueue();
+    await refreshStatus();
+    return result;
+  }, [refreshStatus]);
+
   return {
     configured,
     online,
     status,
     phase,
     lastResult,
+    lastPullResult,
     refreshStatus,
     syncNow,
+    pullNow,
+    repairQueue,
+    purgeUnsupported,
   };
 }

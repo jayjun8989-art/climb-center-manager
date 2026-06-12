@@ -48,3 +48,7 @@ backups/
 .env.*
 !.env.example
 !.env.example.*
+
+# Tauri updater signing (private key — never commit)
+keys/
+.tauri-keys/

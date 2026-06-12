@@ -10,10 +10,22 @@ pub struct Member {
     pub parent_name: Option<String>,
     pub parent_phone: Option<String>,
     pub memo: Option<String>,
+    #[serde(default)]
+    pub address: Option<String>,
     pub status: String,
     pub created_at: String,
     pub updated_at: String,
     pub deleted_at: Option<String>,
+    #[serde(default)]
+    pub locker_number: Option<String>,
+    #[serde(default)]
+    pub locker_status: Option<String>,
+    #[serde(default)]
+    pub locker_start_date: Option<String>,
+    #[serde(default)]
+    pub locker_end_date: Option<String>,
+    #[serde(default)]
+    pub locker_memo: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,8 +66,28 @@ pub struct MemberListItem {
     pub remaining_text: String,
     pub last_visit_at: Option<String>,
     pub pause_remaining_days: Option<i32>,
+    #[serde(default)]
+    pub latest_membership_end_date: Option<String>,
+    #[serde(default)]
+    pub latest_membership_type: Option<String>,
+    #[serde(default)]
+    pub days_since_expired: Option<i32>,
+    #[serde(default)]
+    pub is_inactive_30_days: bool,
+    #[serde(default)]
+    pub pause_start_date: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemberEditLog {
+    pub id: i64,
+    pub member_id: i64,
+    pub action: String,
+    pub editor: Option<String>,
+    pub summary: String,
+    pub created_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,6 +98,8 @@ pub struct MemberDetail {
     pub attendance: Vec<AttendanceLog>,
     pub payments: Vec<Payment>,
     pub pause_logs: Vec<PauseLog>,
+    #[serde(default)]
+    pub edit_logs: Vec<MemberEditLog>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -82,10 +116,17 @@ pub struct MemberInput {
     pub total_sessions: Option<i32>,
     pub remaining_sessions: Option<i32>,
     pub notes: Option<String>,
+    pub address: Option<String>,
     pub price: Option<f64>,
     pub payment_method: Option<String>,
     pub payment_date: Option<String>,
     pub payment_memo: Option<String>,
+    pub locker_number: Option<String>,
+    pub locker_start_date: Option<String>,
+    pub locker_end_date: Option<String>,
+    pub locker_memo: Option<String>,
+    #[serde(default)]
+    pub edited_by: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,6 +140,21 @@ pub struct AttendanceLog {
     pub deducted_count: i32,
     pub memo: Option<String>,
     pub created_at: String,
+    #[serde(default)]
+    pub canceled_at: Option<String>,
+    #[serde(default)]
+    pub cancel_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LockerListItem {
+    pub id: i64,
+    pub locker_number: String,
+    pub locker_status: String,
+    pub member_name: Option<String>,
+    pub locker_start_date: Option<String>,
+    pub locker_end_date: Option<String>,
+    pub memo: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -159,6 +215,8 @@ pub struct DashboardStats {
     pub monthly_count: i64,
     pub session_count: i64,
     pub junior_count: i64,
+    pub regular_members: i64,
+    pub inactive_30_members: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -186,6 +244,7 @@ pub struct BackupResult {
 pub struct StorageInfo {
     pub db_path: String,
     pub backup_dir: String,
+    pub reports_dir: String,
     pub journal_mode: String,
     pub integrity_ok: bool,
 }

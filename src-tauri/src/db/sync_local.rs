@@ -1,7 +1,12 @@
 use crate::db::{AppState, DbError};
+use crate::models::MemberInput;
 use chrono::Local;
 use rusqlite::{Connection, OptionalExtension, Result as SqlResult};
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+
+const CENTER_UUID_ONCLE: &str = "11111111-1111-1111-1111-111111111001";
+const CENTER_UUID_GRABIT: &str = "11111111-1111-1111-1111-111111111002";
 
 const SYNC_TABLES: &[&str] = &[
     "members",
@@ -82,6 +87,204 @@ fn add_column_if_missing(
     Ok(())
 }
 
+pub fn center_uuid_for_code(center: &str) -> Option<&'static str> {
+    match center {
+        "ONCLE" => Some(CENTER_UUID_ONCLE),
+        "GRABIT" => Some(CENTER_UUID_GRABIT),
+        _ => None,
+    }
+}
+
+fn db_membership_to_legacy_type(membership_type: &str) -> String {
+    match membership_type {
+        "30days" => "monthly_1".into(),
+        "90days" => "monthly_3".into(),
+        "180days" => "monthly_6".into(),
+        "5times" => "session".into(),
+        "8times" | "16times" | "junior" => "junior".into(),
+        _ => "monthly_1".into(),
+    }
+}
+
+/// Supabase 동기화용 JSON — center, name, center_id 필수 포함.
+pub fn member_sync_payload_from_input(input: &MemberInput) -> Result<String, DbError> {
+    let mut value =
+        serde_json::to_value(input).map_err(|error| DbError::Message(error.to_string()))?;
+    let obj = value
+        .as_object_mut()
+        .ok_or_else(|| DbError::Message("회원 데이터 형식 변환에 실패했습니다.".into()))?;
+    if let Some(center_id) = center_uuid_for_code(&input.center) {
+        obj.insert("center_id".to_string(), Value::String(center_id.to_string()));
+    }
+    serde_json::to_string(&value).map_err(|error| DbError::Message(error.to_string()))
+}
+
+pub fn build_member_sync_payload_json(state: &AppState, member_id: i64) -> Result<String, DbError> {
+    state.with_conn(|conn| build_member_sync_payload_json_conn(conn, member_id))
+}
+
+fn build_member_sync_payload_json_conn(conn: &Connection, member_id: i64) -> Result<String, DbError> {
+    let (name, phone, member_type, center, parent_name, parent_phone, memo, address): (
+        String,
+        Option<String>,
+        String,
+        String,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+    ) = conn
+        .query_row(
+            "SELECT name, phone, member_type, center, parent_name, parent_phone, memo, address
+             FROM members WHERE id = ?1",
+            [member_id],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                    row.get(5)?,
+                    row.get(6)?,
+                    row.get(7)?,
+                ))
+            },
+        )
+        .map_err(|_| DbError::Message(format!("로컬 회원 #{member_id}을 찾을 수 없습니다.")))?;
+
+    let membership = conn
+        .query_row(
+            "SELECT id, membership_type, start_date, end_date, total_count, remaining_count, price
+             FROM memberships
+             WHERE member_id = ?1
+             ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'paused' THEN 1 ELSE 2 END, id DESC
+             LIMIT 1",
+            [member_id],
+            |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                    row.get::<_, Option<i32>>(4)?,
+                    row.get::<_, Option<i32>>(5)?,
+                    row.get::<_, Option<f64>>(6)?,
+                ))
+            },
+        )
+        .optional()?;
+
+    let (
+        local_membership_id,
+        membership_type,
+        start_date,
+        end_date,
+        total_sessions,
+        remaining_sessions,
+        price,
+    ) = membership.unwrap_or((
+        0_i64,
+        "30days".to_string(),
+        Local::now().format("%Y-%m-%d").to_string(),
+        None,
+        None,
+        None,
+        None,
+    ));
+
+    let legacy_membership_type = db_membership_to_legacy_type(&membership_type);
+    let center_id = center_uuid_for_code(&center).map(str::to_string);
+
+    let payload = json!({
+        "center": center,
+        "name": name,
+        "center_id": center_id,
+        "phone": phone,
+        "member_type": member_type,
+        "parent_name": parent_name,
+        "parent_phone": parent_phone,
+        "membership_type": legacy_membership_type,
+        "local_membership_id": if local_membership_id > 0 {
+            json!(local_membership_id)
+        } else {
+            json!(null)
+        },
+        "start_date": start_date,
+        "end_date": end_date,
+        "total_sessions": total_sessions,
+        "remaining_sessions": remaining_sessions,
+        "notes": memo,
+        "address": address,
+        "price": price,
+    });
+
+    serde_json::to_string(&payload).map_err(|error| DbError::Message(error.to_string()))
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RepairSyncQueueResult {
+    pub repaired: i64,
+    pub removed: i64,
+    pub failed: i64,
+}
+
+pub fn repair_member_sync_queue(state: &AppState) -> Result<RepairSyncQueueResult, DbError> {
+    let items = list_sync_queue(state, 500)?;
+    let mut repaired = 0_i64;
+    let mut failed = 0_i64;
+
+    for item in items {
+        if item.entity_type != "member" {
+            continue;
+        }
+        if item.operation != "insert" && item.operation != "update" && item.operation != "soft_delete"
+        {
+            continue;
+        }
+
+        match build_member_sync_payload_json(state, item.entity_local_id) {
+            Ok(mut payload_json) => {
+                if item.operation == "soft_delete" {
+                    if let Ok(mut value) = serde_json::from_str::<Value>(&payload_json) {
+                        if let Some(obj) = value.as_object_mut() {
+                            obj.insert("local_id".to_string(), json!(item.entity_local_id));
+                        }
+                        payload_json = serde_json::to_string(&value)
+                            .map_err(|error| DbError::Message(error.to_string()))?;
+                    }
+                }
+                state.with_conn(|conn| {
+                    conn.execute(
+                        "UPDATE sync_queue SET payload_json = ?1, last_error = NULL WHERE id = ?2",
+                        rusqlite::params![payload_json, item.id],
+                    )?;
+                    Ok(())
+                })?;
+                repaired += 1;
+            }
+            Err(_) => failed += 1,
+        }
+    }
+
+    Ok(RepairSyncQueueResult {
+        repaired,
+        removed: 0,
+        failed,
+    })
+}
+
+pub fn purge_unsupported_sync_queue(state: &AppState) -> Result<i64, DbError> {
+    state.with_conn(|conn| {
+        let removed = conn.execute(
+            "DELETE FROM sync_queue
+             WHERE entity_type != 'member' OR last_error IS NOT NULL",
+            [],
+        )?;
+        Ok(removed as i64)
+    })
+}
+
 pub fn enqueue_entity_op(
     state: &AppState,
     entity_type: &str,
@@ -115,6 +318,7 @@ pub struct SyncQueueItem {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncStatus {
     pub pending_count: i64,
+    pub failed_count: i64,
     pub last_pull_at: Option<String>,
     pub last_push_at: Option<String>,
     pub device_id: Option<String>,
@@ -124,6 +328,12 @@ pub fn fetch_sync_status(state: &AppState) -> Result<SyncStatus, DbError> {
     state.with_conn(|conn| {
         let pending_count: i64 = conn.query_row(
             "SELECT COUNT(*) FROM sync_queue",
+            [],
+            |row| row.get(0),
+        )?;
+
+        let failed_count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL",
             [],
             |row| row.get(0),
         )?;
@@ -140,6 +350,7 @@ pub fn fetch_sync_status(state: &AppState) -> Result<SyncStatus, DbError> {
 
         Ok(SyncStatus {
             pending_count,
+            failed_count,
             last_pull_at: read_state("last_pull_at")?,
             last_push_at: read_state("last_push_at")?,
             device_id: read_state("device_id")?,

@@ -1,7 +1,8 @@
-import { CalendarCheck2, PauseCircle, PlayCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { CalendarCheck2, PauseCircle, PlayCircle, XCircle } from "lucide-react";
+import { startOfMonth } from "date-fns";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
-import type { MemberDetail, MemberListItem, PauseLog, Payment } from "../types";
+import type { AttendanceLog, MemberDetail, MemberListItem, PauseLog, Payment, PermissionSet } from "../types";
 import {
   formatDateTime,
   formatMembershipLabel,
@@ -11,29 +12,40 @@ import {
   MEMBER_TYPE_LABELS,
   paymentMethodLabel,
   phoneFormat,
+  resolveMemberLocalId,
 } from "../utils/member";
+import {
+  AttendanceCalendar,
+  formatAttendanceLogLine,
+  getAttendanceLogsForDate,
+} from "./AttendanceCalendar";
 
 interface MemberDetailPanelProps {
   member: MemberListItem | null;
-  onAttendance: (member: MemberListItem) => Promise<MemberListItem>;
+  onAttendance: (member: MemberListItem) => Promise<MemberListItem | null>;
   onUpdated: (member: MemberListItem) => void;
+  permissions: PermissionSet;
 }
 
-export function MemberDetailPanel({ member, onAttendance, onUpdated }: MemberDetailPanelProps) {
+export function MemberDetailPanel({ member, onAttendance, onUpdated, permissions }: MemberDetailPanelProps) {
   const [detail, setDetail] = useState<MemberDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [message, setMessage] = useState("");
+  const [calendarMonth, setCalendarMonth] = useState(() => startOfMonth(new Date()));
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   useEffect(() => {
     if (!member) {
       setDetail(null);
+      setSelectedDate(null);
       return;
     }
 
     setLoading(true);
+    const memberId = resolveMemberLocalId(member);
     api
-      .getMemberDetail(member.id)
+      .getMemberDetail(memberId)
       .then(setDetail)
       .catch((error) => {
         setDetail(null);
@@ -41,6 +53,16 @@ export function MemberDetailPanel({ member, onAttendance, onUpdated }: MemberDet
       })
       .finally(() => setLoading(false));
   }, [member]);
+
+  const dayLogs = useMemo(() => {
+    if (!detail || !selectedDate) return [];
+    return getAttendanceLogsForDate(detail.attendance, selectedDate);
+  }, [detail, selectedDate]);
+
+  const sortedAttendance = useMemo(() => {
+    if (!detail) return [];
+    return [...detail.attendance].sort((a, b) => b.checkin_at.localeCompare(a.checkin_at));
+  }, [detail]);
 
   if (!member) {
     return (
@@ -54,15 +76,21 @@ export function MemberDetailPanel({ member, onAttendance, onUpdated }: MemberDet
   }
 
   const currentMember = member;
+  const locker = detail?.member;
+
+  async function refreshDetail() {
+    const nextDetail = await api.getMemberDetail(currentMember.id);
+    setDetail(nextDetail);
+  }
 
   async function handleAttendance() {
     setProcessing(true);
     setMessage("");
     try {
       const updated = await onAttendance(currentMember);
+      if (!updated) return;
       onUpdated(updated);
-      const nextDetail = await api.getMemberDetail(currentMember.id);
-      setDetail(nextDetail);
+      await refreshDetail();
       setMessage(`${updated.name}님 출석이 완료되었습니다.`);
     } catch (error) {
       setMessage(String(error));
@@ -77,7 +105,7 @@ export function MemberDetailPanel({ member, onAttendance, onUpdated }: MemberDet
     try {
       const updated = await api.pauseMembership(currentMember.membership_id, reason);
       onUpdated(updated);
-      setDetail(await api.getMemberDetail(currentMember.id));
+      await refreshDetail();
       setMessage("회원권이 정지되었습니다.");
     } catch (error) {
       setMessage(String(error));
@@ -89,8 +117,21 @@ export function MemberDetailPanel({ member, onAttendance, onUpdated }: MemberDet
     try {
       const updated = await api.resumeMembership(currentMember.membership_id);
       onUpdated(updated);
-      setDetail(await api.getMemberDetail(currentMember.id));
+      await refreshDetail();
       setMessage("회원권 정지가 해제되었습니다.");
+    } catch (error) {
+      setMessage(String(error));
+    }
+  }
+
+  async function handleCancelAttendance(log: AttendanceLog) {
+    const reason = window.prompt("출석 취소 사유를 입력해주세요.", "") ?? "";
+    if (reason === null) return;
+    try {
+      const result = await api.cancelAttendance(log.id, reason || undefined);
+      onUpdated(result.data);
+      await refreshDetail();
+      setMessage("출석이 취소되었습니다.");
     } catch (error) {
       setMessage(String(error));
     }
@@ -111,17 +152,35 @@ export function MemberDetailPanel({ member, onAttendance, onUpdated }: MemberDet
           </div>
         </div>
         <div className="flex flex-col gap-2">
-          <button className="btn btn-primary" disabled={processing} onClick={handleAttendance}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={processing || !permissions.canCheckAttendance}
+            title={!permissions.canCheckAttendance ? permissions.denyReason : undefined}
+            onClick={() => void handleAttendance()}
+          >
             <CalendarCheck2 size={18} />
             {processing ? "처리 중..." : "출석 체크"}
           </button>
           {currentMember.membership_id && currentMember.status === "paused" ? (
-            <button className="btn btn-secondary" onClick={handleResume}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={!permissions.canResumeMembership}
+              title={!permissions.canResumeMembership ? permissions.denyReason : undefined}
+              onClick={() => void handleResume()}
+            >
               <PlayCircle size={18} />
               정지 해제
             </button>
           ) : currentMember.membership_id ? (
-            <button className="btn btn-secondary" onClick={handlePause}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={!permissions.canPauseMembership}
+              title={!permissions.canPauseMembership ? permissions.denyReason : undefined}
+              onClick={() => void handlePause()}
+            >
               <PauseCircle size={18} />
               회원권 정지
             </button>
@@ -137,7 +196,20 @@ export function MemberDetailPanel({ member, onAttendance, onUpdated }: MemberDet
         <DetailRow label="센터" value={currentMember.center} />
         <DetailRow label="시작일" value={currentMember.start_date ?? "-"} />
         <DetailRow label="만료/잔여" value={getExpiryText(currentMember)} />
-        <DetailRow label="최근 방문" value={currentMember.last_visit_at ? formatDateTime(currentMember.last_visit_at) : "-"} />
+        <DetailRow
+          label="최근 방문"
+          value={currentMember.last_visit_at ? formatDateTime(currentMember.last_visit_at) : "-"}
+        />
+        {locker?.locker_number && (
+          <>
+            <DetailRow label="락카 번호" value={locker.locker_number} />
+            <DetailRow
+              label="락카 기간"
+              value={`${locker.locker_start_date?.slice(0, 10) ?? "-"} ~ ${locker.locker_end_date?.slice(0, 10) ?? "-"}`}
+            />
+            {locker.locker_memo && <DetailRow label="락카 메모" value={locker.locker_memo} />}
+          </>
+        )}
         <DetailRow label="메모" value={currentMember.memo || "-"} />
       </dl>
 
@@ -151,15 +223,40 @@ export function MemberDetailPanel({ member, onAttendance, onUpdated }: MemberDet
         <p className="mt-6 text-sm text-[var(--muted)]">상세 기록 불러오는 중...</p>
       ) : detail ? (
         <div className="mt-6 space-y-6">
+          <AttendanceCalendar
+            attendanceLogs={detail.attendance}
+            month={calendarMonth}
+            onMonthChange={setCalendarMonth}
+            selectedDate={selectedDate}
+            onDateSelect={setSelectedDate}
+          />
+
+          {selectedDate && dayLogs.length > 0 && (
+            <div>
+              <h3 className="font-semibold">선택한 날짜 출석</h3>
+              <div className="mt-3 space-y-2">
+                {dayLogs.map((record) => (
+                  <AttendanceRow
+                    key={record.id}
+                    record={record}
+                    canCancel={permissions.canCancelAttendance && !record.canceled_at}
+                    onCancel={() => void handleCancelAttendance(record)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           <RecordSection title="출석 기록">
-            {detail.attendance.length === 0 ? (
+            {sortedAttendance.length === 0 ? (
               <EmptyText text="출석 기록이 없습니다." />
             ) : (
-              detail.attendance.map((record) => (
-                <RecordRow
+              sortedAttendance.map((record) => (
+                <AttendanceRow
                   key={record.id}
-                  primary={formatDateTime(record.checkin_at)}
-                  secondary={`${record.attendance_type}${record.deducted_count ? ` · ${record.deducted_count}회 차감` : ""}`}
+                  record={record}
+                  canCancel={permissions.canCancelAttendance && !record.canceled_at}
+                  onCancel={() => void handleCancelAttendance(record)}
                 />
               ))
             )}
@@ -196,9 +293,50 @@ export function MemberDetailPanel({ member, onAttendance, onUpdated }: MemberDet
               ))
             )}
           </RecordSection>
+
+          <RecordSection title="수정 내역">
+            {(detail.edit_logs ?? []).length === 0 ? (
+              <EmptyText text="수정 내역이 없습니다." />
+            ) : (
+              (detail.edit_logs ?? []).map((log) => (
+                <RecordRow
+                  key={log.id}
+                  primary={log.summary}
+                  secondary={`${formatDateTime(log.created_at)}${log.editor ? ` · ${log.editor}` : ""}`}
+                />
+              ))
+            )}
+          </RecordSection>
         </div>
       ) : null}
     </section>
+  );
+}
+
+function AttendanceRow({
+  record,
+  canCancel,
+  onCancel,
+}: {
+  record: AttendanceLog;
+  canCancel: boolean;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] px-4 py-3 text-sm">
+      <div>
+        <p>{formatAttendanceLogLine(record)}</p>
+        {record.cancel_reason && (
+          <p className="mt-1 text-xs text-[var(--muted)]">취소 사유: {record.cancel_reason}</p>
+        )}
+      </div>
+      {canCancel && (
+        <button type="button" className="btn btn-secondary shrink-0 !px-3 !py-2 text-xs" onClick={onCancel}>
+          <XCircle size={16} />
+          취소
+        </button>
+      )}
+    </div>
   );
 }
 

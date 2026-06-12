@@ -2,6 +2,7 @@ mod backup;
 mod commands;
 mod db;
 mod models;
+mod reports;
 
 use backup::ensure_daily_backup;
 use db::AppState;
@@ -33,15 +34,26 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let app_data_dir = app
                 .path()
                 .app_data_dir()
                 .map_err(|error| format!("앱 데이터 경로를 찾을 수 없습니다: {error}"))?;
-            let db_path = app_data_dir.join("climb_center.db");
-            let backup_dir = app_data_dir.join("backups");
+            std::fs::create_dir_all(&app_data_dir).ok();
 
-            let state = AppState::new(db_path, backup_dir).map_err(|error| {
+            const DB_FILENAME: &str = "climb-center-manager.db";
+            const LEGACY_DB_FILENAME: &str = "climb_center.db";
+            let db_path = app_data_dir.join(DB_FILENAME);
+            let legacy_db_path = app_data_dir.join(LEGACY_DB_FILENAME);
+            if !db_path.exists() && legacy_db_path.exists() {
+                let _ = std::fs::rename(&legacy_db_path, &db_path);
+            }
+            let backup_dir = app_data_dir.join("backups");
+            let reports_dir = app_data_dir.join("reports");
+
+            let state = AppState::new(db_path, backup_dir, reports_dir).map_err(|error| {
                 format!(
                     "데이터베이스를 초기화하지 못했습니다.\n경로: {}\n원인: {error}",
                     app_data_dir.to_string_lossy()
@@ -64,6 +76,9 @@ pub fn run() {
             commands::edit_member,
             commands::remove_member,
             commands::record_attendance,
+            commands::has_attendance_today_cmd,
+            commands::cancel_attendance_cmd,
+            commands::list_lockers,
             commands::fetch_attendance,
             commands::fetch_payments,
             commands::fetch_pause_logs,
@@ -79,6 +94,8 @@ pub fn run() {
             commands::open_data_folder,
             commands::fetch_sync_status,
             commands::fetch_sync_queue,
+            commands::repair_sync_queue,
+            commands::purge_unsupported_sync_queue_cmd,
             commands::complete_sync_queue_item,
             commands::fail_sync_queue_item,
             commands::update_sync_state,
@@ -86,6 +103,15 @@ pub fn run() {
             commands::complete_member_sync_push,
             commands::fetch_remote_id,
             commands::enqueue_sync,
+            commands::count_local_members,
+            commands::ensure_local_db_ready,
+            commands::import_pull_snapshot_cmd,
+            commands::fetch_report_info,
+            commands::write_report_file_cmd,
+            commands::set_report_state_cmd,
+            commands::open_reports_folder,
+            commands::open_report_file,
+            commands::open_reports_archive_folder,
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|error| {

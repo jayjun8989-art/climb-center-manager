@@ -11,6 +11,7 @@ export interface SyncQueueItem {
 
 export interface SyncStatus {
   pending_count: number;
+  failed_count: number;
   last_pull_at: string | null;
   last_push_at: string | null;
   device_id: string | null;
@@ -23,5 +24,17 @@ export interface SyncRunResult {
   failed: number;
   skipped: number;
   errors: string[];
+  message?: string;
+}
+
+export interface PullRunResult {
+  importedMembers: number;
+  importedMemberships: number;
+  importedAttendance: number;
+  importedLockers: number;
+  updatedMembers: number;
+  skipped: number;
+  errors: string[];
+  warnings: string[];
   message?: string;
 }

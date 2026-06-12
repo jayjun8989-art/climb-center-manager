@@ -1,20 +1,54 @@
+const ERROR_REPLACEMENTS: [RegExp, string][] = [
+  [/command failed/i, "요청 처리에 실패했습니다."],
+  [/invalid args/i, "입력값이 올바르지 않습니다."],
+  [/DUPLICATE_TODAY/i, "오늘 이미 출석 처리된 회원입니다."],
+  [/payload/i, "데이터"],
+  [/\bpush\b/i, "전송"],
+  [/supabase/i, "서버"],
+  [/\brpc\b/i, "요청"],
+  [/sync_queue/i, "동기화 대기 목록"],
+  [/tauri/i, "프로그램"],
+];
+
+function sanitizeUserMessage(message: string): string {
+  let result = message.trim();
+  for (const [pattern, replacement] of ERROR_REPLACEMENTS) {
+    result = result.replace(pattern, replacement);
+  }
+  if (result.includes("???") || result.includes("\uFFFD")) {
+    if (/CHECK constraint failed/i.test(message)) {
+      return "입력값이 저장 규칙에 맞지 않습니다. 회원 구분과 회원권 정보를 확인하세요.";
+    }
+    return "알 수 없는 오류가 발생했습니다.";
+  }
+  return result;
+}
+
 export function formatAppError(error: unknown): string {
   if (typeof error === "string" && error.trim()) {
-    return error;
+    return sanitizeUserMessage(error);
   }
 
   if (error instanceof Error && error.message.trim()) {
-    return error.message;
+    return sanitizeUserMessage(error.message);
   }
 
   if (error && typeof error === "object") {
-    const maybeMessage = (error as { message?: unknown }).message;
-    if (typeof maybeMessage === "string" && maybeMessage.trim()) {
-      return maybeMessage;
+    const record = error as Record<string, unknown>;
+    if (typeof record.message === "string" && record.message.trim()) {
+      return sanitizeUserMessage(record.message);
+    }
+    if (typeof record.error === "string" && record.error.trim()) {
+      return sanitizeUserMessage(record.error);
     }
   }
 
-  return "? ? ?? ??? ??????.";
+  return "알 수 없는 오류가 발생했습니다.";
+}
+export function logAppError(context: string, error: unknown): string {
+  const message = formatAppError(error);
+  console.error(`[${context}]`, error);
+  return message;
 }
 
 export function showFatalError(title: string, message: string) {
@@ -34,7 +68,7 @@ export function showFatalError(title: string, message: string) {
       <div style="max-width: 720px; width: 100%;">
         <h1 style="font-size: 1.5rem; margin: 0 0 0.75rem;">${escapeHtml(title)}</h1>
         <p style="margin: 0 0 1rem; color: #94a3b8;">
-          ?? ?? ????? ?? ???? ?? ??????.
+          앱을 시작하지 못했습니다. 아래 메시지를 확인해주세요.
         </p>
         <pre style="
           white-space: pre-wrap;

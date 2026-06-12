@@ -1,41 +1,65 @@
-import { invoke } from "@tauri-apps/api/core";
 import type { Center, MemberInput } from "../types";
+import { invokeCommand, isTauriApp, safeInvoke } from "../lib/tauri";
 import { getSession } from "../lib/supabase/auth";
 import { getSupabaseClient } from "../lib/supabase/client";
 import { isSupabaseConfigured } from "../lib/supabase/config";
-import { centerIdForCode } from "../lib/supabase/centers";
-import { formatSyncError } from "./errors";
-import type { SyncQueueItem, SyncRunResult, SyncStatus } from "./types";
+import {
+  centerCodeFromId,
+  centerIdForCode,
+  resolveCenterId,
+  resolveCenterIds,
+} from "../lib/supabase/centers";
+import {
+  buildSupabaseMembershipRow,
+  supabaseMemberTypeFromPayload,
+} from "./membershipMapping";
+import { formatSyncError, isPostgrestError } from "./errors";
+import { buildPullSnapshot, toInvokePullSnapshot } from "./pullMapping";
+import type { SyncErrorContext } from "./permissionContext";
+import type { PullRunResult, SyncQueueItem, SyncRunResult, SyncStatus } from "./types";
 
 const DEVICE_ID_KEY = "device_id";
 
-type MemberSyncPayload = MemberInput & { center: Center };
+type MemberSyncPayload = MemberInput & {
+  center: Center;
+  center_id?: string;
+  local_id?: number;
+  local_membership_id?: number | null;
+};
+
+type PayloadParseResult =
+  | { ok: true; payload: MemberSyncPayload }
+  | { ok: false; missingFields: string[]; message: string };
 
 async function fetchLocalSyncStatus(): Promise<SyncStatus> {
-  return invoke<SyncStatus>("fetch_sync_status");
+  return (await safeInvoke<SyncStatus>("fetch_sync_status")) ?? {
+    pending_count: 0,
+    failed_count: 0,
+    last_pull_at: null,
+    last_push_at: null,
+    device_id: null,
+  };
 }
 
 async function fetchLocalQueue(limit = 100): Promise<SyncQueueItem[]> {
-  return invoke<SyncQueueItem[]>("fetch_sync_queue", { limit });
+  return (await safeInvoke<SyncQueueItem[]>("fetch_sync_queue", { limit })) ?? [];
 }
 
 async function failQueueItem(id: number, error: string) {
-  return invoke("fail_sync_queue_item", { id, error });
+  await safeInvoke("fail_sync_queue_item", { id, error });
 }
 
 async function updateSyncState(key: string, value: string) {
-  return invoke("update_sync_state", { key, value });
+  await safeInvoke("update_sync_state", { key, value });
 }
 
 async function fetchRemoteId(entityType: string, localId: number): Promise<string | null> {
-  try {
-    return await invoke<string | null>("fetch_remote_id", {
+  return (
+    (await safeInvoke<string | null>("fetch_remote_id", {
       entity_type: entityType,
       local_id: localId,
-    });
-  } catch {
-    return null;
-  }
+    })) ?? null
+  );
 }
 
 async function completeMemberPush(
@@ -44,7 +68,7 @@ async function completeMemberPush(
   remoteId: string,
   remoteUpdatedAt?: string | null,
 ) {
-  return invoke("complete_member_sync_push", {
+  await safeInvoke("complete_member_sync_push", {
     queue_id: queueId,
     local_member_id: localMemberId,
     remote_id: remoteId,
@@ -56,12 +80,89 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-function parseMemberPayload(payloadJson: string): MemberSyncPayload {
-  const payload = JSON.parse(payloadJson) as MemberSyncPayload;
-  if (!payload.center || !payload.name?.trim()) {
-    throw new Error("??? payload? ?? ?? ?? ??? ????.");
+function normalizeCenter(value: unknown): Center | null {
+  if (value === "ONCLE" || value === "GRABIT") return value;
+  return null;
+}
+
+function parseMemberPayload(payloadJson: string): PayloadParseResult {
+  let raw: Record<string, unknown>;
+  try {
+    raw = JSON.parse(payloadJson) as Record<string, unknown>;
+  } catch {
+    return {
+      ok: false,
+      missingFields: ["(JSON 파싱 실패)"],
+      message: "동기화 데이터 형식이 올바르지 않습니다.",
+    };
   }
-  return payload;
+
+  const missingFields: string[] = [];
+  const center = normalizeCenter(raw.center);
+  const centerId = typeof raw.center_id === "string" ? raw.center_id.trim() : "";
+  const name = typeof raw.name === "string" ? raw.name.trim() : "";
+
+  if (!name) missingFields.push("name");
+  if (!center && !centerId) {
+    missingFields.push("center");
+    missingFields.push("center_id");
+  }
+
+  if (missingFields.length > 0) {
+    return {
+      ok: false,
+      missingFields,
+      message: `동기화 데이터에 필수 정보(${missingFields.join(", ")})가 없습니다.`,
+    };
+  }
+
+  const resolvedCenter = center ?? (centerId ? centerCodeFromId(centerId) : null);
+  if (!resolvedCenter) {
+    return {
+      ok: false,
+      missingFields: ["center"],
+      message: "동기화 데이터에 센터 정보가 없습니다.",
+    };
+  }
+
+  const base = raw as unknown as MemberSyncPayload;
+  const localMembershipId =
+    typeof raw.local_membership_id === "number" ? raw.local_membership_id : null;
+  return {
+    ok: true,
+    payload: {
+      ...base,
+      center: resolvedCenter,
+      name,
+      center_id: centerId || centerIdForCode(resolvedCenter),
+      local_membership_id: localMembershipId,
+    },
+  };
+}
+
+function memberNameFromPayloadJson(payloadJson: string): string | null {
+  try {
+    const raw = JSON.parse(payloadJson) as { name?: unknown };
+    return typeof raw.name === "string" && raw.name.trim() ? raw.name.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+function formatSyncFailure(
+  item: SyncQueueItem,
+  operation: string,
+  detail: { missingFields?: string[]; message: string },
+  center?: Center | null,
+): string {
+  const nameHint = memberNameFromPayloadJson(item.payload_json);
+  const fields =
+    detail.missingFields && detail.missingFields.length > 0
+      ? ` · 누락: ${detail.missingFields.join(", ")}`
+      : "";
+  const label = nameHint ? `"${nameHint}"` : `회원 #${item.entity_local_id}`;
+  const centerHint = center ? ` · 센터: ${center}` : "";
+  return `${label} · ${operation}${fields}${centerHint} · ${detail.message}`;
 }
 
 function memberRowFromPayload(payload: MemberSyncPayload, centerId: string) {
@@ -69,11 +170,137 @@ function memberRowFromPayload(payload: MemberSyncPayload, centerId: string) {
     center_id: centerId,
     name: payload.name.trim(),
     phone: payload.phone?.trim() || null,
-    member_type: payload.member_type ?? "general",
+    address: payload.address?.trim() || null,
+    member_type: supabaseMemberTypeFromPayload(payload),
     parent_name: payload.parent_name ?? null,
     parent_phone: payload.parent_phone ?? null,
     memo: payload.notes ?? null,
   };
+}
+
+async function mapRemoteMembershipId(
+  localMembershipId: number,
+  remoteMembershipId: string,
+): Promise<void> {
+  await safeInvoke("map_remote_id", {
+    entity_type: "membership",
+    local_id: localMembershipId,
+    remote_id: remoteMembershipId,
+  });
+}
+
+async function upsertRemoteMembership(
+  supabase: NonNullable<ReturnType<typeof getSupabaseClient>>,
+  payload: MemberSyncPayload,
+  remoteMemberId: string,
+  centerId: string,
+): Promise<void> {
+  const membershipRow = buildSupabaseMembershipRow(payload, remoteMemberId, centerId);
+  const localMembershipId = payload.local_membership_id ?? null;
+
+  let remoteMembershipId =
+    localMembershipId != null ? await fetchRemoteId("membership", localMembershipId) : null;
+
+  if (!remoteMembershipId) {
+    const { data: existing, error: lookupError } = await supabase
+      .from("memberships")
+      .select("id")
+      .eq("member_id", remoteMemberId)
+      .in("status", ["active", "paused"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (lookupError) throw lookupError;
+    remoteMembershipId = existing?.id ?? null;
+  }
+
+  if (remoteMembershipId) {
+    const { data, error } = await supabase
+      .from("memberships")
+      .update(membershipRow)
+      .eq("id", remoteMembershipId)
+      .select("id")
+      .single();
+    if (error) throw error;
+    if (localMembershipId != null) {
+      await mapRemoteMembershipId(localMembershipId, data.id);
+    }
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("memberships")
+    .insert(membershipRow)
+    .select("id")
+    .single();
+  if (error) throw error;
+  if (localMembershipId != null) {
+    await mapRemoteMembershipId(localMembershipId, data.id);
+  }
+}
+
+function normalizePhoneDigits(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, "");
+  return digits || null;
+}
+
+async function findRemoteMemberByPhone(
+  supabase: NonNullable<ReturnType<typeof getSupabaseClient>>,
+  centerId: string,
+  phone: string | null | undefined,
+): Promise<{ id: string; updated_at: string } | null> {
+  const phoneNormalized = normalizePhoneDigits(phone);
+  if (!phoneNormalized) return null;
+
+  const { data, error } = await supabase
+    .from("members")
+    .select("id, updated_at")
+    .eq("center_id", centerId)
+    .eq("phone_normalized", phoneNormalized)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+async function upsertRemoteMember(
+  supabase: NonNullable<ReturnType<typeof getSupabaseClient>>,
+  row: ReturnType<typeof memberRowFromPayload>,
+  centerId: string,
+  phone: string | null | undefined,
+): Promise<{ id: string; updated_at: string }> {
+  const { data, error } = await supabase
+    .from("members")
+    .insert(row)
+    .select("id, updated_at")
+    .single();
+
+  if (
+    error &&
+    isPostgrestError(error) &&
+    error.code === "23505"
+  ) {
+    const existing = await findRemoteMemberByPhone(supabase, centerId, phone);
+    if (existing) {
+      const { data: updated, error: updateError } = await supabase
+        .from("members")
+        .update(row)
+        .eq("id", existing.id)
+        .select("id, updated_at")
+        .single();
+      if (updateError) throw updateError;
+      return updated;
+    }
+  }
+
+  if (error) throw error;
+  return data;
+}
+
+async function resolveCenterIdForPayload(payload: MemberSyncPayload): Promise<string> {
+  if (payload.center_id?.trim()) return payload.center_id.trim();
+  return resolveCenterId(payload.center);
 }
 
 async function ensureDeviceId(status: SyncStatus): Promise<string> {
@@ -83,8 +310,47 @@ async function ensureDeviceId(status: SyncStatus): Promise<string> {
   return deviceId;
 }
 
+export async function repairSyncQueue(): Promise<{
+  repaired: number;
+  failed: number;
+  message: string;
+}> {
+  if (!isTauriApp()) {
+    return { repaired: 0, failed: 0, message: "데스크톱 앱에서만 대기 목록을 복구할 수 있습니다." };
+  }
+  const result = await safeInvoke<{ repaired: number; failed: number; removed: number }>(
+    "repair_sync_queue",
+  );
+  if (!result) {
+    return { repaired: 0, failed: 0, message: "대기 목록 복구에 실패했습니다." };
+  }
+  return {
+    repaired: result.repaired,
+    failed: result.failed,
+    message: `대기 목록 복구 완료: ${result.repaired}건 갱신${result.failed > 0 ? `, 실패 ${result.failed}건` : ""}`,
+  };
+}
+
+export async function purgeUnsupportedSyncQueue(): Promise<{
+  removed: number;
+  message: string;
+}> {
+  if (!isTauriApp()) {
+    return { removed: 0, message: "데스크톱 앱에서만 정리할 수 있습니다." };
+  }
+  const removed =
+    (await safeInvoke<number>("purge_unsupported_sync_queue_cmd")) ?? 0;
+  return {
+    removed,
+    message:
+      removed > 0
+        ? `실패·불필요 동기화 대기 항목 ${removed}건을 제거했습니다.`
+        : "제거할 대기 항목이 없습니다.",
+  };
+}
+
 export async function checkOnline(): Promise<boolean> {
-  if (!isSupabaseConfigured()) return false;
+  if (!isSupabaseConfigured() || !isTauriApp()) return false;
   try {
     const supabase = getSupabaseClient();
     if (!supabase) return false;
@@ -97,39 +363,80 @@ export async function checkOnline(): Promise<boolean> {
 
 async function pushMemberQueueItem(
   item: SyncQueueItem,
+  syncContext: SyncErrorContext,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = getSupabaseClient();
   if (!supabase) {
-    return { ok: false, error: "Supabase ?????? ????? ?????." };
+    return { ok: false, error: "서버 연결을 확인해주세요." };
   }
 
-  const payload = parseMemberPayload(item.payload_json);
-  const centerId = centerIdForCode(payload.center);
-  const row = memberRowFromPayload(payload, centerId);
+  const operation = item.operation;
 
-  try {
-    if (item.operation === "insert") {
+  if (operation === "soft_delete") {
+    try {
+      const remoteId = await fetchRemoteId("member", item.entity_local_id);
+      if (!remoteId) {
+        await safeInvoke("complete_sync_queue_item", { id: item.id });
+        return { ok: true };
+      }
+      const deletedAt = nowIso();
       const { data, error } = await supabase
         .from("members")
-        .insert(row)
+        .update({ deleted_at: deletedAt, status: "inactive" })
+        .eq("id", remoteId)
         .select("id, updated_at")
         .single();
       if (error) throw error;
       await completeMemberPush(item.id, item.entity_local_id, data.id, data.updated_at);
       return { ok: true };
+    } catch (error) {
+      const message = formatSyncError(error, syncContext, null);
+      return {
+        ok: false,
+        error: formatSyncFailure(item, "삭제", { message }, null),
+      };
+    }
+  }
+
+  const parsed = parseMemberPayload(item.payload_json);
+  if (!parsed.ok) {
+    return {
+      ok: false,
+      error: formatSyncFailure(item, operation === "insert" ? "등록" : "수정", parsed, null),
+    };
+  }
+
+  const payload = parsed.payload;
+  let centerId: string;
+  try {
+    centerId = await resolveCenterIdForPayload(payload);
+  } catch (error) {
+    const message = formatSyncError(error, syncContext, payload.center);
+    return {
+      ok: false,
+      error: formatSyncFailure(item, operation === "insert" ? "등록" : "수정", {
+        missingFields: ["center_id"],
+        message,
+      }, payload.center),
+    };
+  }
+
+  const row = memberRowFromPayload(payload, centerId);
+
+  try {
+    if (operation === "insert") {
+      const data = await upsertRemoteMember(supabase, row, centerId, payload.phone);
+      await upsertRemoteMembership(supabase, payload, data.id, centerId);
+      await completeMemberPush(item.id, item.entity_local_id, data.id, data.updated_at);
+      return { ok: true };
     }
 
-    if (item.operation === "update") {
+    if (operation === "update") {
       let remoteId = await fetchRemoteId("member", item.entity_local_id);
 
       if (!remoteId) {
-        const { data, error } = await supabase
-          .from("members")
-          .insert(row)
-          .select("id, updated_at")
-          .single();
-        if (error) throw error;
-        remoteId = data.id;
+        const data = await upsertRemoteMember(supabase, row, centerId, payload.phone);
+        await upsertRemoteMembership(supabase, payload, data.id, centerId);
         await completeMemberPush(item.id, item.entity_local_id, data.id, data.updated_at);
         return { ok: true };
       }
@@ -141,43 +448,46 @@ async function pushMemberQueueItem(
         .select("id, updated_at")
         .single();
       if (error) throw error;
+      await upsertRemoteMembership(supabase, payload, data.id, centerId);
       await completeMemberPush(item.id, item.entity_local_id, data.id, data.updated_at);
       return { ok: true };
     }
 
-    if (item.operation === "soft_delete") {
-      const remoteId = await fetchRemoteId("member", item.entity_local_id);
-      if (!remoteId) {
-        return { ok: false, error: "??? ?? ?? ID ??? ????." };
-      }
-
-      const deletedAt = nowIso();
-      const { data, error } = await supabase
-        .from("members")
-        .update({ deleted_at: deletedAt, status: "inactive" })
-        .eq("id", remoteId)
-        .select("id, updated_at")
-        .single();
-      if (error) throw error;
-      await completeMemberPush(item.id, item.entity_local_id, data.id, data.updated_at);
-      return { ok: true };
-    }
-
-    return { ok: false, error: `???? ?? ??? ?????: ${item.operation}` };
+    return {
+      ok: false,
+      error: formatSyncFailure(item, operation, {
+        message: `지원하지 않는 작업입니다: ${operation}`,
+      }, payload.center),
+    };
   } catch (error) {
-    return { ok: false, error: formatSyncError(error) };
+    const message = formatSyncError(error, syncContext, payload.center);
+    console.error("[sync] members push 실패:", { operation, row, error });
+    return {
+      ok: false,
+      error: formatSyncFailure(item, operation === "insert" ? "등록" : "수정", { message }, payload.center),
+    };
   }
 }
 
-/** Push local sync_queue to Supabase (members only � no pull merge). */
-export async function pushSyncQueue(): Promise<SyncRunResult> {
+/** Push local sync_queue to Supabase (members only — no pull merge). */
+export async function pushSyncQueue(syncContext?: SyncErrorContext): Promise<SyncRunResult> {
+  if (!isTauriApp()) {
+    return {
+      pushed: 0,
+      failed: 0,
+      skipped: 0,
+      errors: [],
+      message: "데스크톱 앱에서만 동기화할 수 있습니다.",
+    };
+  }
+
   if (!isSupabaseConfigured()) {
     return {
       pushed: 0,
       failed: 0,
       skipped: 0,
       errors: [],
-      message: "Supabase? ???? ?????. .env ??? ?????.",
+      message: "서버 연결이 설정되지 않았습니다. 관리자에게 문의하세요.",
     };
   }
 
@@ -188,7 +498,7 @@ export async function pushSyncQueue(): Promise<SyncRunResult> {
       failed: 0,
       skipped: 0,
       errors: [],
-      message: "Supabase ???? ?????.",
+      message: "로그인이 필요합니다.",
     };
   }
 
@@ -199,12 +509,27 @@ export async function pushSyncQueue(): Promise<SyncRunResult> {
       failed: 0,
       skipped: 0,
       errors: [],
-      message: "Supabase ?????? ????? ?????.",
+      message: "서버 연결을 확인해주세요.",
     };
   }
 
+  await resolveCenterIds().catch((error) => {
+    console.warn("[sync] centers preload 실패, seed UUID 사용:", error);
+  });
+
+  await repairSyncQueue().catch((error) => {
+    console.warn("[sync] 큐 자동 복구 실패:", error);
+  });
+
   const status = await fetchLocalSyncStatus();
   await ensureDeviceId(status);
+
+  const context: SyncErrorContext = syncContext ?? {
+    loginEmail: session.user.email ?? null,
+    roles: null,
+    rolesLoaded: true,
+    rolesError: null,
+  };
 
   const queue = await fetchLocalQueue(100);
   let pushed = 0;
@@ -218,7 +543,7 @@ export async function pushSyncQueue(): Promise<SyncRunResult> {
       continue;
     }
 
-    const result = await pushMemberQueueItem(item);
+    const result = await pushMemberQueueItem(item, context);
     if (result.ok) {
       pushed += 1;
       continue;
@@ -226,7 +551,7 @@ export async function pushSyncQueue(): Promise<SyncRunResult> {
 
     await failQueueItem(item.id, result.error);
     failed += 1;
-    errors.push(`?? #${item.entity_local_id}: ${result.error}`);
+    errors.push(result.error);
   }
 
   if (pushed > 0) {
@@ -235,19 +560,209 @@ export async function pushSyncQueue(): Promise<SyncRunResult> {
 
   let message: string | undefined;
   if (pushed > 0 && failed === 0) {
-    message = `??? ??: ${pushed}? ???`;
+    message = `업로드 완료: ${pushed}건 반영`;
   } else if (failed > 0) {
-    message = errors[0] ?? `??? ?? ${failed}?`;
+    message = errors[0] ?? `업로드 실패 ${failed}건`;
   } else if (queue.length === 0) {
-    message = "???? ?? ??? ????.";
+    message = "동기화할 대기 항목이 없습니다.";
   } else if (skipped > 0 && pushed === 0 && failed === 0) {
-    message = "?? ??? ?? ??? ????. (?? ?? ?? push ???)";
+    message = `회원 외 ${skipped}건은 아직 동기화되지 않습니다. 「불필요 항목 정리」로 제거할 수 있습니다.`;
   }
 
   return { pushed, failed, skipped, errors, message };
 }
 
-/** @deprecated Use pushSyncQueue � pull merge is not implemented yet. */
+async function countLocalMembers(): Promise<number> {
+  return (await safeInvoke<number>("count_local_members")) ?? 0;
+}
+
+/** Pull members/memberships/attendance/lockers from Supabase into local SQLite cache. */
+export async function pullFromSupabase(options?: {
+  onlyIfEmpty?: boolean;
+  centerIds?: string[];
+}): Promise<PullRunResult> {
+  const emptyResult = (
+    partial: Partial<PullRunResult> & Pick<PullRunResult, "message">,
+  ): PullRunResult => ({
+    importedMembers: 0,
+    importedMemberships: 0,
+    importedAttendance: 0,
+    importedLockers: 0,
+    updatedMembers: 0,
+    skipped: 0,
+    errors: [],
+    warnings: [],
+    ...partial,
+  });
+
+  if (!isTauriApp()) {
+    return emptyResult({ message: "데스크톱 앱에서만 불러올 수 있습니다." });
+  }
+
+  if (!isSupabaseConfigured()) {
+    return emptyResult({ message: "서버 연결이 설정되지 않았습니다." });
+  }
+
+  const session = await getSession();
+  if (!session) {
+    return emptyResult({ message: "로그인이 필요합니다." });
+  }
+
+  try {
+    await invokeCommand<void>("ensure_local_db_ready");
+  } catch (error) {
+    const detail = formatSyncError(error);
+    console.error("[pull] ensure_local_db_ready failed", error);
+    return emptyResult({
+      errors: [detail],
+      message: `Supabase 데이터 불러오기에 실패했습니다: ${detail}`,
+    });
+  }
+
+  const localCount = await countLocalMembers();
+  if (options?.onlyIfEmpty && localCount > 0) {
+    return emptyResult({ message: "로컬 회원 데이터가 이미 있습니다." });
+  }
+
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return emptyResult({ message: "서버 연결을 확인해주세요." });
+  }
+
+  const centerIds =
+    options?.centerIds ?? Object.values(await resolveCenterIds().catch(() => CENTER_IDS_FALLBACK()));
+
+  const membersRes = await supabase
+    .from("members")
+    .select(
+      "id, center_id, name, phone, address, member_type, parent_name, parent_phone, memo, status, created_at, updated_at",
+    )
+    .in("center_id", centerIds)
+    .is("deleted_at", null);
+  if (membersRes.error) {
+    const message = formatSyncError(membersRes.error);
+    console.error("[pull] members fetch failed", membersRes.error);
+    return emptyResult({
+      errors: [message],
+      message,
+    });
+  }
+
+  const memberIds = (membersRes.data ?? []).map((row) => row.id);
+  if (memberIds.length === 0) {
+    await updateSyncState("last_pull_at", nowIso());
+    return emptyResult({ message: "Supabase에 불러올 회원이 없습니다." });
+  }
+
+  const warnings: string[] = [];
+  const errors: string[] = [];
+
+  const membershipsRes = await supabase
+    .from("memberships")
+    .select(
+      "id, member_id, center_id, membership_type, pass_type, start_date, end_date, total_count, used_count, remaining_count, status, price, created_at, updated_at",
+    )
+    .in("center_id", centerIds);
+  if (membershipsRes.error) {
+    const message = formatSyncError(membershipsRes.error);
+    console.warn("[pull] memberships fetch failed", membershipsRes.error);
+    warnings.push(`회원권 데이터는 불러오지 못했습니다: ${message}`);
+  }
+
+  const attendanceRes = await supabase
+    .from("attendance_logs")
+    .select(
+      "id, member_id, membership_id, center_id, checkin_at, attendance_type, deducted_count, memo, created_at",
+    )
+    .in("center_id", centerIds)
+    .is("canceled_at", null);
+  if (attendanceRes.error) {
+    const message = formatSyncError(attendanceRes.error);
+    console.warn("[pull] attendance fetch failed", attendanceRes.error);
+    warnings.push(`출석 데이터는 불러오지 못했습니다: ${message}`);
+  }
+
+  const lockersRes = await supabase
+    .from("lockers")
+    .select("member_id, center_id, locker_number, status, start_date, end_date, memo")
+    .in("center_id", centerIds)
+    .not("member_id", "is", null);
+  if (lockersRes.error) {
+    const message = formatSyncError(lockersRes.error);
+    console.warn("[pull] lockers fetch failed", lockersRes.error);
+    warnings.push(`락카 데이터는 불러오지 못했지만 회원관리 기능은 사용할 수 있습니다. (${message})`);
+  }
+
+  const snapshot = toInvokePullSnapshot(
+    buildPullSnapshot({
+      members: membersRes.data ?? [],
+      memberships: membershipsRes.data ?? [],
+      attendanceLogs: attendanceRes.data ?? [],
+      lockers: lockersRes.data ?? [],
+    }),
+  );
+
+  let importResult: {
+    importedMembers: number;
+    importedMemberships: number;
+    importedAttendance: number;
+    importedLockers: number;
+    updatedMembers: number;
+    skipped: number;
+  };
+
+  try {
+    console.debug("[pull] import_pull_snapshot_cmd payload", snapshot);
+    importResult = await invokeCommand("import_pull_snapshot_cmd", { snapshot });
+  } catch (error) {
+    const detail = formatSyncError(error);
+    console.error("[pull] import_pull_snapshot_cmd failed", error, snapshot);
+    return emptyResult({
+      errors: [detail],
+      warnings,
+      message: `Supabase 데이터 불러오기에 실패했습니다: ${detail}`,
+    });
+  }
+
+  await updateSyncState("last_pull_at", nowIso());
+
+  const totalImported =
+    importResult.importedMembers +
+    importResult.importedMemberships +
+    importResult.importedAttendance +
+    importResult.importedLockers;
+
+  let message: string;
+  if (totalImported > 0 || importResult.updatedMembers > 0) {
+    message = `불러오기 완료: 회원 ${importResult.importedMembers + importResult.updatedMembers}명 · 출석 ${importResult.importedAttendance}건 · 락카 ${importResult.importedLockers}건`;
+  } else {
+    message = "변경할 데이터가 없습니다.";
+  }
+  if (warnings.length > 0) {
+    message = `${message} ${warnings[0]}`;
+  }
+
+  return {
+    importedMembers: importResult.importedMembers,
+    importedMemberships: importResult.importedMemberships,
+    importedAttendance: importResult.importedAttendance,
+    importedLockers: importResult.importedLockers,
+    updatedMembers: importResult.updatedMembers,
+    skipped: importResult.skipped,
+    errors,
+    warnings,
+    message,
+  };
+}
+
+function CENTER_IDS_FALLBACK(): Record<Center, string> {
+  return {
+    ONCLE: centerIdForCode("ONCLE"),
+    GRABIT: centerIdForCode("GRABIT"),
+  };
+}
+
+/** @deprecated Use pushSyncQueue — pull merge is not implemented yet. */
 export async function runSync(_center?: Center): Promise<SyncRunResult> {
   return pushSyncQueue();
 }
@@ -255,3 +770,6 @@ export async function runSync(_center?: Center): Promise<SyncRunResult> {
 export async function getSyncStatus(): Promise<SyncStatus> {
   return fetchLocalSyncStatus();
 }
+
+export type { SyncErrorContext } from "./permissionContext";
+export { centerIdForCode };

@@ -78,9 +78,9 @@ pub fn display_badge(
 ) -> String {
     if member_status == "paused" || membership_status == "paused" {
         if let Some(days) = pause_remaining_days {
-            return format!("\u{cc28}\u{c815}\u{c911} / \u{b09a}\u{c740}\u{ae30}\u{ac04} {days}\u{c77c}");
+            return format!("\u{c815}\u{c9c0}\u{c911} / \u{b09a}\u{c740}\u{ae30}\u{ac04} {days}\u{c77c}");
         }
-        return "\u{cc28}\u{c815}\u{c911}".to_string();
+        return "\u{c815}\u{c9c0}\u{c911}".to_string();
     }
 
     if membership_status == "finished" {
@@ -102,7 +102,7 @@ pub fn display_badge(
                 }
             }
         }
-        return "\u{c774}\u{c6a9} \u{ac00}\u{ce59}".to_string();
+        return "\u{c774}\u{c6a9} \u{ac00}\u{b2a5}".to_string();
     }
 
     let remaining = remaining_count.unwrap_or(0);
@@ -112,7 +112,7 @@ pub fn display_badge(
     if remaining <= 2 {
         return "\u{c794}\u{c5ec} \u{d69f}\u{c218} \u{bd80}\u{c871}".to_string();
     }
-    "\u{c774}\u{c6a9} \u{ac00}\u{ce59}".to_string()
+    "\u{c774}\u{c6a9} \u{ac00}\u{b2a5}".to_string()
 }
 
 pub fn remaining_text(
@@ -124,7 +124,7 @@ pub fn remaining_text(
     today: NaiveDate,
 ) -> String {
     if let Some(days) = pause_remaining_days {
-        return format!("\u{cc28}\u{c815} \u{b7} \u{b09a}\u{c740} {days}\u{c77c}");
+        return format!("\u{c815}\u{c9c0} \u{b7} \u{b09a}\u{c740} {days}\u{c77c}");
     }
 
     if pass_type == "period" {
@@ -134,7 +134,7 @@ pub fn remaining_text(
                     return format!("\u{be14}\u{bae30} ({end})");
                 }
                 if days == 0 {
-                    return "\u{cc28}\u{c77c} \u{be14}\u{bae30}".to_string();
+                    return "\u{c624}\u{eb8a} \u{be14}\u{bae30}".to_string();
                 }
                 return format!("D-{days} ({end})");
             }
@@ -220,5 +220,15 @@ pub fn legacy_member_type(membership_type: &str) -> &'static str {
         "junior"
     } else {
         "general"
+    }
+}
+
+/// SQLite `members.member_type` CHECK allows general/junior/trial only.
+pub fn normalize_local_member_type(value: &str) -> &'static str {
+    match value {
+        "junior" => "junior",
+        "trial" => "trial",
+        "regular" | "general" => "general",
+        _ => "general",
     }
 }
