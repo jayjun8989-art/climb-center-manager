@@ -1753,8 +1753,16 @@ fn validate_member_input(input: &MemberInput) -> Result<(), DbError> {
         }
         "junior" => {
             let total = input.total_sessions.unwrap_or(0);
-            if total != 8 && total != 16 {
-                return Err(DbError::Message("\u{C8FC}\u{B2C8}\u{C5B4}\u{AD8C}\u{C740} 8\u{D68C} \u{B610}\u{B294} 16\u{D68C}\u{B9CC} \u{B4F1}\u{B85D}\u{D560} \u{C218} \u{C788}\u{C2B5}\u{B2C8}\u{B2E4}.".into()));
+            if total < 1 {
+                return Err(DbError::Message("수업 횟수는 1회 이상 입력해주세요.".into()));
+            }
+            if let Some(remaining) = input.remaining_sessions {
+                if remaining > total {
+                    return Err(DbError::Message("잔여 수업 횟수는 총 수업 횟수보다 클 수 없습니다.".into()));
+                }
+                if remaining < 0 {
+                    return Err(DbError::Message("수업 횟수는 1회 이상 입력해주세요.".into()));
+                }
             }
         }
         _ => return Err(DbError::Message("\u{C9C0}\u{C6D0}\u{D558}\u{C9C0} \u{C54A}\u{B294} \u{D68C}\u{C6D0}\u{AD8C} \u{C885}\u{B958}\u{C785}\u{B2C8}\u{B2E4}.".into())),

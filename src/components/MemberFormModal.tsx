@@ -8,14 +8,13 @@ import {
   dbMembershipToLegacy,
   getJuniorCountFromItem,
   getMonthlyDuration,
-  JUNIOR_COUNTS,
+  JUNIOR_COUNT_PRESETS,
   monthlyTypeFromDuration,
   normalizePhoneInput,
   resolveCategory,
   SESSION_TOTAL_COUNT,
   SESSION_VALIDITY_MONTHS,
   todayString,
-  type JuniorCount,
   type MonthlyDuration,
 } from "../utils/member";
 import { logAppError } from "../utils/errors";
@@ -58,7 +57,11 @@ export function MemberFormModal({
 
   const [monthlyDuration, setMonthlyDuration] = useState<MonthlyDuration>(1);
 
-  const [juniorCount, setJuniorCount] = useState<JuniorCount>(8);
+  const [juniorTotal, setJuniorTotal] = useState<number>(8);
+
+  const [juniorCustom, setJuniorCustom] = useState(false);
+
+  const [juniorRemaining, setJuniorRemaining] = useState<number>(8);
 
   const [startDate, setStartDate] = useState(todayString());
 
@@ -115,7 +118,12 @@ export function MemberFormModal({
       setPhone(member.phone ?? "");
       setCategory(resolveCategoryFromItem(member.membership_type));
       setMonthlyDuration(getMonthlyDuration(legacyType) ?? 1);
-      setJuniorCount(getJuniorCountFromItem(member));
+      {
+        const total = getJuniorCountFromItem(member);
+        setJuniorTotal(total);
+        setJuniorCustom(!JUNIOR_COUNT_PRESETS.includes(total));
+        setJuniorRemaining(member.remaining_count ?? total);
+      }
       setStartDate(member.start_date ?? todayString());
       setEndDate(member.end_date ?? "");
       setNotes(member.memo ?? "");
@@ -145,7 +153,11 @@ export function MemberFormModal({
 
     setMonthlyDuration(1);
 
-    setJuniorCount(8);
+    setJuniorTotal(8);
+
+    setJuniorCustom(false);
+
+    setJuniorRemaining(8);
 
     setStartDate(todayString());
 
@@ -261,9 +273,23 @@ export function MemberFormModal({
 
       membershipType = "junior";
 
-      totalSessions = juniorCount;
+      if (juniorTotal < 1) {
+        setError("수업 횟수는 1회 이상 입력해주세요.");
+        setSaving(false);
+        return;
+      }
 
-      remainingSessions = member?.remaining_count ?? juniorCount;
+      if (juniorRemaining > juniorTotal || juniorRemaining < 0) {
+        setError("잔여 수업 횟수는 총 수업 횟수보다 클 수 없습니다.");
+        setSaving(false);
+        return;
+      }
+
+      totalSessions = juniorTotal;
+
+      remainingSessions = juniorRemaining;
+
+      resolvedEndDate = endDate || null;
 
     }
 
@@ -534,11 +560,11 @@ export function MemberFormModal({
 
             <div>
 
-              <label className="field-label">주니어 횟수</label>
+              <label className="field-label">총 수업 횟수</label>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
 
-                {JUNIOR_COUNTS.map((count) => (
+                {JUNIOR_COUNT_PRESETS.map((count) => (
 
                   <button
 
@@ -546,9 +572,13 @@ export function MemberFormModal({
 
                     type="button"
 
-                    className={`btn ${juniorCount === count ? "btn-primary" : "btn-secondary"}`}
+                    className={`btn ${!juniorCustom && juniorTotal === count ? "btn-primary" : "btn-secondary"}`}
 
-                    onClick={() => setJuniorCount(count)}
+                    onClick={() => {
+                      setJuniorCustom(false);
+                      setJuniorTotal(count);
+                      if (!member) setJuniorRemaining(count);
+                    }}
 
                   >
 
@@ -558,13 +588,55 @@ export function MemberFormModal({
 
                 ))}
 
+                <button
+
+                  type="button"
+
+                  className={`btn ${juniorCustom ? "btn-primary" : "btn-secondary"}`}
+
+                  onClick={() => setJuniorCustom(true)}
+
+                >
+
+                  직접입력
+
+                </button>
+
               </div>
+
+              {juniorCustom && (
+                <input
+                  className="input mt-2"
+                  type="number"
+                  min={1}
+                  value={juniorTotal}
+                  onChange={(e) => {
+                    const value = Math.max(1, Number(e.target.value) || 0);
+                    setJuniorTotal(value);
+                    if (!member) setJuniorRemaining(value);
+                  }}
+                />
+              )}
 
               <p className="mt-2 text-xs text-[var(--muted)]">
 
-                주니어를 선택한 뒤 8회 또는 16회를 고르세요. 출석 시 1회씩 차감됩니다.
+                출석 시 잔여 수업 횟수가 1회씩 차감됩니다.
 
               </p>
+
+              {member && (
+                <div className="mt-3">
+                  <label className="field-label">잔여 수업 횟수</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min={0}
+                    max={juniorTotal}
+                    value={juniorRemaining}
+                    onChange={(e) => setJuniorRemaining(Math.max(0, Number(e.target.value) || 0))}
+                  />
+                </div>
+              )}
 
             </div>
 
@@ -600,35 +672,31 @@ export function MemberFormModal({
 
 
 
-            {category !== "junior" && (
+            <div>
 
-              <div>
+              <label className="field-label">
 
-                <label className="field-label">
+                {category === "session" ? "만료일 (자동)" : "만료일"}
 
-                  {category === "session" ? "만료일 (자동)" : "만료일"}
+              </label>
 
-                </label>
+              <input
 
-                <input
+                className="input"
 
-                  className="input"
+                type="date"
 
-                  type="date"
+                value={displayedEndDate}
 
-                  value={displayedEndDate}
+                onChange={(e) => setEndDate(e.target.value)}
 
-                  onChange={(e) => setEndDate(e.target.value)}
+                readOnly={category === "monthly" || category === "session"}
 
-                  readOnly={category === "monthly" || category === "session"}
+                required={category !== "junior"}
 
-                  required
+              />
 
-                />
-
-              </div>
-
-            )}
+            </div>
 
           </div>
           </>

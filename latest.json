@@ -1,11 +1,11 @@
 {
     "platforms":  {
                       "windows-x86_64":  {
-                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVJuUUtwKyt2VEVWL211U3h6YldZbmM4QXEyR1JQUTJLR2IxcjdYL2VzL3h4d1hiWkhLaExIU3c4bjRiaE1USk8vUktWYU5ZQS93Y2pIdXl1OUhBb2dJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMTg2MDMzCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xOV94NjQtc2V0dXAuZXhlCnNQNEpLdmJZQXdzQ3RwRjBPdHJEWi9YaXNWVU5jQ09SMEZQQ253bndkaHRWRWtnRS9MbW03RkIxbFZrSFlldlhtcFpjN1l1bTNJUXoxaU80MVc5NUJnPT0K",
-                                             "url":  "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.19/ClimbCenterManager_1.0.19_x64-setup.exe"
+                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZzYrR1ZrU1FFdW1TSmlneHpKNmMxZXhmVXFKQXFJVENDTG1DdFU3dlo2b1dpZXVOUkdmUVpDVTNFQkZqWkIwc0szbmZUcDJnZmpuZmhIbjZLT0ttbW5tWHowNWxvMkFJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMjQ3ODEyCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4yMl94NjQtc2V0dXAuZXhlCjN4RG5mbWZRUnBpYlJaaU4vTy9uRW5lck5ieFFyRzNMS0xGUmZSNDErZzgxN0JnRUk5eGtabUtybGE2RjYrU0hYVWNIK0ErWU5XRWFGTUJnNk12Q0FRPT0K",
+                                             "url":  "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.22/ClimbCenterManager_1.0.22_x64-setup.exe"
                                          }
                   },
-    "pub_date":  "2026-06-11T13:55:13Z",
-    "version":  "1.0.19",
-    "notes":  "Supabase에서 불러오기 오류 수정. remoteId 누락 문제 보완 및 로컬 DB 불러오기 안정화"
+    "pub_date":  "2026-06-12T16:03:00Z",
+    "version":  "1.0.22",
+    "notes":  "주니어 수업 횟수 임의 지정/수정 기능 추가, 주니어 잔여 수업 횟수 차감 반영, GRABON 아이콘 글씨 잘림 수정 및 투명 배경 아이콘 적용"
 }

@@ -130,14 +130,13 @@ function mapRemoteMemberType(value: string): string {
 }
 
 function mapRemoteMembershipType(row: SupabaseMembershipRow): string {
-  const total = row.total_count ?? row.remaining_count;
   switch (row.membership_type) {
     case "monthly":
       return "30days";
     case "session":
       return "5times";
     case "junior":
-      return total === 16 ? "16times" : "8times";
+      return "junior";
     case "trial":
       return "trial";
     default:

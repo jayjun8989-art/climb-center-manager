@@ -192,13 +192,9 @@ pub fn map_legacy_membership(
             )
         }
         "junior" => {
-            let total = if total_sessions == Some(16) { 16 } else { 8 };
+            let total = total_sessions.filter(|&v| v >= 1).unwrap_or(8);
             (
-                if total == 16 {
-                    "16times".into()
-                } else {
-                    "8times".into()
-                },
+                "junior".into(),
                 "count".into(),
                 Some(total),
                 None,

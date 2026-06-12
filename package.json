@@ -1,7 +1,7 @@
 {
   "name": "climb-center-manager",
   "private": true,
-  "version": "1.0.21",
+  "version": "1.0.22",
   "type": "module",
   "description": "클라이밍 센터 회원관리 프로그램",
   "scripts": {

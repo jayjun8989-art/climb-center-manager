@@ -101,8 +101,14 @@ pub fn check_attendance_with_options(
         today,
     );
     if computed != "active" {
+        if member.member_type == "junior"
+            && membership.pass_type == "count"
+            && membership.remaining_count.unwrap_or(0) <= 0
+        {
+            return Err(DbError::Message("잔여 수업 횟수가 없습니다.".into()));
+        }
         return Err(DbError::Message(
-            "?????? ??? ???? ??? ? ????.".into(),
+            "이용 가능한 회원권이 아닙니다.".into(),
         ));
     }
 

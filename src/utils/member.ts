@@ -15,11 +15,11 @@ export const CENTER_LABELS = {
 } as const;
 
 export type MonthlyDuration = 1 | 3 | 6;
-export type JuniorCount = 8 | 16;
+export type JuniorCount = number;
 
 export const SESSION_TOTAL_COUNT = 5;
 export const SESSION_VALIDITY_MONTHS = 2;
-export const JUNIOR_COUNTS: JuniorCount[] = [8, 16];
+export const JUNIOR_COUNT_PRESETS: number[] = [4, 8, 12, 16, 20];
 
 export const MEMBERSHIP_LABELS: Record<LegacyMembershipType, string> = {
   monthly_1: "월권 (1개월)",
@@ -189,7 +189,8 @@ export function getMonthlyDuration(type: LegacyMembershipType): MonthlyDuration 
 }
 
 export function getJuniorCountFromItem(member: Pick<MemberListItem, "membership_type" | "total_count">): JuniorCount {
-  if (member.membership_type === "16times" || member.total_count === 16) return 16;
+  if (member.total_count != null) return member.total_count;
+  if (member.membership_type === "16times") return 16;
   return 8;
 }
 

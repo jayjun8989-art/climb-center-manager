@@ -196,6 +196,15 @@ export function MemberDetailPanel({ member, onAttendance, onUpdated, permissions
         <DetailRow label="센터" value={currentMember.center} />
         <DetailRow label="시작일" value={currentMember.start_date ?? "-"} />
         <DetailRow label="만료/잔여" value={getExpiryText(currentMember)} />
+        {currentMember.member_type === "junior" && (
+          <>
+            <DetailRow label="종료일" value={currentMember.end_date ?? "-"} />
+            <DetailRow
+              label="총 수업 횟수 / 잔여 수업 횟수"
+              value={`${currentMember.total_count ?? "-"}회 / ${currentMember.remaining_count ?? "-"}회`}
+            />
+          </>
+        )}
         <DetailRow
           label="최근 방문"
           value={currentMember.last_visit_at ? formatDateTime(currentMember.last_visit_at) : "-"}
