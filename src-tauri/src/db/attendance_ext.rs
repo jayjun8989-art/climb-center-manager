@@ -26,12 +26,15 @@ pub fn migrate_attendance_cancel(conn: &rusqlite::Connection) -> Result<(), rusq
 }
 
 pub fn has_attendance_today(state: &AppState, member_id: i64) -> Result<bool, DbError> {
-    let today = today_string();
+    has_attendance_on_date(state, member_id, &today_string())
+}
+
+pub fn has_attendance_on_date(state: &AppState, member_id: i64, date: &str) -> Result<bool, DbError> {
     state.with_conn(|conn| {
         let count: i64 = conn.query_row(
             "SELECT COUNT(*) FROM attendance_logs
              WHERE member_id = ?1 AND date(checkin_at) = ?2 AND canceled_at IS NULL",
-            params![member_id, today],
+            params![member_id, date],
             |row| row.get(0),
         )?;
         Ok(count > 0)
@@ -61,8 +64,15 @@ pub fn check_attendance_with_options(
     member_id: i64,
     membership_id: Option<i64>,
     force_duplicate: bool,
+    checkin_date: Option<String>,
 ) -> Result<MemberListItem, DbError> {
-    if !force_duplicate && has_attendance_today(state, member_id)? {
+    let today_str = today_string();
+    let date = checkin_date.unwrap_or_else(|| today_str.clone());
+    if date > today_str {
+        return Err(DbError::Message("미래 날짜로는 출석 체크를 할 수 없습니다.".into()));
+    }
+
+    if !force_duplicate && has_attendance_on_date(state, member_id, &date)? {
         return Err(DbError::Message("DUPLICATE_TODAY".into()));
     }
 
@@ -115,6 +125,11 @@ pub fn check_attendance_with_options(
     state.with_conn(|conn| {
         let tx = conn.transaction()?;
         let now = now_string();
+        let checkin_at = if date == today_str {
+            now.clone()
+        } else {
+            format!("{date} 12:00:00")
+        };
         let mut deducted = 0;
 
         if membership.pass_type == "count" {
@@ -137,7 +152,7 @@ pub fn check_attendance_with_options(
                 member_id,
                 membership.id,
                 member.center,
-                now,
+                checkin_at,
                 attendance_type_for_member(&member.member_type),
                 deducted,
                 now,

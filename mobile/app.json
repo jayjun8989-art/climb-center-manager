@@ -1,16 +1,18 @@
 {
   "expo": {
-    "name": "클라이밍 센터",
+    "name": "GRABON Manager",
     "slug": "climb-center-mobile",
     "scheme": "climbcenter",
-    "version": "1.0.0",
+    "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.grabon.manager"
     },
     "android": {
+      "package": "com.grabon.manager",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -23,7 +25,22 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-router"
-    ]
+      "expo-router",
+      "expo-updates"
+    ],
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/d251a4af-5e6c-4fed-9341-7e860aa480dc",
+      "fallbackToCacheTimeout": 0
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d251a4af-5e6c-4fed-9341-7e860aa480dc"
+      }
+    },
+    "owner": "jayjun1227"
   }
 }

@@ -11,7 +11,7 @@ mod status;
 mod sync_local;
 
 pub use attendance_ext::{
-    cancel_attendance, check_attendance_with_options, has_attendance_today,
+    cancel_attendance, check_attendance_with_options, has_attendance_today, has_attendance_on_date,
 };
 pub use ensure_schema::ensure_local_schema;
 pub use locker::list_center_lockers;

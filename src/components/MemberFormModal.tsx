@@ -34,7 +34,7 @@ const categoryOptions: { value: MembershipCategory; label: string }[] = [
   { value: "junior", label: "주니어" },
 ];
 
-const monthlyDurations: MonthlyDuration[] = [1, 3, 6];
+const monthlyDurations: MonthlyDuration[] = [1, 2, 3, 6];
 
 function resolveCategoryFromItem(type: MemberListItem["membership_type"]): MembershipCategory {
   return resolveCategory(type ?? undefined);
@@ -498,7 +498,7 @@ export function MemberFormModal({
 
               <label className="field-label">월권 기간</label>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
 
                 {monthlyDurations.map((duration) => (
 

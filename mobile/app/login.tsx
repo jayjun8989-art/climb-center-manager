@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { useApp } from "../src/context/AppContext";
+import { GRABON_ADMIN_EMAIL } from "../src/lib/admin";
 
 export default function LoginScreen() {
   const { signIn } = useApp();
@@ -28,7 +29,11 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await signIn(email, password);
-      router.replace("/(app)/attendance");
+      if (email.trim() === GRABON_ADMIN_EMAIL) {
+        router.replace("/(admin)");
+      } else {
+        router.replace("/(app)/attendance");
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "???? ??????.");
     } finally {

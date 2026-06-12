@@ -14,7 +14,7 @@ export const CENTER_LABELS = {
   GRABIT: "GRABIT",
 } as const;
 
-export type MonthlyDuration = 1 | 3 | 6;
+export type MonthlyDuration = 1 | 2 | 3 | 6;
 export type JuniorCount = number;
 
 export const SESSION_TOTAL_COUNT = 5;
@@ -23,6 +23,7 @@ export const JUNIOR_COUNT_PRESETS: number[] = [4, 8, 12, 16, 20];
 
 export const MEMBERSHIP_LABELS: Record<LegacyMembershipType, string> = {
   monthly_1: "월권 (1개월)",
+  monthly_2: "월권 (2개월)",
   monthly_3: "월권 (3개월)",
   monthly_6: "월권 (6개월)",
   session: "횟수권 (5회/2개월)",
@@ -31,6 +32,7 @@ export const MEMBERSHIP_LABELS: Record<LegacyMembershipType, string> = {
 
 export const DB_MEMBERSHIP_LABELS: Record<string, string> = {
   "30days": "기간권 (30일)",
+  "60days": "기간권 (60일)",
   "90days": "기간권 (90일)",
   "180days": "기간권 (180일)",
   "5times": "횟수권 (5회)",
@@ -107,7 +109,7 @@ export function formatLatestMembershipTypeLabel(type: string | null | undefined)
   if (!type) return "없음";
   const simplified = SUPABASE_MEMBERSHIP_TYPE_LABELS[type];
   if (simplified) return simplified.split(" 또는")[0];
-  if (type === "30days" || type === "90days" || type === "180days" || type === "monthly") {
+  if (type === "30days" || type === "60days" || type === "90days" || type === "180days" || type === "monthly") {
     return "월권";
   }
   if (type === "5times" || type === "session") return "횟수권";
@@ -151,7 +153,7 @@ export function normalizePhoneInput(value: string): string | null {
 }
 
 export function isMonthlyType(type: LegacyMembershipType): boolean {
-  return type === "monthly_1" || type === "monthly_3" || type === "monthly_6";
+  return type === "monthly_1" || type === "monthly_2" || type === "monthly_3" || type === "monthly_6";
 }
 
 export function isJuniorType(type: LegacyMembershipType): boolean {
@@ -166,6 +168,8 @@ export function dbMembershipToLegacy(type: string | null | undefined): LegacyMem
   switch (type) {
     case "30days":
       return "monthly_1";
+    case "60days":
+      return "monthly_2";
     case "90days":
       return "monthly_3";
     case "180days":
@@ -183,6 +187,7 @@ export function dbMembershipToLegacy(type: string | null | undefined): LegacyMem
 
 export function getMonthlyDuration(type: LegacyMembershipType): MonthlyDuration | null {
   if (type === "monthly_1") return 1;
+  if (type === "monthly_2") return 2;
   if (type === "monthly_3") return 3;
   if (type === "monthly_6") return 6;
   return null;
@@ -213,6 +218,7 @@ export function formatMembershipLabel(member: Pick<MemberListItem, "membership_t
   }
   if (
     member.membership_type === "30days" ||
+    member.membership_type === "60days" ||
     member.membership_type === "90days" ||
     member.membership_type === "180days"
   ) {
@@ -226,6 +232,7 @@ export function formatMembershipLabel(member: Pick<MemberListItem, "membership_t
 
 export function monthlyTypeFromDuration(duration: MonthlyDuration): LegacyMembershipType {
   if (duration === 1) return "monthly_1";
+  if (duration === 2) return "monthly_2";
   if (duration === 3) return "monthly_3";
   return "monthly_6";
 }

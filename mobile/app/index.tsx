@@ -2,6 +2,7 @@ import { Redirect } from "expo-router";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useApp } from "../src/context/AppContext";
 import { isSupabaseConfigured } from "../src/lib/config";
+import { GRABON_ADMIN_EMAIL } from "../src/lib/admin";
 
 export default function Index() {
   const { session, loading } = useApp();
@@ -28,6 +29,10 @@ export default function Index() {
 
   if (!session) {
     return <Redirect href="/login" />;
+  }
+
+  if (session.user.email === GRABON_ADMIN_EMAIL) {
+    return <Redirect href="/(admin)" />;
   }
 
   return <Redirect href="/(app)/attendance" />;

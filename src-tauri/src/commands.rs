@@ -2,6 +2,7 @@ use crate::backup::{create_backup, get_backup_info, restore_backup};
 use crate::db::{
     cancel_attendance, check_attendance_with_options, complete_member_push, count_active_members,
     create_member, delete_member, enqueue_sync_item, ensure_local_schema, has_attendance_today,
+    has_attendance_on_date,
     import_pull_snapshot, list_center_lockers, get_attendance, get_dashboard_stats,
     get_expiring_members, get_member_detail, get_pause_logs, get_payments, get_remote_id, list_members,
     list_sync_queue, mark_sync_queue_error, pause_membership, purge_unsupported_sync_queue,
@@ -108,12 +109,14 @@ pub fn record_attendance(
     member_id: i64,
     membership_id: Option<i64>,
     force_duplicate: Option<bool>,
+    checkin_date: Option<String>,
 ) -> Result<MutationResult<MemberListItem>, String> {
     let member = check_attendance_with_options(
         &state,
         member_id,
         membership_id,
         force_duplicate.unwrap_or(false),
+        checkin_date,
     )
     .map_err(|e| e.to_string())?;
     Ok(MutationResult {
@@ -125,6 +128,15 @@ pub fn record_attendance(
 #[tauri::command]
 pub fn has_attendance_today_cmd(state: State<'_, AppState>, member_id: i64) -> Result<bool, String> {
     has_attendance_today(&state, member_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn has_attendance_on_date_cmd(
+    state: State<'_, AppState>,
+    member_id: i64,
+    date: String,
+) -> Result<bool, String> {
+    has_attendance_on_date(&state, member_id, &date).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

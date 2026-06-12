@@ -30,9 +30,11 @@ export function supabaseMembershipTypeFromLegacy(
 ): SupabaseMembershipType {
   switch (legacyType) {
     case "monthly_1":
+    case "monthly_2":
     case "monthly_3":
     case "monthly_6":
     case "30days":
+    case "60days":
     case "90days":
     case "180days":
     case "monthly":

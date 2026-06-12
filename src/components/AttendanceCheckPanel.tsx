@@ -12,10 +12,12 @@ interface AttendanceCheckPanelProps {
   loading: boolean;
   search: string;
   onSearch: (value: string) => void;
-  onAttendance: (member: MemberListItem) => void;
+  onAttendance: (member: MemberListItem, checkinDate: string) => void;
   permissions: PermissionSet;
   selectedId: number | null;
   onSelect: (member: MemberListItem) => void;
+  checkinDate: string;
+  onCheckinDateChange: (value: string) => void;
 }
 
 export function AttendanceCheckPanel({
@@ -27,12 +29,31 @@ export function AttendanceCheckPanel({
   permissions,
   selectedId,
   onSelect,
+  checkinDate,
+  onCheckinDateChange,
 }: AttendanceCheckPanelProps) {
+  const today = new Date().toISOString().slice(0, 10);
+  const isPastDate = checkinDate !== today;
+
   return (
     <section className="glass-panel flex min-h-[520px] flex-col rounded-[1.5rem] p-5">
       <div className="mb-4">
         <h2 className="text-lg font-bold">출석 체크</h2>
         <p className="text-sm text-[var(--muted)]">이름 또는 전화번호로 회원을 찾아 출석 처리합니다.</p>
+      </div>
+
+      <div className="mb-4 flex items-center gap-2">
+        <label className="text-sm text-[var(--muted)] shrink-0">출석 날짜</label>
+        <input
+          type="date"
+          className="input"
+          value={checkinDate}
+          max={today}
+          onChange={(event) => onCheckinDateChange(event.target.value || today)}
+        />
+        {isPastDate && (
+          <span className="text-xs font-semibold text-[var(--brand)]">지난 날짜로 출석 처리됩니다</span>
+        )}
       </div>
 
       <div className="relative mb-4">
@@ -90,7 +111,7 @@ export function AttendanceCheckPanel({
                     }
                     onClick={(event) => {
                       event.stopPropagation();
-                      onAttendance(member);
+                      onAttendance(member, checkinDate);
                     }}
                   >
                     <CalendarCheck2 size={18} />

@@ -137,9 +137,17 @@ export const api = {
     return readCommand("has_attendance_today_cmd", { memberId }, () => false);
   },
 
+  hasAttendanceOnDate(
+    member: MemberListItem | { id?: number | null; member_id?: number | null },
+    date: string,
+  ): Promise<boolean> {
+    const memberId = resolveMemberLocalId(member);
+    return readCommand("has_attendance_on_date_cmd", { memberId, date }, () => false);
+  },
+
   recordAttendance(
     member: MemberListItem | { id?: number | null; member_id?: number | null; membership_id?: number | null },
-    options?: { membershipId?: number | null; forceDuplicate?: boolean },
+    options?: { membershipId?: number | null; forceDuplicate?: boolean; checkinDate?: string | null },
   ): Promise<MutationResult<MemberListItem>> {
     const memberId = resolveMemberLocalId(member);
     const membershipId = options?.membershipId ?? member.membership_id ?? null;
@@ -149,6 +157,7 @@ export const api = {
         memberId,
         membershipId,
         forceDuplicate: options?.forceDuplicate ?? false,
+        checkinDate: options?.checkinDate ?? null,
       },
       () => fallbackRecordAttendance(memberId),
     );

@@ -52,6 +52,8 @@ function mapMembershipLabel(type: string) {
   switch (type) {
     case "monthly_1":
       return "30days";
+    case "monthly_2":
+      return "60days";
     case "monthly_3":
       return "90days";
     case "monthly_6":

@@ -52,3 +52,4 @@ backups/
 # Tauri updater signing (private key — never commit)
 keys/
 .tauri-keys/
+.sentry-native/

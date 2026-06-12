@@ -77,6 +77,7 @@ pub fn run() {
             commands::remove_member,
             commands::record_attendance,
             commands::has_attendance_today_cmd,
+            commands::has_attendance_on_date_cmd,
             commands::cancel_attendance_cmd,
             commands::list_lockers,
             commands::fetch_attendance,

@@ -1,11 +1,11 @@
 {
     "platforms":  {
                       "windows-x86_64":  {
-                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZzYrR1ZrU1FFdW1TSmlneHpKNmMxZXhmVXFKQXFJVENDTG1DdFU3dlo2b1dpZXVOUkdmUVpDVTNFQkZqWkIwc0szbmZUcDJnZmpuZmhIbjZLT0ttbW5tWHowNWxvMkFJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMjQ3ODEyCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4yMl94NjQtc2V0dXAuZXhlCjN4RG5mbWZRUnBpYlJaaU4vTy9uRW5lck5ieFFyRzNMS0xGUmZSNDErZzgxN0JnRUk5eGtabUtybGE2RjYrU0hYVWNIK0ErWU5XRWFGTUJnNk12Q0FRPT0K",
-                                             "url":  "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.22/ClimbCenterManager_1.0.22_x64-setup.exe"
+                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVFaUWx1SVpWSWJscmtTUUFvTW9kQU5KRTFJMFBWNTdXRlhhZ09ySG5uSC90djRnZjdZcXlTT1VwbzIrRUh6enIwb1IrUkpHR2RWMDBkVkZJK1FpdUFFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMjU3MzkzCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4yM194NjQtc2V0dXAuZXhlCldXSTFIampwZmpoL3FWalZTclZnQmRWbHFxakpSTlBPSUdsNUFMSkEzdityMW5kVXJHQXZlYm9GcVZEUmxNbWV5K0gvaXRkc0MzKzRJY1NKbUpvN0F3PT0K",
+                                             "url":  "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.23/ClimbCenterManager_1.0.23_x64-setup.exe"
                                          }
                   },
-    "pub_date":  "2026-06-12T16:03:00Z",
-    "version":  "1.0.22",
-    "notes":  "주니어 수업 횟수 임의 지정/수정 기능 추가, 주니어 잔여 수업 횟수 차감 반영, GRABON 아이콘 글씨 잘림 수정 및 투명 배경 아이콘 적용"
+    "pub_date":  "2026-06-12T09:43:44Z",
+    "version":  "1.0.23",
+    "notes":  "회원권 등록에 2개월 옵션 추가, 출석체크에 날짜 선택 기능 추가(지난 날짜 출석/차감 가능)"
 }

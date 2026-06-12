@@ -2,12 +2,13 @@ export type Center = "ONCLE" | "GRABIT";
 export type CenterRole = "owner" | "admin" | "staff" | "viewer";
 /** Login screen account type: owner (admin tab) vs staff tab. */
 export type LoginAccountKind = "owner" | "staff";
-export type LegacyMembershipType = "monthly_1" | "monthly_3" | "monthly_6" | "session" | "junior";
+export type LegacyMembershipType = "monthly_1" | "monthly_2" | "monthly_3" | "monthly_6" | "session" | "junior";
 export type MembershipType = LegacyMembershipType;
 export type MemberType = "regular" | "general" | "junior" | "trial";
 export type PassType = "period" | "count";
 export type DbMembershipType =
   | "30days"
+  | "60days"
   | "90days"
   | "180days"
   | "5times"

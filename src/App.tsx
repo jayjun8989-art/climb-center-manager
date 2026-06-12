@@ -76,6 +76,7 @@ export default function App() {
   const [activeView, setActiveView] = useState<AppView>("members");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [attendanceSearch, setAttendanceSearch] = useState("");
+  const [attendanceCheckinDate, setAttendanceCheckinDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [membershipSearch, setMembershipSearch] = useState("");
   const [lockerSearch, setLockerSearch] = useState("");
   const [lockerFilter, setLockerFilter] = useState<LockerFilter>("all");
@@ -401,7 +402,7 @@ export default function App() {
 
   async function handleAttendance(
     member: MemberListItem,
-    options?: { forceDuplicate?: boolean },
+    options?: { forceDuplicate?: boolean; checkinDate?: string | null },
   ): Promise<MemberListItem | null> {
     assertPermission(permissions.canCheckAttendance, permissions.denyReason);
     const memberId = resolveMemberLocalId(member);
@@ -410,12 +411,16 @@ export default function App() {
       throw new Error("회원 ID를 찾을 수 없습니다.");
     }
 
+    const checkinDate = options?.checkinDate ?? null;
     let forceDuplicate = options?.forceDuplicate ?? false;
     if (!forceDuplicate && isTauriApp()) {
-      const hasToday = await api.hasAttendanceToday(member);
-      if (hasToday) {
+      const hasOnDate = checkinDate
+        ? await api.hasAttendanceOnDate(member, checkinDate)
+        : await api.hasAttendanceToday(member);
+      if (hasOnDate) {
+        const dateLabel = checkinDate ?? "오늘";
         const confirmed = window.confirm(
-          "오늘 이미 출석 처리된 회원입니다. 그래도 추가 출석하시겠습니까?",
+          `${dateLabel} 이미 출석 처리된 회원입니다. 그래도 추가 출석하시겠습니까?`,
         );
         if (!confirmed) return null;
         forceDuplicate = true;
@@ -426,6 +431,7 @@ export default function App() {
       const result = await api.recordAttendance(member, {
         membershipId: member.membership_id,
         forceDuplicate,
+        checkinDate,
       });
       setSelectedMember(result.data);
       if (result.backup_warning) {
@@ -436,12 +442,13 @@ export default function App() {
       return result.data;
     } catch (error) {
       const message = logAppError("출석 체크", error);
-      if (message.includes("오늘 이미 출석")) {
+      if (message.includes("이미 출석")) {
+        const dateLabel = checkinDate ?? "오늘";
         const confirmed = window.confirm(
-          "오늘 이미 출석 처리된 회원입니다. 그래도 추가 출석하시겠습니까?",
+          `${dateLabel} 이미 출석 처리된 회원입니다. 그래도 추가 출석하시겠습니까?`,
         );
         if (confirmed) {
-          return handleAttendance(member, { forceDuplicate: true });
+          return handleAttendance(member, { forceDuplicate: true, checkinDate });
         }
       }
       setToast(message);
@@ -744,9 +751,12 @@ export default function App() {
               permissions={permissions}
               selectedId={selectedMember?.id ?? null}
               onSelect={setSelectedMember}
-              onAttendance={(member) => {
-                void handleAttendance(member).then((updated) => {
-                  if (updated) setToast(`${updated.name}님 출석 완료`);
+              checkinDate={attendanceCheckinDate}
+              onCheckinDateChange={setAttendanceCheckinDate}
+              onAttendance={(member, checkinDate) => {
+                const today = new Date().toISOString().slice(0, 10);
+                void handleAttendance(member, { checkinDate: checkinDate === today ? null : checkinDate }).then((updated) => {
+                  if (updated) setToast(`${updated.name}님 출석 완료${checkinDate !== today ? ` (${checkinDate})` : ""}`);
                 });
               }}
             />
