@@ -8,7 +8,7 @@ import {
   Sun,
   Users,
 } from "lucide-react";
-import { GrabonLogo, GrabonMark } from "./GrabonLogo";
+import { GrabonLogo } from "./GrabonLogo";
 import type { ReactNode } from "react";
 import type { Center, DashboardStats, BackupInfo, MemberGroupFilter, MemberStatusFilter, PermissionSet } from "../types";
 import { MEMBER_GROUP_LABELS, MEMBER_STATUS_LABELS, getMemberGroupCount } from "../utils/member";
@@ -56,7 +56,6 @@ export function Header({
     <header className="glass-panel rounded-[1.5rem] p-5">
       <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex items-start gap-4">
-          <GrabonMark className="h-14 w-14 shrink-0 object-contain" />
           <div>
             <GrabonLogo className="h-8 w-auto max-w-[220px] object-contain" />
             <h1 className="mt-2 text-2xl font-bold">클라이밍 센터 회원관리</h1>
