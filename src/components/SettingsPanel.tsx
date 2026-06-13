@@ -1,10 +1,12 @@
-import { DatabaseBackup, Download, FolderOpen, KeyRound, Settings, ShieldAlert, Upload, X } from "lucide-react";
+import { DatabaseBackup, Download, FolderOpen, KeyRound, RefreshCw, Settings, ShieldAlert, Upload, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { BackupInfo, Center, DuplicateMemberCandidateGroup, LocalDuplicateCleanupSummary, ReportInfo, StorageInfo } from "../types";
+import type { BackupInfo, Center, DuplicateMemberCandidateGroup, LocalDuplicateCleanupSummary, ReportInfo, StorageInfo, SyncDiagnostics } from "../types";
 import type { SyncStatus } from "../sync/types";
 import { checkForUpdate, getAppVersion, installUpdate, UPDATER_ENDPOINT, type UpdateCheckOutcome } from "../lib/updater";
 import type { Update } from "@tauri-apps/plugin-updater";
 import { api } from "../api/client";
+import { repairSyncQueue } from "../sync/engine";
+import { getSupabaseClient } from "../lib/supabase/client";
 
 interface SettingsPanelProps {
   open: boolean;
@@ -85,6 +87,11 @@ export function SettingsPanel({
   const [duplicatesOpen, setDuplicatesOpen] = useState(false);
   const [duplicateGroups, setDuplicateGroups] = useState<DuplicateMemberCandidateGroup[]>([]);
   const [duplicatesLoading, setDuplicatesLoading] = useState(false);
+
+  const [diagnostics, setDiagnostics] = useState<SyncDiagnostics | null>(null);
+  const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
+  const [retryBusy, setRetryBusy] = useState(false);
+  const [verifyBusyId, setVerifyBusyId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -212,6 +219,68 @@ export function SettingsPanel({
       onNotify(error instanceof Error ? error.message : String(error));
     } finally {
       setDuplicatesLoading(false);
+    }
+  }
+
+  async function handleRefreshDiagnostics() {
+    setDiagnosticsLoading(true);
+    try {
+      const result = await api.fetchSyncDiagnostics();
+      setDiagnostics(result);
+    } catch (error) {
+      onNotify(error instanceof Error ? error.message : String(error));
+    } finally {
+      setDiagnosticsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    void handleRefreshDiagnostics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  async function handleRetryFailed() {
+    setRetryBusy(true);
+    try {
+      const repair = await repairSyncQueue();
+      if (repair.message) onNotify(repair.message);
+      if (onPushToSupabase) onPushToSupabase();
+      await handleRefreshDiagnostics();
+    } catch (error) {
+      onNotify(error instanceof Error ? error.message : String(error));
+    } finally {
+      setRetryBusy(false);
+    }
+  }
+
+  async function handleVerifyOnServer(localId: number, remoteId: string | null) {
+    if (!remoteId) {
+      onNotify("remote_id가 없어 서버 존재 확인을 할 수 없습니다.");
+      return;
+    }
+    setVerifyBusyId(localId);
+    try {
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        onNotify("서버 연결을 확인해주세요.");
+        return;
+      }
+      const { data, error } = await supabase
+        .from("members")
+        .select("id")
+        .eq("id", remoteId)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (error) {
+        onNotify(`서버 존재 확인 실패: ${error.message}`);
+        return;
+      }
+      onNotify(data ? `서버에 존재합니다 (id: ${data.id})` : "서버에 해당 회원이 존재하지 않습니다.");
+    } catch (error) {
+      onNotify(error instanceof Error ? error.message : String(error));
+    } finally {
+      setVerifyBusyId(null);
     }
   }
 
@@ -499,6 +568,102 @@ export function SettingsPanel({
                   최근 결과: {cleanupResult.groups_processed}개 그룹 처리, {cleanupResult.rows_hidden}건 숨김
                   {cleanupResult.affected_names.length > 0 &&
                     ` (${cleanupResult.affected_names.join(", ")})`}
+                </div>
+              )}
+            </div>
+          )}
+
+          {center && (
+            <div className="rounded-2xl border border-[var(--border)] p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <RefreshCw size={16} className="text-sky-500" />
+                  동기화 진단
+                </div>
+                <button
+                  className="btn btn-secondary !px-3"
+                  disabled={diagnosticsLoading}
+                  onClick={() => void handleRefreshDiagnostics()}
+                >
+                  {diagnosticsLoading ? "새로고침 중..." : "진단 새로고침"}
+                </button>
+              </div>
+
+              {diagnostics && (
+                <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-[var(--muted)] sm:grid-cols-3">
+                  <div>대기: <span className="font-semibold text-[var(--text)]">{diagnostics.queue_pending}</span></div>
+                  <div>실패: <span className="font-semibold text-[var(--text)]">{diagnostics.queue_failed}</span></div>
+                  <div>blocked: <span className="font-semibold text-[var(--text)]">{diagnostics.queue_blocked}</span></div>
+                  <div>remote_id 없는 회원: <span className="font-semibold text-[var(--text)]">{diagnostics.members_without_remote_id}</span></div>
+                  <div>remote_id 없는 회원권: <span className="font-semibold text-[var(--text)]">{diagnostics.memberships_without_remote_id}</span></div>
+                  <div>로컬 전용 회원: <span className="font-semibold text-[var(--text)]">{diagnostics.local_only_members}</span></div>
+                  <div>서버 동기화 완료: <span className="font-semibold text-[var(--text)]">{diagnostics.synced_members}</span></div>
+                  <div>센터 매핑 실패: <span className="font-semibold text-[var(--text)]">{diagnostics.center_mapping_failed}</span></div>
+                  <div>hidden_locally: <span className="font-semibold text-[var(--text)]">{diagnostics.hidden_locally_count}</span></div>
+                  <div>is_local_duplicate: <span className="font-semibold text-[var(--text)]">{diagnostics.local_duplicate_count}</span></div>
+                </div>
+              )}
+
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {onPullFromSupabase && (
+                  <button className="btn btn-secondary" disabled={syncBusy} onClick={onPullFromSupabase}>
+                    Supabase에서 불러오기
+                  </button>
+                )}
+                {onPushToSupabase && (
+                  <button className="btn btn-secondary" disabled={syncBusy} onClick={onPushToSupabase}>
+                    Supabase로 동기화
+                  </button>
+                )}
+                <button
+                  className="btn btn-primary sm:col-span-2"
+                  disabled={retryBusy || syncBusy}
+                  onClick={() => void handleRetryFailed()}
+                >
+                  {retryBusy ? "재시도 중..." : "실패 항목 다시 시도"}
+                </button>
+              </div>
+
+              {diagnostics && diagnostics.problem_members.length > 0 && (
+                <div className="mt-3 max-h-64 overflow-auto rounded-xl border border-[var(--border)]">
+                  <table className="w-full text-left text-[11px]">
+                    <thead className="sticky top-0 bg-[var(--panel-strong)]">
+                      <tr>
+                        <th className="px-2 py-1">이름</th>
+                        <th className="px-2 py-1">센터</th>
+                        <th className="px-2 py-1">번호</th>
+                        <th className="px-2 py-1">local id</th>
+                        <th className="px-2 py-1">remote_id</th>
+                        <th className="px-2 py-1">상태</th>
+                        <th className="px-2 py-1">마지막 시도</th>
+                        <th className="px-2 py-1">에러</th>
+                        <th className="px-2 py-1"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {diagnostics.problem_members.map((m) => (
+                        <tr key={m.local_id} className="border-t border-[var(--border)]">
+                          <td className="px-2 py-1">{m.name}</td>
+                          <td className="px-2 py-1">{m.center}</td>
+                          <td className="px-2 py-1">{m.member_no ?? "-"}</td>
+                          <td className="px-2 py-1">{m.local_id}</td>
+                          <td className="px-2 py-1 max-w-[100px] truncate" title={m.remote_id ?? ""}>{m.remote_id ?? "없음"}</td>
+                          <td className="px-2 py-1">{m.sync_status ?? "-"}</td>
+                          <td className="px-2 py-1">{m.last_sync_attempt ?? "-"}</td>
+                          <td className="px-2 py-1 max-w-[140px] truncate" title={m.last_error ?? ""}>{m.last_error ?? "-"}</td>
+                          <td className="px-2 py-1">
+                            <button
+                              className="btn btn-secondary !px-2 !py-0.5 text-[10px]"
+                              disabled={verifyBusyId === m.local_id || !m.remote_id}
+                              onClick={() => void handleVerifyOnServer(m.local_id, m.remote_id)}
+                            >
+                              서버 존재 확인
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>

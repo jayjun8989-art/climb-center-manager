@@ -20,8 +20,9 @@ pub use pull_import::{
     count_active_members, import_pull_snapshot, PullImportResult, PullSnapshot,
 };
 pub use sync_local::{
-    complete_member_push, enqueue_entity_op, enqueue_sync_item, fetch_sync_status, get_remote_id,
-    list_sync_queue, mark_sync_queue_error, purge_unsupported_sync_queue, repair_member_sync_queue,
-    remove_sync_queue_item, set_sync_state, upsert_id_map, RepairSyncQueueResult, SyncQueueItem,
+    complete_member_push, enqueue_entity_op, enqueue_sync_item, fetch_sync_status,
+    get_remote_id, get_sync_diagnostics, list_sync_queue, mark_sync_queue_error,
+    purge_unsupported_sync_queue, repair_member_sync_queue, remove_sync_queue_item, set_sync_state,
+    upsert_id_map, RepairSyncQueueResult, SyncDiagnostics, SyncDiagnosticMember, SyncQueueItem,
     SyncStatus,
 };

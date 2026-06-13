@@ -514,6 +514,146 @@ pub fn set_sync_state(state: &AppState, key: &str, value: &str) -> Result<(), Db
     })
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncDiagnosticMember {
+    pub local_id: i64,
+    pub name: String,
+    pub center: String,
+    pub member_no: Option<i64>,
+    pub remote_id: Option<String>,
+    pub sync_status: Option<String>,
+    pub last_sync_attempt: Option<String>,
+    pub last_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncDiagnostics {
+    pub queue_pending: i64,
+    pub queue_failed: i64,
+    pub queue_blocked: i64,
+    pub members_without_remote_id: i64,
+    pub memberships_without_remote_id: i64,
+    pub local_only_members: i64,
+    pub synced_members: i64,
+    pub center_mapping_failed: i64,
+    pub hidden_locally_count: i64,
+    pub local_duplicate_count: i64,
+    pub problem_members: Vec<SyncDiagnosticMember>,
+}
+
+pub fn get_sync_diagnostics(state: &AppState) -> Result<SyncDiagnostics, DbError> {
+    state.with_conn(|conn| {
+        let queue_pending: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NULL",
+            [],
+            |row| row.get(0),
+        )?;
+        let queue_failed: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL AND retry_count < 5",
+            [],
+            |row| row.get(0),
+        )?;
+        let queue_blocked: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL AND retry_count >= 5",
+            [],
+            |row| row.get(0),
+        )?;
+
+        let members_without_remote_id: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM members
+             WHERE deleted_at IS NULL AND status = 'active'
+               AND (remote_id IS NULL OR remote_id = '')",
+            [],
+            |row| row.get(0),
+        )?;
+
+        let memberships_without_remote_id: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM memberships m
+             JOIN members mm ON mm.id = m.member_id
+             WHERE mm.deleted_at IS NULL AND m.status = 'active'
+               AND (m.remote_id IS NULL OR m.remote_id = '')",
+            [],
+            |row| row.get(0),
+        )?;
+
+        let local_only_members: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM members
+             WHERE deleted_at IS NULL AND (remote_id IS NULL OR remote_id = '')",
+            [],
+            |row| row.get(0),
+        )?;
+
+        let synced_members: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM members
+             WHERE deleted_at IS NULL AND remote_id IS NOT NULL AND remote_id != ''",
+            [],
+            |row| row.get(0),
+        )?;
+
+        let center_mapping_failed: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM members
+             WHERE deleted_at IS NULL AND (center IS NULL OR center NOT IN ('ONCLE', 'GRABIT'))",
+            [],
+            |row| row.get(0),
+        )?;
+
+        let hidden_locally_count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM members WHERE COALESCE(hidden_locally, 0) = 1",
+            [],
+            |row| row.get(0),
+        )?;
+
+        let local_duplicate_count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM members WHERE COALESCE(is_local_duplicate, 0) = 1",
+            [],
+            |row| row.get(0),
+        )?;
+
+        let mut stmt = conn.prepare(
+            "SELECT m.id, m.name, m.center, m.member_no, m.remote_id, m.sync_status,
+                    sq.created_at, sq.last_error
+             FROM members m
+             LEFT JOIN sync_queue sq ON sq.entity_type = 'member' AND sq.entity_local_id = m.id
+             WHERE m.deleted_at IS NULL
+               AND (
+                 (m.remote_id IS NULL OR m.remote_id = '')
+                 OR sq.last_error IS NOT NULL
+               )
+             GROUP BY m.id
+             ORDER BY m.id DESC
+             LIMIT 200",
+        )?;
+        let problem_members = stmt
+            .query_map([], |row| {
+                Ok(SyncDiagnosticMember {
+                    local_id: row.get(0)?,
+                    name: row.get(1)?,
+                    center: row.get(2)?,
+                    member_no: row.get(3)?,
+                    remote_id: row.get(4)?,
+                    sync_status: row.get(5)?,
+                    last_sync_attempt: row.get(6)?,
+                    last_error: row.get(7)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(SyncDiagnostics {
+            queue_pending,
+            queue_failed,
+            queue_blocked,
+            members_without_remote_id,
+            memberships_without_remote_id,
+            local_only_members,
+            synced_members,
+            center_mapping_failed,
+            hidden_locally_count,
+            local_duplicate_count,
+            problem_members,
+        })
+    })
+}
+
 pub fn upsert_id_map(
     state: &AppState,
     entity_type: &str,

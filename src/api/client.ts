@@ -16,6 +16,7 @@ import type {
   ReportInfo,
   SelfCheckinMember,
   StorageInfo,
+  SyncDiagnostics,
   SyncQueueItem,
   SyncStatus,
   DuplicateMemberCandidateGroup,
@@ -295,6 +296,22 @@ export const api = {
 
   fetchSyncQueue(limit = 50): Promise<SyncQueueItem[]> {
     return readCommand("fetch_sync_queue", { limit }, () => fallbackSyncQueue(limit));
+  },
+
+  fetchSyncDiagnostics(): Promise<SyncDiagnostics> {
+    return readCommand("get_sync_diagnostics", {}, () => ({
+      queue_pending: 0,
+      queue_failed: 0,
+      queue_blocked: 0,
+      members_without_remote_id: 0,
+      memberships_without_remote_id: 0,
+      local_only_members: 0,
+      synced_members: 0,
+      center_mapping_failed: 0,
+      hidden_locally_count: 0,
+      local_duplicate_count: 0,
+      problem_members: [],
+    }));
   },
 
   findDuplicateMembers(center: Center): Promise<DuplicateMemberCandidateGroup[]> {

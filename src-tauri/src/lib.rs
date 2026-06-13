@@ -98,6 +98,7 @@ pub fn run() {
             commands::open_backup_folder,
             commands::open_data_folder,
             commands::fetch_sync_status,
+            commands::get_sync_diagnostics,
             commands::fetch_sync_queue,
             commands::repair_sync_queue,
             commands::purge_unsupported_sync_queue_cmd,

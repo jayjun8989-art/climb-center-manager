@@ -263,6 +263,31 @@ export interface SyncStatus {
   device_id: string | null;
 }
 
+export interface SyncDiagnosticMember {
+  local_id: number;
+  name: string;
+  center: string;
+  member_no: number | null;
+  remote_id: string | null;
+  sync_status: string | null;
+  last_sync_attempt: string | null;
+  last_error: string | null;
+}
+
+export interface SyncDiagnostics {
+  queue_pending: number;
+  queue_failed: number;
+  queue_blocked: number;
+  members_without_remote_id: number;
+  memberships_without_remote_id: number;
+  local_only_members: number;
+  synced_members: number;
+  center_mapping_failed: number;
+  hidden_locally_count: number;
+  local_duplicate_count: number;
+  problem_members: SyncDiagnosticMember[];
+}
+
 export type MemberStatus = "active" | "expiring" | "expired" | "depleted" | "paused";
 
 export interface UserCenterRoleRow {

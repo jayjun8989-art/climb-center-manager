@@ -367,6 +367,11 @@ pub fn fetch_remote_id(
 }
 
 #[tauri::command]
+pub fn get_sync_diagnostics(state: State<'_, AppState>) -> Result<crate::db::SyncDiagnostics, String> {
+    crate::db::get_sync_diagnostics(&state).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn repair_sync_queue(state: State<'_, AppState>) -> Result<RepairSyncQueueResult, String> {
     repair_member_sync_queue(&state).map_err(|e| e.to_string())
 }
