@@ -1,11 +1,11 @@
 {
     "platforms":  {
                       "windows-x86_64":  {
-                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVgvajNRSmIwQjhaUUtZcFUvR1dSS0Q0Z3Qxdlllc2VtZDluSHhTTEVEVUxLUmlTYk9mVVZNT0RrdDJUZFpQdkJFR20yeWI4V1hmSDhSYzBaUldnaUFRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMzE4NDYwCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4yNV94NjQtc2V0dXAuZXhlCk9SYTloNjdhZFBCbTViU3hscVdOYVB4ampLUXlBZTcxM21tNzdQYkttYUtTNzY4VE9IaHFDeEUrZUNHTVJ6ZU12eVkvY2cwS1RBNWxWZE5ZdkUxNURRPT0K",
-                                             "url":  "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.25/ClimbCenterManager_1.0.25_x64-setup.exe"
+                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVowaFUzejZRSmxRVGJweGJVSWlqeTVhNVJ5alhDVEMvVUxFcFZ6NzNVRFR0YllTMldqTkdSeHJlazlOWnd3SkxqZkFxYk5hVVNOc2JRNEl5OURSWHdnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMzIwMjkxCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4yNl94NjQtc2V0dXAuZXhlCmpndk1teTkrT1VNckpaY1Q0THR6UkRLNXV4ek9tM0J4NTNJMnY5OTArTDJKdEFkWVluaytoR2JEajVSc1A3akl0VmdZUHk2VGs4Y0NHTTBBcUpZSUNRPT0K",
+                                             "url":  "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.26/ClimbCenterManager_1.0.26_x64-setup.exe"
                                          }
                   },
     "pub_date":  "2026-06-13T00:00:00Z",
-    "version":  "1.0.25",
-    "notes":  "자동 업데이트 서명키 기준선(B915) 재설정, 셀프 출석체크 모드 추가, v1.0.24 기능 유지"
+    "version":  "1.0.26",
+    "notes":  "회원 목록 중복 표시 수정, 대표 회원권 선택 로직 보완, Supabase pull 중복 upsert 방지"
 }
