@@ -1,6 +1,6 @@
 use rusqlite::{Connection, Result as SqlResult};
 
-const LATEST_SCHEMA_VERSION: i64 = 8;
+const LATEST_SCHEMA_VERSION: i64 = 9;
 
 const SYNC_TABLES: &[&str] = &[
     "members",
@@ -58,6 +58,7 @@ pub fn ensure_local_schema(conn: &Connection) -> SqlResult<()> {
     add_column_if_missing(conn, "attendance_logs", "canceled_at", "TEXT")?;
     add_column_if_missing(conn, "attendance_logs", "canceled_by", "TEXT")?;
     add_column_if_missing(conn, "attendance_logs", "cancel_reason", "TEXT")?;
+    add_column_if_missing(conn, "attendance_logs", "source", "TEXT NOT NULL DEFAULT 'staff'")?;
 
     conn.execute_batch(
         "

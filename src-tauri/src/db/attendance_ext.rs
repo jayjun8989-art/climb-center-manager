@@ -134,6 +134,9 @@ pub fn check_attendance_with_options(
             format!("{date} 12:00:00")
         };
         let mut deducted = 0;
+        let is_self_checkin = matches!(editor, Some("self-checkin") | Some("self_checkin"));
+        let source = if is_self_checkin { "self_checkin" } else { "staff" };
+        let memo = if is_self_checkin { Some("회원 셀프 출석") } else { None };
 
         if membership.pass_type == "count" {
             let remaining = membership.remaining_count.unwrap_or(0) - 1;
@@ -149,8 +152,8 @@ pub fn check_attendance_with_options(
         tx.execute(
             "INSERT INTO attendance_logs (
                 member_id, membership_id, center, checkin_at, attendance_type,
-                deducted_count, memo, created_at, canceled_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULL, ?7, NULL)",
+                deducted_count, memo, created_at, canceled_at, source
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULL, ?9)",
             params![
                 member_id,
                 membership.id,
@@ -158,7 +161,9 @@ pub fn check_attendance_with_options(
                 checkin_at,
                 attendance_type_for_member(&member.member_type),
                 deducted,
+                memo,
                 now,
+                source,
             ],
         )?;
 
@@ -169,16 +174,17 @@ pub fn check_attendance_with_options(
             before_remaining
         };
         let kind_label = if member.member_type == "junior" { "주니어 수업" } else { "횟수" };
+        let source_label = if is_self_checkin { " [셀프 출석]" } else { "" };
         let summary = if deducted > 0 {
             format!(
-                "출석 기록 ({date}) · {kind_label} 차감: {} \u{2192} {}",
+                "출석 기록 ({date}){source_label} · {kind_label} 차감: {} \u{2192} {}",
                 before_remaining.unwrap_or(0),
                 after_remaining.unwrap_or(0)
             )
         } else if date == today_str {
-            "출석 기록".to_string()
+            format!("출석 기록{source_label}")
         } else {
-            format!("과거 날짜 출석 기록 ({date})")
+            format!("과거 날짜 출석 기록 ({date}){source_label}")
         };
         super::member_edit_log::insert_member_edit_log(&*tx, member_id, "update", editor, &summary)?;
 
