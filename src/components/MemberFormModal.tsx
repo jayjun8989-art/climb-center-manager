@@ -69,6 +69,7 @@ export function MemberFormModal({
 
   const [notes, setNotes] = useState("");
   const [address, setAddress] = useState("");
+  const [memberNo, setMemberNo] = useState("");
 
   const [lockerNumber, setLockerNumber] = useState("");
 
@@ -127,6 +128,7 @@ export function MemberFormModal({
       setStartDate(member.start_date ?? todayString());
       setEndDate(member.end_date ?? "");
       setNotes(member.memo ?? "");
+      setMemberNo(member.member_no != null ? String(member.member_no) : "");
       setAddress("");
       setLockerNumber("");
       setLockerStartDate("");
@@ -164,6 +166,7 @@ export function MemberFormModal({
     setEndDate(calcMonthlyEndDate(todayString(), 1));
 
     setNotes("");
+    setMemberNo("");
     setAddress("");
 
     setLockerNumber("");
@@ -195,6 +198,15 @@ export function MemberFormModal({
   }, [category, startDate, monthlyDuration]);
 
 
+
+  async function handleIssueMemberNo() {
+    try {
+      const next = await api.getNextMemberNo(center);
+      setMemberNo(String(next));
+    } catch (issueError) {
+      setError(issueError instanceof Error ? issueError.message : String(issueError));
+    }
+  }
 
   if (!isOpen) return null;
 
@@ -237,6 +249,7 @@ export function MemberFormModal({
         remaining_sessions: member.remaining_count,
         notes: notes.trim() || null,
         address: address.trim() || null,
+        member_no: memberNo.trim() ? Number(memberNo.trim()) : null,
       };
       await onSubmit(input);
       onClose();
@@ -325,6 +338,8 @@ export function MemberFormModal({
       locker_end_date: lockerEndDate || null,
 
       locker_memo: lockerMemo.trim() || null,
+
+      member_no: memberNo.trim() ? Number(memberNo.trim()) : null,
 
     };
 
@@ -431,6 +446,46 @@ export function MemberFormModal({
               placeholder="010-0000-0000"
 
             />
+
+          </div>
+
+
+
+          <div>
+
+            <label className="field-label">회원번호</label>
+
+            <div className="flex gap-2">
+
+              <input
+
+                className="input"
+
+                type="number"
+
+                value={memberNo}
+
+                onChange={(e) => setMemberNo(e.target.value)}
+
+                placeholder="회원번호"
+
+              />
+
+              <button
+
+                type="button"
+
+                className="btn btn-secondary whitespace-nowrap"
+
+                onClick={() => void handleIssueMemberNo()}
+
+              >
+
+                회원번호 자동 발급
+
+              </button>
+
+            </div>
 
           </div>
 

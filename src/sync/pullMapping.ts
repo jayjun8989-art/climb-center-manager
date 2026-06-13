@@ -14,6 +14,7 @@ type SupabaseMemberRow = {
   status: string;
   created_at: string;
   updated_at: string;
+  member_no: number | null;
 };
 
 type SupabaseMembershipRow = {
@@ -69,6 +70,7 @@ export type PullSnapshotPayload = {
     status: string;
     createdAt: string;
     updatedAt: string;
+    memberNo: number | null;
   }>;
   memberships: Array<{
     remoteId: string;
@@ -183,6 +185,7 @@ export function buildPullSnapshot(input: {
       status: row.status,
       createdAt: toLocalDateTime(row.created_at),
       updatedAt: toLocalDateTime(row.updated_at),
+      memberNo: row.member_no ?? null,
     })),
     memberships: input.memberships.map((row) => ({
       remoteId: row.id,

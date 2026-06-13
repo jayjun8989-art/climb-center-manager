@@ -47,6 +47,7 @@ export const MEMBER_GROUP_LABELS: Record<MemberGroupFilter, string> = {
   regular: "일반 회원",
   junior: "주니어",
   inactive_30: "1개월 미등록",
+  no_member_no: "회원번호 없음",
 };
 
 export function normalizeMemberType(
@@ -66,7 +67,7 @@ export function normalizeMemberType(
 }
 
 export function memberMatchesGroupFilter(
-  member: Pick<MemberListItem, "member_type" | "membership_type" | "latest_membership_end_date" | "is_inactive_30_days" | "status">,
+  member: Pick<MemberListItem, "member_type" | "membership_type" | "latest_membership_end_date" | "is_inactive_30_days" | "status" | "member_no">,
   group: MemberGroupFilter,
 ): boolean {
   const normalized = normalizeMemberType(member.member_type, member.membership_type);
@@ -75,6 +76,8 @@ export function memberMatchesGroupFilter(
       return normalized === "regular";
     case "junior":
       return normalized === "junior";
+    case "no_member_no":
+      return member.member_no == null;
     case "inactive_30":
       if (member.status === "paused") return false;
       if (member.is_inactive_30_days != null) return member.is_inactive_30_days;
@@ -102,6 +105,10 @@ export function getMemberGroupCount(
       return stats.junior_count;
     case "inactive_30":
       return stats.inactive_30_members;
+    case "no_member_no":
+      return 0;
+    default:
+      return 0;
   }
 }
 

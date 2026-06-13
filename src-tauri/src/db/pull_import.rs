@@ -20,6 +20,8 @@ pub struct PullMemberRow {
     pub status: String,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(default)]
+    pub member_no: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -119,12 +121,17 @@ fn phone_normalized(phone: &Option<String>) -> Option<String> {
     normalize_phone(phone).map(|value| value.replace(|c: char| !c.is_ascii_digit(), ""))
 }
 
-fn find_local_member_id(conn: &rusqlite::Connection, remote_id: &str) -> Result<Option<i64>, DbError> {
+fn find_local_member_id(
+    conn: &rusqlite::Connection,
+    row: &PullMemberRow,
+) -> Result<Option<i64>, DbError> {
+    let remote_id = &row.remote_id;
+
     if let Some(id) = conn
         .query_row(
             "SELECT id FROM members WHERE remote_id = ?1",
             [remote_id],
-            |row| row.get(0),
+            |r| r.get(0),
         )
         .optional()
         .map_err(DbError::from)?
@@ -136,13 +143,56 @@ fn find_local_member_id(conn: &rusqlite::Connection, remote_id: &str) -> Result<
     // member row whose `members.remote_id` column wasn't backfilled (e.g. rows
     // created before the remote_id column existed). Without this fallback,
     // repeated pulls would insert a brand-new duplicate member row every time.
-    conn.query_row(
-        "SELECT local_id FROM id_map WHERE entity_type = 'member' AND remote_id = ?1",
-        [remote_id],
-        |row| row.get(0),
-    )
-    .optional()
-    .map_err(DbError::from)
+    if let Some(id) = conn
+        .query_row(
+            "SELECT local_id FROM id_map WHERE entity_type = 'member' AND remote_id = ?1",
+            [remote_id],
+            |r| r.get(0),
+        )
+        .optional()
+        .map_err(DbError::from)?
+    {
+        return Ok(Some(id));
+    }
+
+    // Fallback: center + phone (normalized) — covers members that were never
+    // synced before (no remote_id, no id_map entry) but already exist locally.
+    if let Some(phone_norm) = phone_normalized(&row.phone) {
+        if let Some(id) = conn
+            .query_row(
+                "SELECT id FROM members
+                 WHERE center = ?1 AND phone_normalized = ?2 AND deleted_at IS NULL
+                 ORDER BY updated_at DESC, id DESC LIMIT 1",
+                params![row.center, phone_norm],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(DbError::from)?
+        {
+            return Ok(Some(id));
+        }
+    }
+
+    // Fallback: center + name + member_type when phone is absent on both sides.
+    if row.phone.as_deref().map(str::trim).unwrap_or("").is_empty() {
+        let member_type = normalize_local_member_type(&row.member_type);
+        if let Some(id) = conn
+            .query_row(
+                "SELECT id FROM members
+                 WHERE center = ?1 AND name = ?2 AND member_type = ?3
+                   AND IFNULL(phone, '') = '' AND deleted_at IS NULL
+                 ORDER BY updated_at DESC, id DESC LIMIT 1",
+                params![row.center, row.name.trim(), member_type],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(DbError::from)?
+        {
+            return Ok(Some(id));
+        }
+    }
+
+    Ok(None)
 }
 
 fn find_local_membership_id(
@@ -166,11 +216,12 @@ fn upsert_member(
     let phone = normalize_phone(&row.phone);
     let phone_norm = phone_normalized(&row.phone);
 
-    if let Some(local_id) = find_local_member_id(conn, &row.remote_id)? {
+    if let Some(local_id) = find_local_member_id(conn, row)? {
         conn.execute(
             "UPDATE members SET
                 name = ?1, phone = ?2, phone_normalized = ?3, member_type = ?4, center = ?5,
                 parent_name = ?6, parent_phone = ?7, memo = ?8, address = ?9, status = ?10,
+                member_no = COALESCE(member_no, ?13),
                 updated_at = ?11, sync_status = 'synced', remote_updated_at = ?11
              WHERE id = ?12",
             params![
@@ -186,6 +237,7 @@ fn upsert_member(
                 row.status,
                 row.updated_at,
                 local_id,
+                row.member_no,
             ],
         )?;
         conn.execute(
@@ -199,9 +251,9 @@ fn upsert_member(
     conn.execute(
         "INSERT INTO members (
             name, phone, phone_normalized, member_type, center, parent_name, parent_phone,
-            memo, address, status, created_at, updated_at, deleted_at,
+            memo, address, member_no, status, created_at, updated_at, deleted_at,
             remote_id, sync_status, remote_updated_at
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, NULL, ?13, 'synced', ?12)",
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, NULL, ?14, 'synced', ?13)",
         params![
             row.name.trim(),
             phone,
@@ -212,6 +264,7 @@ fn upsert_member(
             row.parent_phone,
             row.memo,
             row.address,
+            row.member_no,
             row.status,
             row.created_at,
             row.updated_at,

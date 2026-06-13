@@ -12,6 +12,8 @@ pub struct Member {
     pub memo: Option<String>,
     #[serde(default)]
     pub address: Option<String>,
+    #[serde(default)]
+    pub member_no: Option<i64>,
     pub status: String,
     pub created_at: String,
     pub updated_at: String,
@@ -76,8 +78,21 @@ pub struct MemberListItem {
     pub is_inactive_30_days: bool,
     #[serde(default)]
     pub pause_start_date: Option<String>,
+    #[serde(default)]
+    pub member_no: Option<i64>,
+    #[serde(default)]
+    pub remote_id: Option<String>,
+    #[serde(default)]
+    pub _duplicate_info: Option<DuplicateInfo>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DuplicateInfo {
+    pub duplicate_count: i64,
+    pub duplicate_local_ids: Vec<i64>,
+    pub duplicate_remote_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,6 +106,8 @@ pub struct SelfCheckinMember {
     pub remaining_text: String,
     pub display_status: String,
     pub membership_id: Option<i64>,
+    #[serde(default)]
+    pub phone_last4: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -140,6 +157,8 @@ pub struct MemberInput {
     pub locker_memo: Option<String>,
     #[serde(default)]
     pub edited_by: Option<String>,
+    #[serde(default)]
+    pub member_no: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

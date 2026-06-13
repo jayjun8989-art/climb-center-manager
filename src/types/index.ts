@@ -27,6 +27,7 @@ export interface SelfCheckinMember {
   remaining_text: string;
   display_status: string;
   membership_id: number | null;
+  phone_last4?: string | null;
 }
 
 export interface Member {
@@ -48,6 +49,7 @@ export interface Member {
   locker_start_date?: string | null;
   locker_end_date?: string | null;
   locker_memo?: string | null;
+  member_no?: number | null;
 }
 
 export interface Membership {
@@ -91,6 +93,8 @@ export interface MemberListItem {
   days_since_expired?: number | null;
   is_inactive_30_days?: boolean;
   pause_start_date?: string | null;
+  member_no?: number | null;
+  remote_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -137,6 +141,7 @@ export interface MemberInput {
   locker_end_date?: string | null;
   locker_memo?: string | null;
   edited_by?: string | null;
+  member_no?: number | null;
 }
 
 export interface PaginatedMembers {
@@ -230,7 +235,7 @@ export interface MutationResult<T> {
   backup_warning: string | null;
 }
 
-export type MemberGroupFilter = "all" | "regular" | "junior" | "inactive_30";
+export type MemberGroupFilter = "all" | "regular" | "junior" | "inactive_30" | "no_member_no";
 export type MemberStatusFilter = "all" | "active" | "expired";
 
 export interface BackupResult {

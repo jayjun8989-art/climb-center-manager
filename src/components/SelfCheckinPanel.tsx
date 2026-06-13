@@ -130,11 +130,13 @@ export function SelfCheckinPanel({ onClose }: SelfCheckinPanelProps) {
           <div className="space-y-4">
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-4 text-center">
               <p className="text-lg font-bold">{member.name}님</p>
+              {member.phone_last4 && (
+                <p className="mt-1 text-sm text-[var(--muted)]">전화번호 끝 4자리: {member.phone_last4}</p>
+              )}
               <p className="mt-1 text-sm text-[var(--muted)]">
-                {member.center} · {member.membership_type ?? "이용권 없음"}
+                {member.membership_type ?? "이용권 없음"}
               </p>
               <p className="mt-1 text-sm text-[var(--muted)]">{member.remaining_text}</p>
-              <p className="mt-1 text-xs text-[var(--muted)]">{member.display_status}</p>
             </div>
             {error && (
               <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-500">

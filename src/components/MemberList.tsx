@@ -148,7 +148,14 @@ export function MemberList({
                   ) : (
                     <>
                       <div>
-                        <p className="font-semibold">{member.name}</p>
+                        <p className="font-semibold">
+                          {member.name}
+                          {member.member_no != null && (
+                            <span className="ml-2 rounded bg-[var(--panel-strong)] px-1.5 py-0.5 text-xs text-[var(--muted)]">
+                              #{member.member_no}
+                            </span>
+                          )}
+                        </p>
                         <span className={getStatusBadgeClass(member)}>{getStatusLabel(member)}</span>
                       </div>
                       <p className="text-sm">{formatMembershipLabel(member)}</p>

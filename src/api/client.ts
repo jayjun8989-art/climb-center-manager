@@ -165,6 +165,10 @@ export const api = {
     );
   },
 
+  getNextMemberNo(center: Center): Promise<number> {
+    return readCommand<number>("get_next_member_no", { center }, () => 1001);
+  },
+
   lookupMemberByNumber(center: Center, memberNumber: number): Promise<SelfCheckinMember | null> {
     return readCommand<SelfCheckinMember | null>(
       "lookup_member_by_number",

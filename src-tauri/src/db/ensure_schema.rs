@@ -1,6 +1,6 @@
 use rusqlite::{Connection, Result as SqlResult};
 
-const LATEST_SCHEMA_VERSION: i64 = 7;
+const LATEST_SCHEMA_VERSION: i64 = 8;
 
 const SYNC_TABLES: &[&str] = &[
     "members",
@@ -53,6 +53,8 @@ pub fn ensure_local_schema(conn: &Connection) -> SqlResult<()> {
     add_column_if_missing(conn, "members", "locker_end_date", "TEXT")?;
     add_column_if_missing(conn, "members", "locker_memo", "TEXT")?;
 
+    add_column_if_missing(conn, "members", "member_no", "INTEGER")?;
+
     add_column_if_missing(conn, "attendance_logs", "canceled_at", "TEXT")?;
     add_column_if_missing(conn, "attendance_logs", "canceled_by", "TEXT")?;
     add_column_if_missing(conn, "attendance_logs", "cancel_reason", "TEXT")?;
@@ -102,6 +104,7 @@ pub fn ensure_local_schema(conn: &Connection) -> SqlResult<()> {
         CREATE INDEX IF NOT EXISTS idx_members_locker ON members(center, locker_number);
         CREATE INDEX IF NOT EXISTS idx_member_edit_logs_member
             ON member_edit_logs(member_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_members_member_no ON members(center, member_no);
 
         UPDATE members SET locker_status = 'empty'
         WHERE locker_status IS NULL OR locker_status = '';

@@ -175,6 +175,7 @@ function memberRowFromPayload(payload: MemberSyncPayload, centerId: string) {
     parent_name: payload.parent_name ?? null,
     parent_phone: payload.parent_phone ?? null,
     memo: payload.notes ?? null,
+    member_no: payload.member_no ?? null,
   };
 }
 
@@ -635,7 +636,7 @@ export async function pullFromSupabase(options?: {
   const membersRes = await supabase
     .from("members")
     .select(
-      "id, center_id, name, phone, address, member_type, parent_name, parent_phone, memo, status, created_at, updated_at",
+      "id, center_id, name, phone, address, member_type, parent_name, parent_phone, memo, status, created_at, updated_at, member_no",
     )
     .in("center_id", centerIds)
     .is("deleted_at", null);

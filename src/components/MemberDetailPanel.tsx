@@ -221,6 +221,10 @@ export function MemberDetailPanel({ member, onAttendance, onUpdated, permissions
 
       <dl className="mt-5 grid gap-3 text-sm">
         <DetailRow
+          label="회원번호"
+          value={currentMember.member_no != null ? String(currentMember.member_no) : "미등록"}
+        />
+        <DetailRow
           label="연락처"
           value={currentMember.phone ? phoneFormat(currentMember.phone) : "-"}
         />
@@ -252,6 +256,12 @@ export function MemberDetailPanel({ member, onAttendance, onUpdated, permissions
         )}
         <DetailRow label="메모" value={currentMember.memo || "-"} />
       </dl>
+
+      {currentMember.member_no == null && (
+        <p className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-600">
+          셀프 출석을 사용하려면 회원번호를 등록해주세요.
+        </p>
+      )}
 
       {message && (
         <p className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] px-4 py-3 text-sm">

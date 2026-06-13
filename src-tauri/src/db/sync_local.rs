@@ -124,7 +124,7 @@ pub fn build_member_sync_payload_json(state: &AppState, member_id: i64) -> Resul
 }
 
 fn build_member_sync_payload_json_conn(conn: &Connection, member_id: i64) -> Result<String, DbError> {
-    let (name, phone, member_type, center, parent_name, parent_phone, memo, address): (
+    let (name, phone, member_type, center, parent_name, parent_phone, memo, address, member_no): (
         String,
         Option<String>,
         String,
@@ -133,9 +133,10 @@ fn build_member_sync_payload_json_conn(conn: &Connection, member_id: i64) -> Res
         Option<String>,
         Option<String>,
         Option<String>,
+        Option<i64>,
     ) = conn
         .query_row(
-            "SELECT name, phone, member_type, center, parent_name, parent_phone, memo, address
+            "SELECT name, phone, member_type, center, parent_name, parent_phone, memo, address, member_no
              FROM members WHERE id = ?1",
             [member_id],
             |row| {
@@ -148,6 +149,7 @@ fn build_member_sync_payload_json_conn(conn: &Connection, member_id: i64) -> Res
                     row.get(5)?,
                     row.get(6)?,
                     row.get(7)?,
+                    row.get(8)?,
                 ))
             },
         )
@@ -217,6 +219,7 @@ fn build_member_sync_payload_json_conn(conn: &Connection, member_id: i64) -> Res
         "notes": memo,
         "address": address,
         "price": price,
+        "member_no": member_no,
     });
 
     serde_json::to_string(&payload).map_err(|error| DbError::Message(error.to_string()))

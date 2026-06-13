@@ -138,6 +138,11 @@ pub fn lookup_member_by_number(
 }
 
 #[tauri::command]
+pub fn get_next_member_no(state: State<'_, AppState>, center: String) -> Result<i64, String> {
+    crate::db::get_next_member_no(&state, &center).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn has_attendance_today_cmd(state: State<'_, AppState>, member_id: i64) -> Result<bool, String> {
     has_attendance_today(&state, member_id).map_err(|e| e.to_string())
 }

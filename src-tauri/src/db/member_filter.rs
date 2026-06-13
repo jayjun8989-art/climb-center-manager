@@ -38,6 +38,7 @@ pub fn member_group_clause(group: &str, today: &str) -> String {
     match group {
         "regular" | "general" => format!(" AND ({normalized}) = 'regular'"),
         "junior" => format!(" AND ({normalized}) = 'junior'"),
+        "no_member_no" => " AND m.member_no IS NULL".to_string(),
         "inactive_30" => inactive_30_clause(today),
         _ => String::new(),
     }

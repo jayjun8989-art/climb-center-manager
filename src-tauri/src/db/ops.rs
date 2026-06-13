@@ -390,6 +390,9 @@ fn map_list_item(row: &Row<'_>, today: NaiveDate) -> Result<MemberListItem, rusq
         days_since_expired,
         is_inactive_30_days,
         pause_start_date: row.get(22).ok(),
+        member_no: row.get(23).ok(),
+        remote_id: row.get(24).ok(),
+        _duplicate_info: None,
         created_at,
         updated_at,
     })
@@ -413,7 +416,8 @@ const LIST_SELECT: &str = "
             SELECT pause_start_date FROM pause_logs
             WHERE membership_id = ms.id AND pause_end_date IS NULL
             ORDER BY id DESC LIMIT 1
-        ) AS pause_start_date
+        ) AS pause_start_date,
+        m.member_no, m.remote_id
     FROM members m
     LEFT JOIN memberships ms ON ms.id = ";
 
@@ -423,7 +427,7 @@ const LIST_SELECT: &str = "
 pub fn lookup_member_for_self_checkin(
     state: &AppState,
     center: &str,
-    member_id: i64,
+    member_no: i64,
 ) -> Result<Option<crate::models::SelfCheckinMember>, DbError> {
     state.with_conn(|conn| {
         super::ensure_schema::ensure_local_schema(conn).map_err(DbError::from)?;
@@ -431,26 +435,87 @@ pub fn lookup_member_for_self_checkin(
         let active_sub = active_membership_subquery();
         let sql = format!(
             "{LIST_SELECT}{active_sub}
-             WHERE m.id = ?1 AND m.center = ?2 AND m.deleted_at IS NULL"
+             WHERE m.member_no = ?1 AND m.center = ?2 AND m.deleted_at IS NULL"
         );
         let item = conn
-            .query_row(&sql, params![member_id, center], |row| {
+            .query_row(&sql, params![member_no, center], |row| {
                 map_list_item(row, today_date)
             })
             .optional()?;
 
-        Ok(item.map(|item| crate::models::SelfCheckinMember {
-            id: item.id,
-            name: item.name,
-            center: item.center,
-            membership_type: item.membership_type,
-            pass_type: item.pass_type,
-            remaining_count: item.remaining_count,
-            remaining_text: item.remaining_text,
-            display_status: item.display_status,
-            membership_id: item.membership_id,
+        Ok(item.map(|item| {
+            let phone_last4 = item
+                .phone
+                .as_ref()
+                .map(|p| p.chars().filter(|c| c.is_ascii_digit()).collect::<String>())
+                .filter(|digits| digits.len() >= 4)
+                .map(|digits| digits[digits.len() - 4..].to_string());
+
+            crate::models::SelfCheckinMember {
+                id: item.id,
+                name: item.name,
+                center: item.center,
+                membership_type: item.membership_type,
+                pass_type: item.pass_type,
+                remaining_count: item.remaining_count,
+                remaining_text: item.remaining_text,
+                display_status: item.display_status,
+                membership_id: item.membership_id,
+                phone_last4,
+            }
         }))
     })
+}
+
+/// Returns the next available member_no for a center (max + 1, or 1001 if none).
+pub fn get_next_member_no(state: &AppState, center: &str) -> Result<i64, DbError> {
+    state.with_conn(|conn| {
+        super::ensure_schema::ensure_local_schema(conn).map_err(DbError::from)?;
+        let max: Option<i64> = conn.query_row(
+            "SELECT MAX(member_no) FROM members WHERE center = ?1",
+            params![center],
+            |row| row.get(0),
+        )?;
+        Ok(max.map(|v| v + 1).unwrap_or(1001))
+    })
+}
+
+/// Ensures member_no is unique within a center (excluding the given member id).
+fn assert_member_no_unique(
+    conn: &Connection,
+    center: &str,
+    member_no: Option<i64>,
+    exclude_id: Option<i64>,
+) -> Result<(), DbError> {
+    let Some(no) = member_no else {
+        return Ok(());
+    };
+
+    let existing_id: Option<i64> = if let Some(id) = exclude_id {
+        conn.query_row(
+            "SELECT id FROM members
+             WHERE center = ?1 AND member_no = ?2 AND deleted_at IS NULL AND id != ?3
+             LIMIT 1",
+            params![center, no, id],
+            |row| row.get(0),
+        )
+        .optional()?
+    } else {
+        conn.query_row(
+            "SELECT id FROM members
+             WHERE center = ?1 AND member_no = ?2 AND deleted_at IS NULL
+             LIMIT 1",
+            params![center, no],
+            |row| row.get(0),
+        )
+        .optional()?
+    };
+
+    if existing_id.is_some() {
+        return Err(DbError::Message("이미 사용 중인 회원번호입니다.".into()));
+    }
+
+    Ok(())
 }
 
 pub fn get_member_list_item_by_id(
@@ -681,13 +746,15 @@ fn map_member(row: &Row<'_>) -> Result<Member, rusqlite::Error> {
         locker_start_date: row.get(15).ok(),
         locker_end_date: row.get(16).ok(),
         locker_memo: row.get(17).ok(),
+        member_no: row.get(18).ok(),
     })
 }
 
 const MEMBER_SELECT: &str = "
     SELECT id, name, phone, member_type, center, parent_name, parent_phone, memo, address,
            status, created_at, updated_at, deleted_at,
-           locker_number, locker_status, locker_start_date, locker_end_date, locker_memo
+           locker_number, locker_status, locker_start_date, locker_end_date, locker_memo,
+           member_no
     FROM members
 ";
 
@@ -795,14 +862,15 @@ pub fn create_member(
 
     let member_id = state.with_conn(|conn| {
         assert_phone_unique(conn, &input.center, &phone_normalized, None)?;
+        assert_member_no_unique(conn, &input.center, input.member_no, None)?;
         let now = now_string();
         let tx = conn.transaction()?;
 
         tx.execute(
             "INSERT INTO members (
                 name, phone, phone_normalized, member_type, center, parent_name, parent_phone,
-                memo, address, status, created_at, updated_at, deleted_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'active', ?10, ?10, NULL)",
+                memo, address, member_no, status, created_at, updated_at, deleted_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'active', ?11, ?11, NULL)",
             params![
                 input.name.trim(),
                 normalize_optional_phone(&input.phone),
@@ -813,6 +881,7 @@ pub fn create_member(
                 input.parent_phone,
                 input.notes,
                 input.address,
+                input.member_no,
                 now,
             ],
         )?;
@@ -908,14 +977,15 @@ pub fn update_member(state: &AppState, id: i64, input: MemberInput) -> Result<Me
 
     state.with_conn(|conn| {
         assert_phone_unique(conn, &input.center, &phone_normalized, Some(id))?;
+        assert_member_no_unique(conn, &input.center, input.member_no, Some(id))?;
         let now = now_string();
         let tx = conn.transaction()?;
 
         let updated = tx.execute(
             "UPDATE members SET
                 name = ?1, phone = ?2, phone_normalized = ?3, member_type = ?4, center = ?5,
-                parent_name = ?6, parent_phone = ?7, memo = ?8, address = ?9, updated_at = ?10
-             WHERE id = ?11 AND deleted_at IS NULL",
+                parent_name = ?6, parent_phone = ?7, memo = ?8, address = ?9, member_no = ?10, updated_at = ?11
+             WHERE id = ?12 AND deleted_at IS NULL",
             params![
                 input.name.trim(),
                 normalize_optional_phone(&input.phone),
@@ -926,6 +996,7 @@ pub fn update_member(state: &AppState, id: i64, input: MemberInput) -> Result<Me
                 input.parent_phone,
                 input.notes,
                 input.address,
+                input.member_no,
                 now,
                 id,
             ],
