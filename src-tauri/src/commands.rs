@@ -128,6 +128,16 @@ pub fn record_attendance(
 }
 
 #[tauri::command]
+pub fn lookup_member_by_number(
+    state: State<'_, AppState>,
+    center: String,
+    member_number: i64,
+) -> Result<Option<crate::models::SelfCheckinMember>, String> {
+    crate::db::lookup_member_for_self_checkin(&state, &center, member_number)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn has_attendance_today_cmd(state: State<'_, AppState>, member_id: i64) -> Result<bool, String> {
     has_attendance_today(&state, member_id).map_err(|e| e.to_string())
 }

@@ -392,6 +392,42 @@ const LIST_SELECT: &str = "
     FROM members m
     LEFT JOIN memberships ms ON ms.id = ";
 
+/// Minimal member info for the self-check-in kiosk screen.
+/// Looks up a member by id within a specific center only, returning
+/// just enough info for self-confirmation (no full roster access).
+pub fn lookup_member_for_self_checkin(
+    state: &AppState,
+    center: &str,
+    member_id: i64,
+) -> Result<Option<crate::models::SelfCheckinMember>, DbError> {
+    state.with_conn(|conn| {
+        super::ensure_schema::ensure_local_schema(conn).map_err(DbError::from)?;
+        let today_date = today_date();
+        let active_sub = active_membership_subquery();
+        let sql = format!(
+            "{LIST_SELECT}{active_sub}
+             WHERE m.id = ?1 AND m.center = ?2 AND m.deleted_at IS NULL"
+        );
+        let item = conn
+            .query_row(&sql, params![member_id, center], |row| {
+                map_list_item(row, today_date)
+            })
+            .optional()?;
+
+        Ok(item.map(|item| crate::models::SelfCheckinMember {
+            id: item.id,
+            name: item.name,
+            center: item.center,
+            membership_type: item.membership_type,
+            pass_type: item.pass_type,
+            remaining_count: item.remaining_count,
+            remaining_text: item.remaining_text,
+            display_status: item.display_status,
+            membership_id: item.membership_id,
+        }))
+    })
+}
+
 pub fn get_member_list_item_by_id(
     state: &AppState,
     member_id: i64,

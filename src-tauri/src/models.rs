@@ -81,6 +81,19 @@ pub struct MemberListItem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SelfCheckinMember {
+    pub id: i64,
+    pub name: String,
+    pub center: String,
+    pub membership_type: Option<String>,
+    pub pass_type: Option<String>,
+    pub remaining_count: Option<i32>,
+    pub remaining_text: String,
+    pub display_status: String,
+    pub membership_id: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemberEditLog {
     pub id: i64,
     pub member_id: i64,

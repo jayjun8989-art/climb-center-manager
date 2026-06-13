@@ -17,6 +17,18 @@ export type DbMembershipType =
   | "junior"
   | "trial";
 
+export interface SelfCheckinMember {
+  id: number;
+  name: string;
+  center: Center;
+  membership_type: string | null;
+  pass_type: string | null;
+  remaining_count: number | null;
+  remaining_text: string;
+  display_status: string;
+  membership_id: number | null;
+}
+
 export interface Member {
   id: number;
   name: string;

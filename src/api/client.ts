@@ -14,6 +14,7 @@ import type {
   PauseLog,
   Payment,
   ReportInfo,
+  SelfCheckinMember,
   StorageInfo,
   SyncQueueItem,
   SyncStatus,
@@ -161,6 +162,14 @@ export const api = {
         editor: options?.editor ?? null,
       },
       () => fallbackRecordAttendance(memberId),
+    );
+  },
+
+  lookupMemberByNumber(center: Center, memberNumber: number): Promise<SelfCheckinMember | null> {
+    return readCommand<SelfCheckinMember | null>(
+      "lookup_member_by_number",
+      { center, memberNumber },
+      () => null,
     );
   },
 

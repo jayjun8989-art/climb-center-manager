@@ -4,9 +4,10 @@ import { useState } from "react";
 interface LoginScreenProps {
   loading?: boolean;
   onSubmit: (loginId: string, password: string) => Promise<void>;
+  onOpenSelfCheckin?: () => void;
 }
 
-export function LoginScreen({ loading, onSubmit }: LoginScreenProps) {
+export function LoginScreen({ loading, onSubmit, onOpenSelfCheckin }: LoginScreenProps) {
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -81,6 +82,15 @@ export function LoginScreen({ loading, onSubmit }: LoginScreenProps) {
             {busy ? "로그인 중..." : "로그인"}
           </button>
         </form>
+        {onOpenSelfCheckin && (
+          <button
+            type="button"
+            className="btn btn-secondary mt-4 w-full"
+            onClick={onOpenSelfCheckin}
+          >
+            셀프 출석체크
+          </button>
+        )}
       </div>
     </div>
   );

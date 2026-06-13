@@ -6,6 +6,7 @@ import { MemberStatusPanel } from "./components/MemberStatusPanel";
 import { Header } from "./components/Header";
 import { LockerManagementPanel } from "./components/LockerManagementPanel";
 import { LoginScreen } from "./components/LoginScreen";
+import { SelfCheckinPanel } from "./components/SelfCheckinPanel";
 import { MemberRosterPanel } from "./components/MemberRosterPanel";
 import { MainNav, type AppView } from "./components/MainNav";
 import { MemberDetailPanel } from "./components/MemberDetailPanel";
@@ -71,6 +72,7 @@ export default function App() {
   const { dark, toggleTheme } = useTheme();
   const auth = useSupabaseAuth();
   const [center, setCenter] = useState<Center>("ONCLE");
+  const [selfCheckinOpen, setSelfCheckinOpen] = useState(false);
   const access = useCenterPermissions(center, auth.user, auth.isAuthenticated);
   const { permissions, accessibleCenters, roleLabel, roles, loading: rolesLoading, error: rolesError } = access;
   const [activeView, setActiveView] = useState<AppView>("members");
@@ -570,8 +572,18 @@ export default function App() {
     );
   }
 
+  if (selfCheckinOpen) {
+    return <SelfCheckinPanel onClose={() => setSelfCheckinOpen(false)} />;
+  }
+
   if (requiresLogin && !auth.isAuthenticated) {
-    return <LoginScreen loading={auth.loading} onSubmit={handleLogin} />;
+    return (
+      <LoginScreen
+        loading={auth.loading}
+        onSubmit={handleLogin}
+        onOpenSelfCheckin={() => setSelfCheckinOpen(true)}
+      />
+    );
   }
 
   return (
