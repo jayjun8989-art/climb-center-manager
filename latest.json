@@ -1,11 +1,11 @@
 {
     "platforms":  {
                       "windows-x86_64":  {
-                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVpNWDFqdlZSTndpaHNNMlE2dFlYNk9PSzc2aHJnSmF1TWVrd3diVWFTc3M0RVZZQ1Y0V2R0MS9SK2FNOGxYd1Bha2lLUkdPbm12VkhvZXVxRkQrYUE0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMzM1MTk5CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4yOV94NjQtc2V0dXAuZXhlCjREY1piS3RkalExZi8zWHp0ZDBtc2VnUVZoZG52ZnZOcmpYUE5hdVBPRTgvQlpqZG15aUJldEZZbjliUUJFZytJM0EvTzM5U3crV0FlL2ltWHVzaUN3PT0K",
-                                             "url":  "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.29/ClimbCenterManager_1.0.29_x64-setup.exe"
+                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVVQOTlnSWpZQ0gzSWhYdlhZbDd4eGhRN1Rmb1N0Rmcvdjd4OVUrQkNWLzZ3YSswM3c1OElJMHNMdGkrVXpyZnZ6eWo4WGx5bTEzRDNTTEJFNnlnUmdVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMzM4MDczCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4zMF94NjQtc2V0dXAuZXhlCnl4S0xLa0h2UmVZKzJTZVkzQTZDVTNycHdGd1dyQVptdHdLT0svV2txQWdBVzhnNm9UQlkwWi93OFF0UDUrM0gwVGc3UnlYM2pBa1hRZEtTUzloUUNBPT0K",
+                                             "url":  "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.30/ClimbCenterManager_1.0.30_x64-setup.exe"
                                          }
                   },
     "pub_date":  "2026-06-13T00:00:00Z",
-    "version":  "1.0.29",
-    "notes":  "셀프 출석체크 횟수권/주니어권 차감 동기화 수정, 출석 기록 Supabase 동기화 및 다른 PC 반영 보완"
+    "version":  "1.0.30",
+    "notes":  "서버 기준 로컬 중복 회원 정리 기능 추가(삭제 없이 숨김 처리), 중복 회원 진단 화면 연결, 회원 목록/검색/현황/엑셀/셀프출석에서 숨김 회원 제외"
 }
