@@ -470,6 +470,77 @@ async function pushMemberQueueItem(
   }
 }
 
+type AttendanceSyncPayload = {
+  local_member_id: number;
+  local_membership_id: number;
+  center: Center;
+  checkin_at: string;
+  attendance_type: string;
+  deducted_count: number;
+  memo: string | null;
+  source: string;
+};
+
+function toUtcIso(value: string): string {
+  // Local "YYYY-MM-DD HH:MM:SS" -> ISO with Z (best-effort; treated as local time)
+  const normalized = value.includes("T") ? value : value.replace(" ", "T");
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return new Date().toISOString();
+  return parsed.toISOString();
+}
+
+async function pushAttendanceQueueItem(
+  item: SyncQueueItem,
+  syncContext: SyncErrorContext,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return { ok: false, error: "서버 연결을 확인해주세요." };
+  }
+
+  let payload: AttendanceSyncPayload;
+  try {
+    payload = JSON.parse(item.payload_json) as AttendanceSyncPayload;
+  } catch {
+    return { ok: false, error: `출석 #${item.entity_local_id} · 동기화 데이터 형식이 올바르지 않습니다.` };
+  }
+
+  try {
+    const centerId = centerIdForCode(payload.center);
+    const memberRemoteId = await fetchRemoteId("member", payload.local_member_id);
+    if (!memberRemoteId) {
+      // Member not synced yet — leave queued, retry on next push after member syncs.
+      return { ok: false, error: `출석 #${item.entity_local_id} · 회원이 아직 동기화되지 않았습니다.` };
+    }
+    const membershipRemoteId = await fetchRemoteId("membership", payload.local_membership_id);
+    if (!membershipRemoteId) {
+      return { ok: false, error: `출석 #${item.entity_local_id} · 회원권이 아직 동기화되지 않았습니다.` };
+    }
+
+    const row = {
+      member_id: memberRemoteId,
+      membership_id: membershipRemoteId,
+      center_id: centerId,
+      checkin_at: toUtcIso(payload.checkin_at),
+      attendance_type: payload.attendance_type === "junior" || payload.attendance_type === "trial"
+        ? payload.attendance_type
+        : "normal",
+      deducted_count: payload.deducted_count,
+      memo: payload.memo ?? null,
+      source: payload.source,
+    };
+
+    const { error } = await supabase.from("attendance_logs").insert(row);
+    if (error) throw error;
+
+    await safeInvoke("complete_sync_queue_item", { id: item.id });
+    return { ok: true };
+  } catch (error) {
+    const message = formatSyncError(error, syncContext, payload.center);
+    return { ok: false, error: `출석 #${item.entity_local_id} · ${message}` };
+  }
+}
+
 /** Push local sync_queue to Supabase (members only — no pull merge). */
 export async function pushSyncQueue(syncContext?: SyncErrorContext): Promise<SyncRunResult> {
   if (!isTauriApp()) {
@@ -539,6 +610,18 @@ export async function pushSyncQueue(syncContext?: SyncErrorContext): Promise<Syn
   const errors: string[] = [];
 
   for (const item of queue) {
+    if (item.entity_type === "attendance") {
+      const result = await pushAttendanceQueueItem(item, context);
+      if (result.ok) {
+        pushed += 1;
+        continue;
+      }
+      await failQueueItem(item.id, result.error);
+      failed += 1;
+      errors.push(result.error);
+      continue;
+    }
+
     if (item.entity_type !== "member") {
       skipped += 1;
       continue;

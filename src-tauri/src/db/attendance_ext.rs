@@ -125,7 +125,7 @@ pub fn check_attendance_with_options(
         }
     }
 
-    state.with_conn(|conn| {
+    let result = state.with_conn(|conn| {
         let tx = conn.transaction()?;
         let now = now_string();
         let checkin_at = if date == today_str {
@@ -166,6 +166,7 @@ pub fn check_attendance_with_options(
                 source,
             ],
         )?;
+        let attendance_id = tx.last_insert_rowid();
 
         let before_remaining = membership.remaining_count;
         let after_remaining = if deducted > 0 {
@@ -189,14 +190,40 @@ pub fn check_attendance_with_options(
         super::member_edit_log::insert_member_edit_log(&*tx, member_id, "update", editor, &summary)?;
 
         tx.commit()?;
-        Ok(())
+        Ok((attendance_id, checkin_at, deducted, source.to_string(), memo.map(str::to_string)))
     })?;
 
-    let attendance_payload = serde_json::json!({ "member_id": member_id });
+    let (attendance_id, checkin_at, deducted, source, memo) = result;
+
+    // Push the member/membership (including remaining_count deduction) so
+    // other devices receive the updated remaining counts on next pull.
+    if let Ok(payload_json) = super::sync_local::build_member_sync_payload_json(state, member_id) {
+        if let Ok(payload_value) = serde_json::from_str::<serde_json::Value>(&payload_json) {
+            let _ = super::sync_local::enqueue_entity_op(
+                state,
+                "member",
+                member_id,
+                "update",
+                &payload_value,
+            );
+        }
+    }
+
+    // Push the attendance log itself so it appears on other devices after pull.
+    let attendance_payload = serde_json::json!({
+        "local_member_id": member_id,
+        "local_membership_id": membership.id,
+        "center": member.center,
+        "checkin_at": checkin_at,
+        "attendance_type": attendance_type_for_member(&member.member_type),
+        "deducted_count": deducted,
+        "memo": memo,
+        "source": source,
+    });
     let _ = super::sync_local::enqueue_entity_op(
         state,
         "attendance",
-        member_id,
+        attendance_id,
         "insert",
         &attendance_payload,
     );

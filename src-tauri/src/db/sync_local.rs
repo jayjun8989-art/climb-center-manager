@@ -281,7 +281,7 @@ pub fn purge_unsupported_sync_queue(state: &AppState) -> Result<i64, DbError> {
     state.with_conn(|conn| {
         let removed = conn.execute(
             "DELETE FROM sync_queue
-             WHERE entity_type != 'member' OR last_error IS NOT NULL",
+             WHERE entity_type NOT IN ('member', 'attendance') OR last_error IS NOT NULL",
             [],
         )?;
         Ok(removed as i64)
