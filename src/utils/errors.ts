@@ -1,7 +1,8 @@
 const ERROR_REPLACEMENTS: [RegExp, string][] = [
   [/command failed/i, "요청 처리에 실패했습니다."],
   [/invalid args/i, "입력값이 올바르지 않습니다."],
-  [/DUPLICATE_TODAY/i, "오늘 이미 출석 처리된 회원입니다."],
+  [/DUPLICATE_TODAY/i, "이미 해당 날짜에 출석 기록이 있습니다."],
+  [/OUT_OF_PERIOD/i, "선택한 출석일이 회원권 기간 밖입니다."],
   [/payload/i, "데이터"],
   [/\bpush\b/i, "전송"],
   [/supabase/i, "서버"],

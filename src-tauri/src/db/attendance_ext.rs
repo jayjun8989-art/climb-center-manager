@@ -3,7 +3,7 @@ use crate::models::{AttendanceLog, MemberListItem, Membership};
 use rusqlite::{params, OptionalExtension};
 
 use super::ops::{get_active_membership, get_member, get_member_list_item_by_id, refresh_member_status};
-use super::status::{attendance_type_for_member, compute_membership_status, now_string, today_date, today_string};
+use super::status::{attendance_type_for_member, compute_membership_status, now_string, parse_date, today_date, today_string};
 
 pub fn migrate_attendance_cancel(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
     let add = |col: &str, def: &str| -> Result<(), rusqlite::Error> {
@@ -65,19 +65,20 @@ pub fn check_attendance_with_options(
     membership_id: Option<i64>,
     force_duplicate: bool,
     checkin_date: Option<String>,
+    editor: Option<&str>,
 ) -> Result<MemberListItem, DbError> {
     let today_str = today_string();
     let date = checkin_date.unwrap_or_else(|| today_str.clone());
     if date > today_str {
-        return Err(DbError::Message("미래 날짜로는 출석 체크를 할 수 없습니다.".into()));
+        return Err(DbError::Message("미래 날짜로는 출석 체크할 수 없습니다.".into()));
     }
 
-    if !force_duplicate && has_attendance_on_date(state, member_id, &date)? {
-        return Err(DbError::Message("DUPLICATE_TODAY".into()));
+    if has_attendance_on_date(state, member_id, &date)? {
+        return Err(DbError::Message("이미 해당 날짜에 출석 기록이 있습니다.".into()));
     }
 
     let member = get_member(state, member_id)?
-        .ok_or_else(|| DbError::Message("??? ?? ? ????.".into()))?;
+        .ok_or_else(|| DbError::Message("회원을 찾을 수 없습니다.".into()))?;
 
     let membership = if let Some(mid) = membership_id {
         state.with_conn(|conn| {
@@ -96,30 +97,32 @@ pub fn check_attendance_with_options(
     };
 
     let membership = membership
-        .ok_or_else(|| DbError::Message("?? ???? ????.".into()))?;
+        .ok_or_else(|| DbError::Message("회원권이 없습니다.".into()))?;
 
     if membership.status == "paused" || member.status == "paused" {
-        return Err(DbError::Message("??? ???? ??? ? ????.".into()));
+        return Err(DbError::Message("정지된 회원권은 출석할 수 없습니다.".into()));
     }
 
-    let today = today_date();
+    let attendance_date = parse_date(&date).unwrap_or_else(today_date);
     let computed = compute_membership_status(
         &membership.status,
         &membership.pass_type,
         &membership.end_date,
         membership.remaining_count,
-        today,
+        attendance_date,
     );
     if computed != "active" {
-        if member.member_type == "junior"
-            && membership.pass_type == "count"
-            && membership.remaining_count.unwrap_or(0) <= 0
-        {
+        if membership.pass_type == "count" && membership.remaining_count.unwrap_or(0) <= 0 {
             return Err(DbError::Message("잔여 수업 횟수가 없습니다.".into()));
         }
-        return Err(DbError::Message(
-            "이용 가능한 회원권이 아닙니다.".into(),
-        ));
+        if membership.pass_type == "period" && !force_duplicate {
+            return Err(DbError::Message("OUT_OF_PERIOD".into()));
+        }
+        if membership.pass_type != "period" {
+            return Err(DbError::Message(
+                "이용 가능한 회원권이 아닙니다.".into(),
+            ));
+        }
     }
 
     state.with_conn(|conn| {
@@ -159,6 +162,26 @@ pub fn check_attendance_with_options(
             ],
         )?;
 
+        let before_remaining = membership.remaining_count;
+        let after_remaining = if deducted > 0 {
+            Some(before_remaining.unwrap_or(0) - 1)
+        } else {
+            before_remaining
+        };
+        let kind_label = if member.member_type == "junior" { "주니어 수업" } else { "횟수" };
+        let summary = if deducted > 0 {
+            format!(
+                "출석 기록 ({date}) · {kind_label} 차감: {} \u{2192} {}",
+                before_remaining.unwrap_or(0),
+                after_remaining.unwrap_or(0)
+            )
+        } else if date == today_str {
+            "출석 기록".to_string()
+        } else {
+            format!("과거 날짜 출석 기록 ({date})")
+        };
+        super::member_edit_log::insert_member_edit_log(&*tx, member_id, "update", editor, &summary)?;
+
         tx.commit()?;
         Ok(())
     })?;
@@ -180,28 +203,36 @@ pub fn cancel_attendance(
     state: &AppState,
     attendance_id: i64,
     reason: Option<&str>,
+    editor: Option<&str>,
 ) -> Result<MemberListItem, DbError> {
-    let row: Option<(i64, i64, i32, String)> = state.with_conn(|conn| {
+    let row: Option<(i64, i64, i32, String, String)> = state.with_conn(|conn| {
         conn.query_row(
-            "SELECT al.member_id, al.membership_id, al.deducted_count, ms.pass_type
+            "SELECT al.member_id, al.membership_id, al.deducted_count, ms.pass_type, al.checkin_at
              FROM attendance_logs al
              JOIN memberships ms ON ms.id = al.membership_id
              WHERE al.id = ?1 AND al.canceled_at IS NULL",
             params![attendance_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
         )
         .optional()
         .map_err(DbError::from)
     })?;
 
-    let (member_id, membership_id, deducted, pass_type) = row
-        .ok_or_else(|| DbError::Message("??? ?? ??? ?? ? ????.".into()))?;
+    let (member_id, membership_id, deducted, pass_type, checkin_at) = row
+        .ok_or_else(|| DbError::Message("취소할 출석 기록을 찾을 수 없습니다.".into()))?;
 
     state.with_conn(|conn| {
         let tx = conn.transaction()?;
         let now = now_string();
+        let mut before_remaining: Option<i32> = None;
+        let mut after_remaining: Option<i32> = None;
 
         if deducted > 0 && pass_type == "count" {
+            before_remaining = tx.query_row(
+                "SELECT remaining_count FROM memberships WHERE id = ?1",
+                params![membership_id],
+                |row| row.get(0),
+            )?;
             tx.execute(
                 "UPDATE memberships SET
                     used_count = CASE WHEN used_count > 0 THEN used_count - 1 ELSE 0 END,
@@ -211,12 +242,22 @@ pub fn cancel_attendance(
                  WHERE id = ?2",
                 params![now, membership_id],
             )?;
+            after_remaining = Some(before_remaining.unwrap_or(0) + 1);
         }
 
         tx.execute(
             "UPDATE attendance_logs SET canceled_at = ?1, cancel_reason = ?2 WHERE id = ?3",
             params![now, reason, attendance_id],
         )?;
+
+        let date = checkin_at.get(0..10).unwrap_or(&checkin_at);
+        let summary = if let (Some(before), Some(after)) = (before_remaining, after_remaining) {
+            format!("출석 취소 ({date}) · 잔여 횟수 복원: {before} \u{2192} {after}")
+        } else {
+            format!("출석 취소 ({date})")
+        };
+        super::member_edit_log::insert_member_edit_log(&*tx, member_id, "update", editor, &summary)?;
+
         tx.commit()?;
         Ok(())
     })?;

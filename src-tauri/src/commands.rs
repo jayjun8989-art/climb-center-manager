@@ -110,6 +110,7 @@ pub fn record_attendance(
     membership_id: Option<i64>,
     force_duplicate: Option<bool>,
     checkin_date: Option<String>,
+    editor: Option<String>,
 ) -> Result<MutationResult<MemberListItem>, String> {
     let member = check_attendance_with_options(
         &state,
@@ -117,6 +118,7 @@ pub fn record_attendance(
         membership_id,
         force_duplicate.unwrap_or(false),
         checkin_date,
+        editor.as_deref(),
     )
     .map_err(|e| e.to_string())?;
     Ok(MutationResult {
@@ -144,8 +146,9 @@ pub fn cancel_attendance_cmd(
     state: State<'_, AppState>,
     attendance_id: i64,
     reason: Option<String>,
+    editor: Option<String>,
 ) -> Result<MutationResult<MemberListItem>, String> {
-    let member = cancel_attendance(&state, attendance_id, reason.as_deref())
+    let member = cancel_attendance(&state, attendance_id, reason.as_deref(), editor.as_deref())
         .map_err(|e| e.to_string())?;
     Ok(MutationResult {
         backup_warning: backup_best_effort(&state),

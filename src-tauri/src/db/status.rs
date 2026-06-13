@@ -88,17 +88,17 @@ pub fn display_badge(
     }
 
     if membership_status == "expired" {
-        return "\u{be14}\u{bae30}\u{c784}".to_string();
+        return "\u{b9cc}\u{b8cc}".to_string();
     }
 
     if pass_type == "period" {
         if let Some(end) = end_date.as_ref() {
             if let Some(days) = days_until(end, today) {
                 if days < 0 {
-                    return "\u{be14}\u{bae30}\u{c784}".to_string();
+                    return "\u{b9cc}\u{b8cc}".to_string();
                 }
                 if days <= 7 {
-                    return "\u{be14}\u{bae30} \u{c784}\u{bc15}".to_string();
+                    return "\u{b9cc}\u{b8cc} \u{c784}\u{bc15}".to_string();
                 }
             }
         }
@@ -107,10 +107,10 @@ pub fn display_badge(
 
     let remaining = remaining_count.unwrap_or(0);
     if remaining <= 0 {
-        return "\u{d69f}\u{c218} \u{c18c}\u{c9c4}".to_string();
+        return "\u{c18c}\u{c9c4}".to_string();
     }
     if remaining <= 2 {
-        return "\u{c794}\u{c5ec} \u{d69f}\u{c218} \u{bd80}\u{c871}".to_string();
+        return "\u{c18c}\u{c9c4} \u{c784}\u{bc15}".to_string();
     }
     "\u{c774}\u{c6a9} \u{ac00}\u{b2a5}".to_string()
 }
@@ -124,22 +124,22 @@ pub fn remaining_text(
     today: NaiveDate,
 ) -> String {
     if let Some(days) = pause_remaining_days {
-        return format!("\u{c815}\u{c9c0} \u{b7} \u{b09a}\u{c740} {days}\u{c77c}");
+        return format!("\u{c815}\u{c9c0} / \u{b0a8}\u{c740} {days}\u{c77c}");
     }
 
     if pass_type == "period" {
         if let Some(end) = end_date.as_ref() {
             if let Some(days) = days_until(end, today) {
                 if days < 0 {
-                    return format!("\u{be14}\u{bae30} ({end})");
+                    return format!("\u{b9cc}\u{b8cc} ({end})");
                 }
                 if days == 0 {
-                    return "\u{c624}\u{eb8a} \u{be14}\u{bae30}".to_string();
+                    return "\u{c624}\u{b298} \u{b9cc}\u{b8cc}".to_string();
                 }
                 return format!("D-{days} ({end})");
             }
         }
-        return "\u{be14}\u{bae30}\u{c77c} \u{c5c6}\u{c74c}".to_string();
+        return "\u{b9cc}\u{b8cc}\u{c77c} \u{c5c6}\u{c74c}".to_string();
     }
 
     let remaining = remaining_count.unwrap_or(0);

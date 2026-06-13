@@ -412,26 +412,21 @@ export default function App() {
     }
 
     const checkinDate = options?.checkinDate ?? null;
-    let forceDuplicate = options?.forceDuplicate ?? false;
-    if (!forceDuplicate && isTauriApp()) {
-      const hasOnDate = checkinDate
-        ? await api.hasAttendanceOnDate(member, checkinDate)
-        : await api.hasAttendanceToday(member);
-      if (hasOnDate) {
-        const dateLabel = checkinDate ?? "오늘";
-        const confirmed = window.confirm(
-          `${dateLabel} 이미 출석 처리된 회원입니다. 그래도 추가 출석하시겠습니까?`,
-        );
-        if (!confirmed) return null;
-        forceDuplicate = true;
-      }
+    const today = new Date().toISOString().slice(0, 10);
+    if (checkinDate && checkinDate > today) {
+      const msg = "미래 날짜로는 출석 체크할 수 없습니다.";
+      setToast(msg);
+      throw new Error(msg);
     }
+
+    const forceDuplicate = options?.forceDuplicate ?? false;
 
     try {
       const result = await api.recordAttendance(member, {
         membershipId: member.membership_id,
         forceDuplicate,
         checkinDate,
+        editor: currentLoginId || null,
       });
       setSelectedMember(result.data);
       if (result.backup_warning) {
@@ -441,16 +436,17 @@ export default function App() {
       sync.syncNow().catch(() => undefined);
       return result.data;
     } catch (error) {
-      const message = logAppError("출석 체크", error);
-      if (message.includes("이미 출석")) {
-        const dateLabel = checkinDate ?? "오늘";
+      const rawMessage = error instanceof Error ? error.message : String(error);
+      if (!forceDuplicate && /OUT_OF_PERIOD/i.test(rawMessage)) {
         const confirmed = window.confirm(
-          `${dateLabel} 이미 출석 처리된 회원입니다. 그래도 추가 출석하시겠습니까?`,
+          "선택한 출석일이 회원권 기간 밖입니다. 그래도 출석을 기록하시겠습니까?",
         );
         if (confirmed) {
           return handleAttendance(member, { forceDuplicate: true, checkinDate });
         }
+        return null;
       }
+      const message = logAppError("출석 체크", error);
       setToast(message);
       throw error;
     }
@@ -729,7 +725,8 @@ export default function App() {
               <MemberDetailPanel
                 member={selectedMember}
                 permissions={permissions}
-                onAttendance={handleAttendance}
+                onAttendance={(member, checkinDate) => handleAttendance(member, { checkinDate })}
+                editor={currentLoginId}
                 onUpdated={(updated) => {
                   setSelectedMember(updated);
                   setMembers((current) =>
@@ -763,7 +760,8 @@ export default function App() {
             <MemberDetailPanel
               member={selectedMember}
               permissions={permissions}
-              onAttendance={handleAttendance}
+              onAttendance={(member, checkinDate) => handleAttendance(member, { checkinDate })}
+                editor={currentLoginId}
               onUpdated={(updated) => {
                 setSelectedMember(updated);
                 setMembers((current) =>
@@ -796,7 +794,8 @@ export default function App() {
             <MemberDetailPanel
               member={selectedMember}
               permissions={permissions}
-              onAttendance={handleAttendance}
+              onAttendance={(member, checkinDate) => handleAttendance(member, { checkinDate })}
+                editor={currentLoginId}
               onUpdated={(updated) => {
                 setSelectedMember(updated);
                 setMembers((current) =>

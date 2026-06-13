@@ -147,7 +147,7 @@ export const api = {
 
   recordAttendance(
     member: MemberListItem | { id?: number | null; member_id?: number | null; membership_id?: number | null },
-    options?: { membershipId?: number | null; forceDuplicate?: boolean; checkinDate?: string | null },
+    options?: { membershipId?: number | null; forceDuplicate?: boolean; checkinDate?: string | null; editor?: string | null },
   ): Promise<MutationResult<MemberListItem>> {
     const memberId = resolveMemberLocalId(member);
     const membershipId = options?.membershipId ?? member.membership_id ?? null;
@@ -158,6 +158,7 @@ export const api = {
         membershipId,
         forceDuplicate: options?.forceDuplicate ?? false,
         checkinDate: options?.checkinDate ?? null,
+        editor: options?.editor ?? null,
       },
       () => fallbackRecordAttendance(memberId),
     );
@@ -166,8 +167,9 @@ export const api = {
   cancelAttendance(
     attendanceId: number,
     reason?: string,
+    editor?: string | null,
   ): Promise<MutationResult<MemberListItem>> {
-    return writeCommand("cancel_attendance_cmd", { attendanceId, reason: reason ?? null }, () => {
+    return writeCommand("cancel_attendance_cmd", { attendanceId, reason: reason ?? null, editor: editor ?? null }, () => {
       throw new Error("출석 취소는 데스크톱 앱에서만 지원합니다.");
     });
   },

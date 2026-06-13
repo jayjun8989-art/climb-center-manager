@@ -1,5 +1,5 @@
 import { CalendarCheck2, PauseCircle, PlayCircle, XCircle } from "lucide-react";
-import { startOfMonth } from "date-fns";
+import { format, startOfMonth } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { AttendanceLog, MemberDetail, MemberListItem, PauseLog, Payment, PermissionSet } from "../types";
@@ -22,12 +22,17 @@ import {
 
 interface MemberDetailPanelProps {
   member: MemberListItem | null;
-  onAttendance: (member: MemberListItem) => Promise<MemberListItem | null>;
+  onAttendance: (member: MemberListItem, checkinDate?: string | null) => Promise<MemberListItem | null>;
   onUpdated: (member: MemberListItem) => void;
   permissions: PermissionSet;
+  editor?: string | null;
 }
 
-export function MemberDetailPanel({ member, onAttendance, onUpdated, permissions }: MemberDetailPanelProps) {
+function todayStr(): string {
+  return format(new Date(), "yyyy-MM-dd");
+}
+
+export function MemberDetailPanel({ member, onAttendance, onUpdated, permissions, editor }: MemberDetailPanelProps) {
   const [detail, setDetail] = useState<MemberDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -64,6 +69,10 @@ export function MemberDetailPanel({ member, onAttendance, onUpdated, permissions
     return [...detail.attendance].sort((a, b) => b.checkin_at.localeCompare(a.checkin_at));
   }, [detail]);
 
+  const today = todayStr();
+  const selectedAttendanceDate = selectedDate ? format(selectedDate, "yyyy-MM-dd") : today;
+  const isPastDate = selectedAttendanceDate !== today;
+
   if (!member) {
     return (
       <section className="glass-panel rounded-[1.5rem] p-5">
@@ -84,14 +93,24 @@ export function MemberDetailPanel({ member, onAttendance, onUpdated, permissions
   }
 
   async function handleAttendance() {
+    if (selectedAttendanceDate > today) {
+      setMessage("미래 날짜로는 출석 체크할 수 없습니다.");
+      return;
+    }
+    if (isPastDate) {
+      const confirmed = window.confirm(
+        `선택한 날짜로 출석을 기록하시겠습니까?\n출석일: ${selectedAttendanceDate}`,
+      );
+      if (!confirmed) return;
+    }
     setProcessing(true);
     setMessage("");
     try {
-      const updated = await onAttendance(currentMember);
+      const updated = await onAttendance(currentMember, isPastDate ? selectedAttendanceDate : null);
       if (!updated) return;
       onUpdated(updated);
       await refreshDetail();
-      setMessage(`${updated.name}님 출석이 완료되었습니다.`);
+      setMessage(`${updated.name}님 출석이 완료되었습니다. (${selectedAttendanceDate})`);
     } catch (error) {
       setMessage(String(error));
     } finally {
@@ -128,7 +147,7 @@ export function MemberDetailPanel({ member, onAttendance, onUpdated, permissions
     const reason = window.prompt("출석 취소 사유를 입력해주세요.", "") ?? "";
     if (reason === null) return;
     try {
-      const result = await api.cancelAttendance(log.id, reason || undefined);
+      const result = await api.cancelAttendance(log.id, reason || undefined, editor ?? null);
       onUpdated(result.data);
       await refreshDetail();
       setMessage("출석이 취소되었습니다.");
@@ -152,6 +171,9 @@ export function MemberDetailPanel({ member, onAttendance, onUpdated, permissions
           </div>
         </div>
         <div className="flex flex-col gap-2">
+          <p className="text-right text-xs text-[var(--muted)]">
+            출석 처리일: {selectedAttendanceDate}
+          </p>
           <button
             type="button"
             className="btn btn-primary"
@@ -160,8 +182,17 @@ export function MemberDetailPanel({ member, onAttendance, onUpdated, permissions
             onClick={() => void handleAttendance()}
           >
             <CalendarCheck2 size={18} />
-            {processing ? "처리 중..." : "출석 체크"}
+            {processing ? "처리 중..." : `${selectedAttendanceDate} 출석 체크`}
           </button>
+          {isPastDate && (
+            <button
+              type="button"
+              className="btn btn-secondary !py-1 text-xs"
+              onClick={() => setSelectedDate(null)}
+            >
+              오늘로 변경
+            </button>
+          )}
           {currentMember.membership_id && currentMember.status === "paused" ? (
             <button
               type="button"
