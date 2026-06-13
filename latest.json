@@ -1,11 +1,11 @@
 {
     "platforms":  {
                       "windows-x86_64":  {
-                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVJBd3FIVXMzRlByNTExeU52akVBVDZzZHREdXRTckdaMmdUQ1R3NU9HcXJ0VU9JSGFhdnU5bGVpVWY0cjdvanJUbkVlc1k4cFNJTENnSHlMb0x6M1FzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMzE2MzcyCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4yNF94NjQtc2V0dXAuZXhlCk9hb1VnM0EzZFBCSTY0N1FHeDVCVWFXUytYa0JQZnNENjdUenErQ1IybnB4Y3RQWm9lWmlvSkRENFY1eklTVzVEWjlNOWNUK0dXMjVIWS9idVpZZ0RRPT0K",
-                                             "url":  "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.24/ClimbCenterManager_1.0.24_x64-setup.exe"
+                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWZ5em14K2xwaXVhdnovdnVncUcrdFdXZUl0OGFpNWZtNHlMM05DNTJtMlc3S2hYVUgzK3dpdGZ1VDBCTmpSazVMb0NMS2RLL3lBSmpwblF2K21OeXdjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMzE3NDMxCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4yNV94NjQtc2V0dXAuZXhlCkdXcS9kQzl5ekRmQjd0TktTS3g5SG1vTmVvZHVlNDZ1RlljeitvMHFxbHZHV2dtcm9RSTI0MDBrQldqSzlBTTMvZVBHU0M0SWFKWGM5aElyQ0l2cUJ3PT0K",
+                                             "url":  "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.25/ClimbCenterManager_1.0.25_x64-setup.exe"
                                          }
                   },
     "pub_date":  "2026-06-13T00:00:00Z",
-    "version":  "1.0.24",
-    "notes":  "출석 체크 날짜 선택 오류 수정, 과거 날짜 출석 입력 지원, 한글 상태 라벨 깨짐 수정, 회원 목록 중복 표시 수정"
+    "version":  "1.0.25",
+    "notes":  "자동 업데이트 서명키 불일치 문제 수정, v1.0.24 기능 유지"
 }
