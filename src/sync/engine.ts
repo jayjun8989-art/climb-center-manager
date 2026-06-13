@@ -607,29 +607,25 @@ export async function pushSyncQueue(syncContext?: SyncErrorContext): Promise<Syn
   let pushed = 0;
   let failed = 0;
   let skipped = 0;
+  let pending = 0;
+  let memberPushed = 0;
+  let membershipPushed = 0;
+  let attendancePushed = 0;
   const errors: string[] = [];
 
-  for (const item of queue) {
-    if (item.entity_type === "attendance") {
-      const result = await pushAttendanceQueueItem(item, context);
-      if (result.ok) {
-        pushed += 1;
-        continue;
-      }
-      await failQueueItem(item.id, result.error);
-      failed += 1;
-      errors.push(result.error);
-      continue;
-    }
+  // Step 1: process all "member" items first (includes membership upserts).
+  const memberItems = queue.filter((item) => item.entity_type === "member");
+  const attendanceItems = queue.filter((item) => item.entity_type === "attendance");
+  const otherItems = queue.filter(
+    (item) => item.entity_type !== "member" && item.entity_type !== "attendance",
+  );
 
-    if (item.entity_type !== "member") {
-      skipped += 1;
-      continue;
-    }
-
+  for (const item of memberItems) {
     const result = await pushMemberQueueItem(item, context);
     if (result.ok) {
       pushed += 1;
+      memberPushed += 1;
+      membershipPushed += 1;
       continue;
     }
 
@@ -638,22 +634,56 @@ export async function pushSyncQueue(syncContext?: SyncErrorContext): Promise<Syn
     errors.push(result.error);
   }
 
+  // Step 2: process "attendance" items, verifying member/membership remote_id now exist.
+  for (const item of attendanceItems) {
+    let payload: AttendanceSyncPayload | null = null;
+    try {
+      payload = JSON.parse(item.payload_json) as AttendanceSyncPayload;
+    } catch {
+      // fall through to normal push, which will report the parse error
+    }
+
+    if (payload) {
+      const memberRemoteId = await fetchRemoteId("member", payload.local_member_id);
+      const membershipRemoteId = await fetchRemoteId("membership", payload.local_membership_id);
+      if (!memberRemoteId || !membershipRemoteId) {
+        // Leave as pending (not blocked) — will retry on next push once member syncs.
+        pending += 1;
+        continue;
+      }
+    }
+
+    const result = await pushAttendanceQueueItem(item, context);
+    if (result.ok) {
+      pushed += 1;
+      attendancePushed += 1;
+      continue;
+    }
+    await failQueueItem(item.id, result.error);
+    failed += 1;
+    errors.push(result.error);
+  }
+
+  skipped += otherItems.length;
+
   if (pushed > 0) {
     await updateSyncState("last_push_at", nowIso());
   }
 
   let message: string | undefined;
-  if (pushed > 0 && failed === 0) {
-    message = `업로드 완료: ${pushed}건 반영`;
+  if (pushed > 0 && failed === 0 && pending === 0) {
+    message = `동기화 완료: 회원 ${memberPushed}명, 회원권 ${membershipPushed}건, 출석 ${attendancePushed}건 서버 반영`;
   } else if (failed > 0) {
     message = errors[0] ?? `업로드 실패 ${failed}건`;
+  } else if (pending > 0 && failed === 0) {
+    message = "동기화 보류: 회원 remote_id가 없어 회원 업로드를 먼저 시도합니다.";
   } else if (queue.length === 0) {
     message = "동기화할 대기 항목이 없습니다.";
   } else if (skipped > 0 && pushed === 0 && failed === 0) {
     message = `회원 외 ${skipped}건은 아직 동기화되지 않습니다. 「불필요 항목 정리」로 제거할 수 있습니다.`;
   }
 
-  return { pushed, failed, skipped, errors, message };
+  return { pushed, failed, skipped: skipped + pending, errors, message };
 }
 
 async function countLocalMembers(): Promise<number> {

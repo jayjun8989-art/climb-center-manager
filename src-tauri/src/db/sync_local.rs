@@ -237,6 +237,42 @@ pub fn repair_member_sync_queue(state: &AppState) -> Result<RepairSyncQueueResul
     let mut repaired = 0_i64;
     let mut failed = 0_i64;
 
+    // Reset blocked/failed attendance items whose member already has a remote_id
+    // so they get retried on the next push (un-sticks items like #3/#21).
+    for item in &items {
+        if item.entity_type != "attendance" {
+            continue;
+        }
+        let is_blocked_attendance = item
+            .last_error
+            .as_deref()
+            .map(|err| err.contains("동기화되지") || err.contains("회원이 아직"))
+            .unwrap_or(false);
+        if !is_blocked_attendance {
+            continue;
+        }
+
+        let local_member_id: Option<i64> = serde_json::from_str::<Value>(&item.payload_json)
+            .ok()
+            .and_then(|v| v.get("local_member_id").and_then(|n| n.as_i64()));
+
+        let has_remote_id = match local_member_id {
+            Some(member_id) => get_remote_id(state, "member", member_id)?.is_some(),
+            None => false,
+        };
+
+        if has_remote_id {
+            state.with_conn(|conn| {
+                conn.execute(
+                    "UPDATE sync_queue SET last_error = NULL WHERE id = ?1",
+                    rusqlite::params![item.id],
+                )?;
+                Ok(())
+            })?;
+            repaired += 1;
+        }
+    }
+
     for item in items {
         if item.entity_type != "member" {
             continue;
