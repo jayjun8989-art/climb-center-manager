@@ -3,15 +3,20 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { Center, MemberInput, MemberListItem, MembershipCategory } from "../types";
 import {
+  calcDurationDays,
+  calcEndDateFromDays,
   calcMonthlyEndDate,
   calcSessionEndDate,
   dbMembershipToLegacy,
   getJuniorCountFromItem,
   getMonthlyDuration,
   JUNIOR_COUNT_PRESETS,
+  JUNIOR_PERIOD_DAY_PRESETS,
   monthlyTypeFromDuration,
   normalizePhoneInput,
+  PERIOD_DAY_PRESETS,
   resolveCategory,
+  SESSION_COUNT_PRESETS,
   SESSION_TOTAL_COUNT,
   SESSION_VALIDITY_MONTHS,
   todayString,
@@ -33,8 +38,6 @@ const categoryOptions: { value: MembershipCategory; label: string }[] = [
   { value: "session", label: "횟수권" },
   { value: "junior", label: "주니어" },
 ];
-
-const monthlyDurations: MonthlyDuration[] = [1, 2, 3, 6];
 
 function resolveCategoryFromItem(type: MemberListItem["membership_type"]): MembershipCategory {
   return resolveCategory(type ?? undefined);
@@ -67,6 +70,17 @@ export function MemberFormModal({
 
   const [endDate, setEndDate] = useState("");
 
+  // Period (월권/기간권) custom duration support
+  const [periodCustom, setPeriodCustom] = useState(false);
+
+  // 횟수권 (session) editable totals
+  const [sessionTotal, setSessionTotal] = useState<number>(SESSION_TOTAL_COUNT);
+  const [sessionRemaining, setSessionRemaining] = useState<number>(SESSION_TOTAL_COUNT);
+  const [sessionCustom, setSessionCustom] = useState(false);
+
+  // 주니어권 period custom duration support
+  const [juniorPeriodCustom, setJuniorPeriodCustom] = useState(false);
+
   const [notes, setNotes] = useState("");
   const [address, setAddress] = useState("");
   const [memberNo, setMemberNo] = useState("");
@@ -82,16 +96,6 @@ export function MemberFormModal({
   const [saving, setSaving] = useState(false);
 
   const [error, setError] = useState("");
-
-
-
-  const autoMonthlyEndDate = useMemo(() => {
-
-    if (category !== "monthly" || !startDate) return "";
-
-    return calcMonthlyEndDate(startDate, monthlyDuration);
-
-  }, [category, startDate, monthlyDuration]);
 
 
 
@@ -127,6 +131,15 @@ export function MemberFormModal({
       }
       setStartDate(member.start_date ?? todayString());
       setEndDate(member.end_date ?? "");
+      setPeriodCustom(false);
+      setJuniorPeriodCustom(false);
+      {
+        const total = member.total_count ?? SESSION_TOTAL_COUNT;
+        const remaining = member.remaining_count ?? total;
+        setSessionTotal(total);
+        setSessionRemaining(remaining);
+        setSessionCustom(!SESSION_COUNT_PRESETS.includes(total));
+      }
       setNotes(member.memo ?? "");
       setMemberNo(member.member_no != null ? String(member.member_no) : "");
       setAddress("");
@@ -165,6 +178,12 @@ export function MemberFormModal({
 
     setEndDate(calcMonthlyEndDate(todayString(), 1));
 
+    setPeriodCustom(false);
+    setJuniorPeriodCustom(false);
+    setSessionTotal(SESSION_TOTAL_COUNT);
+    setSessionRemaining(SESSION_TOTAL_COUNT);
+    setSessionCustom(false);
+
     setNotes("");
     setMemberNo("");
     setAddress("");
@@ -183,7 +202,7 @@ export function MemberFormModal({
 
   useEffect(() => {
 
-    if (category === "monthly" && startDate) {
+    if (category === "monthly" && startDate && !periodCustom) {
 
       setEndDate(calcMonthlyEndDate(startDate, monthlyDuration));
 
@@ -195,7 +214,18 @@ export function MemberFormModal({
 
     }
 
-  }, [category, startDate, monthlyDuration]);
+  }, [category, startDate, monthlyDuration, periodCustom]);
+
+  // start_date change recalculates junior end date by current duration, unless manually customized
+  useEffect(() => {
+    if (category === "junior" && startDate && endDate && !juniorPeriodCustom) {
+      const days = calcDurationDays(startDate, endDate);
+      if (days > 0) {
+        setEndDate(calcEndDateFromDays(startDate, days));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDate]);
 
 
 
@@ -268,9 +298,19 @@ export function MemberFormModal({
 
     if (category === "monthly") {
 
-      membershipType = monthlyTypeFromDuration(monthlyDuration);
+      if (!endDate) {
+        setError("만료일을 입력해주세요.");
+        setSaving(false);
+        return;
+      }
 
-      resolvedEndDate = calcMonthlyEndDate(startDate, monthlyDuration);
+      const days = calcDurationDays(startDate, endDate);
+      const approxMonths = Math.round(days / 30);
+      const duration: MonthlyDuration =
+        approxMonths >= 6 ? 6 : approxMonths >= 3 ? 3 : approxMonths >= 2 ? 2 : 1;
+      membershipType = monthlyTypeFromDuration(duration);
+
+      resolvedEndDate = endDate;
 
     } else if (category === "session") {
 
@@ -278,9 +318,21 @@ export function MemberFormModal({
 
       resolvedEndDate = calcSessionEndDate(startDate);
 
-      totalSessions = SESSION_TOTAL_COUNT;
+      if (sessionTotal < 1) {
+        setError("총 횟수는 1회 이상 입력해주세요.");
+        setSaving(false);
+        return;
+      }
 
-      remainingSessions = member?.remaining_count ?? SESSION_TOTAL_COUNT;
+      if (sessionRemaining > sessionTotal || sessionRemaining < 0) {
+        setError("잔여 횟수는 0 이상, 총 횟수 이하여야 합니다.");
+        setSaving(false);
+        return;
+      }
+
+      totalSessions = sessionTotal;
+
+      remainingSessions = sessionRemaining;
 
     } else {
 
@@ -367,15 +419,11 @@ export function MemberFormModal({
 
   const displayedEndDate =
 
-    category === "monthly"
+    category === "session"
 
-      ? autoMonthlyEndDate
+      ? autoSessionEndDate
 
-      : category === "session"
-
-        ? autoSessionEndDate
-
-        : endDate;
+      : endDate;
 
 
 
@@ -551,39 +599,69 @@ export function MemberFormModal({
 
             <div>
 
-              <label className="field-label">월권 기간</label>
+              <label className="field-label">월권/기간권 기간</label>
 
               <div className="grid grid-cols-4 gap-2">
 
-                {monthlyDurations.map((duration) => (
+                {PERIOD_DAY_PRESETS.map((days) => (
 
                   <button
 
-                    key={duration}
+                    key={days}
 
                     type="button"
 
-                    className={`btn ${
+                    className="btn btn-secondary"
 
-                      monthlyDuration === duration ? "btn-primary" : "btn-secondary"
-
-                    }`}
-
-                    onClick={() => setMonthlyDuration(duration)}
+                    onClick={() => {
+                      setPeriodCustom(false);
+                      setEndDate(calcEndDateFromDays(startDate, days));
+                    }}
 
                   >
 
-                    {duration}개월
+                    {days}일
 
                   </button>
 
                 ))}
 
+                <button
+
+                  type="button"
+
+                  className={`btn ${periodCustom ? "btn-primary" : "btn-secondary"}`}
+
+                  onClick={() => setPeriodCustom(true)}
+
+                >
+
+                  직접입력
+
+                </button>
+
+              </div>
+
+              <div className="mt-2 grid gap-2 md:grid-cols-2">
+                <div>
+                  <label className="field-label text-xs">기간 (일)</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min={1}
+                    value={startDate && endDate ? calcDurationDays(startDate, endDate) : ""}
+                    onChange={(e) => {
+                      const days = Math.max(1, Number(e.target.value) || 0);
+                      setPeriodCustom(true);
+                      setEndDate(calcEndDateFromDays(startDate, days));
+                    }}
+                  />
+                </div>
               </div>
 
               <p className="mt-2 text-xs text-[var(--muted)]">
 
-                기간 선택 시 시작일 기준 만료일이 자동 계산됩니다.
+                빠른 기간 선택 또는 만료일을 직접 입력할 수 있습니다.
 
               </p>
 
@@ -595,13 +673,64 @@ export function MemberFormModal({
 
           {category === "session" && (
 
-            <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] px-4 py-3">
+            <div>
+              <label className="field-label">총 횟수</label>
+              <div className="grid grid-cols-3 gap-2 md:grid-cols-6">
+                {SESSION_COUNT_PRESETS.map((count) => (
+                  <button
+                    key={count}
+                    type="button"
+                    className={`btn ${!sessionCustom && sessionTotal === count ? "btn-primary" : "btn-secondary"}`}
+                    onClick={() => {
+                      setSessionCustom(false);
+                      setSessionTotal(count);
+                      if (!member) setSessionRemaining(count);
+                    }}
+                  >
+                    {count}회
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className={`btn ${sessionCustom ? "btn-primary" : "btn-secondary"}`}
+                  onClick={() => setSessionCustom(true)}
+                >
+                  직접입력
+                </button>
+              </div>
 
-              <p className="text-sm font-semibold">5회권 (등록일부터 {SESSION_VALIDITY_MONTHS}개월)</p>
+              <div className="mt-2 grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="field-label text-xs">총 횟수</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min={1}
+                    value={sessionTotal}
+                    onChange={(e) => {
+                      const value = Math.max(1, Number(e.target.value) || 0);
+                      setSessionCustom(!SESSION_COUNT_PRESETS.includes(value));
+                      setSessionTotal(value);
+                      if (!member) setSessionRemaining(value);
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="field-label text-xs">잔여 횟수</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min={0}
+                    max={sessionTotal}
+                    value={sessionRemaining}
+                    onChange={(e) => setSessionRemaining(Math.max(0, Number(e.target.value) || 0))}
+                  />
+                </div>
+              </div>
 
-              <p className="mt-1 text-xs text-[var(--muted)]">
+              <p className="mt-2 text-xs text-[var(--muted)]">
 
-                총 {SESSION_TOTAL_COUNT}회 이용 가능 · 시작일 기준 {SESSION_VALIDITY_MONTHS}개월 내 사용
+                시작일 기준 {SESSION_VALIDITY_MONTHS}개월 내 사용 · 출석 시 잔여 횟수가 1회씩 차감됩니다.
 
               </p>
 
@@ -659,29 +788,24 @@ export function MemberFormModal({
 
               </div>
 
-              {juniorCustom && (
-                <input
-                  className="input mt-2"
-                  type="number"
-                  min={1}
-                  value={juniorTotal}
-                  onChange={(e) => {
-                    const value = Math.max(1, Number(e.target.value) || 0);
-                    setJuniorTotal(value);
-                    if (!member) setJuniorRemaining(value);
-                  }}
-                />
-              )}
-
-              <p className="mt-2 text-xs text-[var(--muted)]">
-
-                출석 시 잔여 수업 횟수가 1회씩 차감됩니다.
-
-              </p>
-
-              {member && (
-                <div className="mt-3">
-                  <label className="field-label">잔여 수업 횟수</label>
+              <div className="mt-2 grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="field-label text-xs">총 수업 횟수</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min={1}
+                    value={juniorTotal}
+                    onChange={(e) => {
+                      const value = Math.max(1, Number(e.target.value) || 0);
+                      setJuniorCustom(!JUNIOR_COUNT_PRESETS.includes(value));
+                      setJuniorTotal(value);
+                      if (!member) setJuniorRemaining(value);
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="field-label text-xs">잔여 수업 횟수</label>
                   <input
                     className="input"
                     type="number"
@@ -691,7 +815,53 @@ export function MemberFormModal({
                     onChange={(e) => setJuniorRemaining(Math.max(0, Number(e.target.value) || 0))}
                   />
                 </div>
-              )}
+              </div>
+
+              <p className="mt-2 text-xs text-[var(--muted)]">
+
+                출석 시 잔여 수업 횟수가 1회씩 차감됩니다.
+
+              </p>
+
+              <div className="mt-3">
+                <label className="field-label">수강 기간</label>
+                <div className="grid grid-cols-3 gap-2 md:grid-cols-5">
+                  {JUNIOR_PERIOD_DAY_PRESETS.map((days) => (
+                    <button
+                      key={days}
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => {
+                        setJuniorPeriodCustom(false);
+                        setEndDate(calcEndDateFromDays(startDate, days));
+                      }}
+                    >
+                      {days}일
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    className={`btn ${juniorPeriodCustom ? "btn-primary" : "btn-secondary"}`}
+                    onClick={() => setJuniorPeriodCustom(true)}
+                  >
+                    직접입력
+                  </button>
+                </div>
+                <div className="mt-2">
+                  <label className="field-label text-xs">기간 (일)</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min={1}
+                    value={startDate && endDate ? calcDurationDays(startDate, endDate) : ""}
+                    onChange={(e) => {
+                      const days = Math.max(1, Number(e.target.value) || 0);
+                      setJuniorPeriodCustom(true);
+                      setEndDate(calcEndDateFromDays(startDate, days));
+                    }}
+                  />
+                </div>
+              </div>
 
             </div>
 
@@ -743,9 +913,13 @@ export function MemberFormModal({
 
                 value={displayedEndDate}
 
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  if (category === "monthly") setPeriodCustom(true);
+                  if (category === "junior") setJuniorPeriodCustom(true);
+                }}
 
-                readOnly={category === "monthly" || category === "session"}
+                readOnly={category === "session"}
 
                 required={category !== "junior"}
 

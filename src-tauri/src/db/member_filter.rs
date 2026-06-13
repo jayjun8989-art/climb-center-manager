@@ -38,7 +38,8 @@ pub fn member_group_clause(group: &str, today: &str) -> String {
     match group {
         "regular" | "general" => format!(" AND ({normalized}) = 'regular'"),
         "junior" => format!(" AND ({normalized}) = 'junior'"),
-        "no_member_no" => " AND m.member_no IS NULL".to_string(),
+        "no_member_no" => " AND (m.member_no IS NULL OR TRIM(m.member_no) = '')
+          AND COALESCE(m.hidden_locally, 0) = 0 AND COALESCE(m.is_local_duplicate, 0) = 0".to_string(),
         "inactive_30" => inactive_30_clause(today),
         _ => String::new(),
     }
@@ -92,6 +93,13 @@ pub fn count_junior_members_sql() -> String {
            AND COALESCE(m.hidden_locally, 0) = 0 AND COALESCE(m.is_local_duplicate, 0) = 0",
         normalized_member_type_sql()
     )
+}
+
+pub fn count_no_member_no_sql() -> &'static str {
+    "SELECT COUNT(*) FROM members m
+     WHERE m.center = ?1 AND m.deleted_at IS NULL
+       AND (m.member_no IS NULL OR TRIM(m.member_no) = '')
+       AND COALESCE(m.hidden_locally, 0) = 0 AND COALESCE(m.is_local_duplicate, 0) = 0"
 }
 
 pub fn count_inactive_30_members_sql(today: &str) -> String {

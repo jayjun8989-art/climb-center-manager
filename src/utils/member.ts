@@ -1,4 +1,4 @@
-import { addMonths, format, parseISO, subDays } from "date-fns";
+import { addDays, addMonths, differenceInCalendarDays, format, parseISO, subDays } from "date-fns";
 
 import type {
   LegacyMembershipType,
@@ -20,6 +20,19 @@ export type JuniorCount = number;
 export const SESSION_TOTAL_COUNT = 5;
 export const SESSION_VALIDITY_MONTHS = 2;
 export const JUNIOR_COUNT_PRESETS: number[] = [4, 8, 12, 16, 20];
+export const PERIOD_DAY_PRESETS: number[] = [7, 14, 30, 60, 90, 180, 365];
+export const SESSION_COUNT_PRESETS: number[] = [1, 5, 10, 20, 30];
+export const JUNIOR_PERIOD_DAY_PRESETS: number[] = [14, 30, 60, 90];
+
+export function calcEndDateFromDays(startDate: string, days: number): string {
+  const start = parseISO(startDate);
+  return format(addDays(start, days - 1), "yyyy-MM-dd");
+}
+
+export function calcDurationDays(startDate: string, endDate: string): number {
+  if (!startDate || !endDate) return 0;
+  return differenceInCalendarDays(parseISO(endDate), parseISO(startDate)) + 1;
+}
 
 export const MEMBERSHIP_LABELS: Record<LegacyMembershipType, string> = {
   monthly_1: "월권 (1개월)",
@@ -93,7 +106,7 @@ export function memberMatchesGroupFilter(
 
 export function getMemberGroupCount(
   group: MemberGroupFilter,
-  stats: { total_members: number; regular_members: number; junior_count: number; inactive_30_members: number } | null,
+  stats: { total_members: number; regular_members: number; junior_count: number; inactive_30_members: number; no_member_no_count?: number } | null,
 ): number {
   if (!stats) return 0;
   switch (group) {
@@ -106,7 +119,7 @@ export function getMemberGroupCount(
     case "inactive_30":
       return stats.inactive_30_members;
     case "no_member_no":
-      return 0;
+      return stats.no_member_no_count ?? 0;
     default:
       return 0;
   }

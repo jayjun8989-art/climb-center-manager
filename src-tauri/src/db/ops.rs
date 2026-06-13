@@ -1767,6 +1767,12 @@ pub fn get_dashboard_stats(
             |r| r.get(0),
         )?;
 
+        let no_member_no_count: i64 = conn.query_row(
+            super::member_filter::count_no_member_no_sql(),
+            params![center],
+            |r| r.get(0),
+        )?;
+
         Ok(crate::models::DashboardStats {
             total_members,
             active_members,
@@ -1779,6 +1785,7 @@ pub fn get_dashboard_stats(
             junior_count,
             regular_members,
             inactive_30_members,
+            no_member_no_count,
         })
     })
 }
@@ -2244,8 +2251,17 @@ fn validate_member_input(input: &MemberInput) -> Result<(), DbError> {
             }
         }
         "session" => {
-            if input.total_sessions.unwrap_or(0) != 5 {
-                return Err(DbError::Message("\u{D68C}\u{C218}\u{AD8C}\u{C740} 5\u{D68C}\u{B9CC} \u{AC00}\u{B2A5}\u{D569}\u{B2C8}\u{B2E4}.".into()));
+            let total = input.total_sessions.unwrap_or(0);
+            if total < 1 {
+                return Err(DbError::Message("\u{CD9D}\u{D69F}\u{C218}\u{B294} 1\u{D69F} \u{C774}\u{C0C1} \u{C785}\u{B825}\u{D574}\u{C8FC}\u{C138}\u{C694}.".into()));
+            }
+            if let Some(remaining) = input.remaining_sessions {
+                if remaining > total {
+                    return Err(DbError::Message("\u{C794}\u{C5EC} \u{D69F}\u{C218}\u{B294} \u{CD9D} \u{D69F}\u{C218}\u{B97C} \u{CD08}\u{D2B8}\u{D560} \u{C218} \u{C5C6}\u{C2B5}\u{B2C8}\u{B2E4}.".into()));
+                }
+                if remaining < 0 {
+                    return Err(DbError::Message("\u{C794}\u{C5EC} \u{D69F}\u{C218}\u{B294} 0 \u{C774}\u{C0C1}\u{C774}\u{C5B4}\u{C57C} \u{D569}\u{B2C8}\u{B2E4}.".into()));
+                }
             }
         }
         "junior" => {

@@ -249,6 +249,7 @@ pub struct DashboardStats {
     pub junior_count: i64,
     pub regular_members: i64,
     pub inactive_30_members: i64,
+    pub no_member_no_count: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

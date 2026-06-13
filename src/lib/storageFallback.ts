@@ -151,6 +151,7 @@ export function defaultDashboardStats(members: MemberListItem[]): DashboardStats
     junior_count: members.filter((m) => normalizeMemberType(m.member_type, m.membership_type) === "junior").length,
     regular_members: members.filter((m) => normalizeMemberType(m.member_type, m.membership_type) === "regular").length,
     inactive_30_members: members.filter((m) => memberMatchesGroupFilter(m, "inactive_30")).length,
+    no_member_no_count: members.filter((m) => memberMatchesGroupFilter(m, "no_member_no")).length,
   };
 }
 

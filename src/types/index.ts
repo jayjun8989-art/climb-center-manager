@@ -200,6 +200,7 @@ export interface DashboardStats {
   junior_count: number;
   regular_members: number;
   inactive_30_members: number;
+  no_member_no_count: number;
 }
 
 export interface BackupInfo {
