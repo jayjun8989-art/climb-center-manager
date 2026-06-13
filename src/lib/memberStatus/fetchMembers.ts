@@ -1,5 +1,6 @@
 import { api } from "../../api/client";
 import { invokeCommand, isTauriApp } from "../../lib/tauri";
+import { normalizeMembers } from "../normalizeMembers";
 import type { Center, MemberListItem } from "../../types";
 
 export async function fetchMembersForCenters(centers: Center[]): Promise<MemberListItem[]> {
@@ -27,10 +28,5 @@ export async function fetchMembersForCenters(centers: Center[]): Promise<MemberL
   );
 
   const merged = pages.flatMap((page) => page.members);
-  const seen = new Set<number>();
-  return merged.filter((member) => {
-    if (seen.has(member.id)) return false;
-    seen.add(member.id);
-    return true;
-  });
+  return normalizeMembers(merged);
 }

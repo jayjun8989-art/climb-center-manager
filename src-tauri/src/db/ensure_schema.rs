@@ -1,6 +1,6 @@
 use rusqlite::{Connection, Result as SqlResult};
 
-const LATEST_SCHEMA_VERSION: i64 = 6;
+const LATEST_SCHEMA_VERSION: i64 = 7;
 
 const SYNC_TABLES: &[&str] = &[
     "members",
@@ -97,6 +97,8 @@ pub fn ensure_local_schema(conn: &Connection) -> SqlResult<()> {
         );
 
         CREATE INDEX IF NOT EXISTS idx_sync_queue_created ON sync_queue(created_at);
+        CREATE INDEX IF NOT EXISTS idx_members_remote_id ON members(remote_id);
+        CREATE INDEX IF NOT EXISTS idx_members_dup_lookup ON members(center, name, phone);
         CREATE INDEX IF NOT EXISTS idx_members_locker ON members(center, locker_number);
         CREATE INDEX IF NOT EXISTS idx_member_edit_logs_member
             ON member_edit_logs(member_id, created_at DESC);

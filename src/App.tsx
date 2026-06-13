@@ -21,6 +21,7 @@ import { useCenterPermissions } from "./hooks/useCenterPermissions";
 import { useSupabaseAuth } from "./hooks/useSupabaseAuth";
 import { useSync } from "./hooks/useSync";
 import { useTheme } from "./hooks/useTheme";
+import { normalizeMembers } from "./lib/normalizeMembers";
 import { assertPermission, canRegisterMemberInCenter, getAccessibleCenters, loginWelcomeLabel, REGISTER_DENIED, validateLoginRoles } from "./lib/permissions";
 import { isSupabaseConfigured } from "./lib/supabase/config";
 import {
@@ -178,11 +179,15 @@ export default function App() {
         page,
         pageSize,
       });
-      setMembers(result.members);
-      setTotal(result.total);
+      const deduped = normalizeMembers(result.members);
+      const dedupedCount = deduped.length !== result.members.length
+        ? result.total - (result.members.length - deduped.length)
+        : result.total;
+      setMembers(deduped);
+      setTotal(dedupedCount);
       setSelectedMember((current) => {
         if (!current) return null;
-        return result.members.find((member) => member.id === current.id) ?? current;
+        return deduped.find((member) => member.id === current.id) ?? current;
       });
     } finally {
       setLoading(false);

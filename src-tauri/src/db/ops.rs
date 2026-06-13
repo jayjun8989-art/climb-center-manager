@@ -257,13 +257,38 @@ fn map_input_membership(input: &MemberInput) -> Result<(String, String, String, 
     ))
 }
 
-fn active_membership_subquery() -> &'static str {
-    "(
-        SELECT id FROM memberships
-        WHERE member_id = m.id AND status IN ('active', 'paused')
-        ORDER BY CASE status WHEN 'active' THEN 0 ELSE 1 END, id DESC
-        LIMIT 1
-    )"
+/// Picks one representative membership row per member, following this
+/// priority:
+///   1. Currently valid (paused, or period within start/end, or
+///      count/junior with remaining sessions > 0) — among valid rows,
+///      the one with the soonest (nearest) end_date wins.
+///   2. If none valid, the most recently created/updated row.
+///   3. If no memberships at all, NULL ("회원권 없음").
+fn active_membership_subquery() -> String {
+    let today = today_string();
+    format!(
+        "(
+            SELECT id FROM memberships
+            WHERE member_id = m.id
+            ORDER BY
+                CASE
+                    WHEN status = 'paused' THEN 0
+                    WHEN pass_type = 'period' AND start_date <= '{today}' AND end_date >= '{today}' THEN 0
+                    WHEN pass_type = 'count' AND IFNULL(remaining_count, 0) > 0 THEN 0
+                    ELSE 1
+                END,
+                CASE
+                    WHEN status = 'paused'
+                        OR (pass_type = 'period' AND start_date <= '{today}' AND end_date >= '{today}')
+                        OR (pass_type = 'count' AND IFNULL(remaining_count, 0) > 0)
+                    THEN IFNULL(end_date, '9999-99-99')
+                    ELSE NULL
+                END ASC,
+                updated_at DESC,
+                id DESC
+            LIMIT 1
+        )"
+    )
 }
 
 fn member_group_clause(group: &str, today: &str) -> String {
@@ -533,6 +558,106 @@ pub fn list_members(
         }
 
         Ok((members, total))
+    })
+}
+
+/// A group of members in the same center that share name+phone (or just
+/// name when phone is empty) and are therefore candidates for being the
+/// same logical person duplicated across local rows (e.g. from repeated
+/// pulls before remote_id matching was fixed).
+///
+/// This is detection-only: no automatic merge/delete is performed. The
+/// `member_ids` are ordered with the recommended "best" representative
+/// first (currently valid membership, then most recently updated).
+#[derive(serde::Serialize)]
+pub struct DuplicateMemberCandidateGroup {
+    pub center: String,
+    pub name: String,
+    pub phone: Option<String>,
+    pub member_ids: Vec<i64>,
+}
+
+/// Finds groups of member rows within a center that look like duplicates of
+/// the same logical person (same center + name + phone, or same center +
+/// name when phone is blank for both). Does not modify any data.
+pub fn find_duplicate_member_candidates(
+    state: &AppState,
+    center: &str,
+) -> Result<Vec<DuplicateMemberCandidateGroup>, DbError> {
+    state.with_conn(|conn| {
+        super::ensure_schema::ensure_local_schema(conn).map_err(DbError::from)?;
+
+        let mut stmt = conn.prepare(
+            "SELECT center, name, IFNULL(phone, '') AS phone_key, GROUP_CONCAT(id) AS ids, COUNT(*) AS cnt
+             FROM members
+             WHERE center = ?1 AND deleted_at IS NULL
+             GROUP BY center, name, phone_key
+             HAVING cnt > 1",
+        )?;
+
+        let today_date = today_date();
+        let active_sub = active_membership_subquery();
+
+        let groups = stmt
+            .query_map(params![center], |row| {
+                let center: String = row.get(0)?;
+                let name: String = row.get(1)?;
+                let phone_key: String = row.get(2)?;
+                let ids_csv: String = row.get(3)?;
+                Ok((center, name, phone_key, ids_csv))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let mut result = Vec::new();
+        for (center, name, phone_key, ids_csv) in groups {
+            let mut ids: Vec<i64> = ids_csv
+                .split(',')
+                .filter_map(|s| s.trim().parse::<i64>().ok())
+                .collect();
+
+            // Order so the "best" representative (currently-valid membership,
+            // then most recently updated) comes first.
+            let sql = format!(
+                "{LIST_SELECT}{active_sub}
+                 WHERE m.id = ?1 AND m.deleted_at IS NULL"
+            );
+            let mut scored: Vec<(i64, bool, String)> = Vec::new();
+            for id in &ids {
+                if let Some(item) = conn
+                    .query_row(&sql, params![*id], |row| map_list_item(row, today_date))
+                    .optional()?
+                {
+                    let is_valid = matches!(item.status.as_str(), "active" | "paused")
+                        || item
+                            .end_date
+                            .as_ref()
+                            .and_then(|d| status::parse_date(d))
+                            .map(|d| d >= today_date)
+                            .unwrap_or(false);
+                    scored.push((*id, is_valid, item.updated_at));
+                } else {
+                    scored.push((*id, false, String::new()));
+                }
+            }
+            scored.sort_by(|a, b| {
+                b.1.cmp(&a.1).then_with(|| b.2.cmp(&a.2))
+            });
+            ids = scored.into_iter().map(|(id, _, _)| id).collect();
+
+            // 중복 후보 진단 로그 (내부용, UI에 노출되지 않음)
+            eprintln!(
+                "[dedup] 중복 후보 발견: center={center} name={name} phone={phone_key} ids={ids:?}"
+            );
+
+            result.push(DuplicateMemberCandidateGroup {
+                center,
+                name,
+                phone: if phone_key.is_empty() { None } else { Some(phone_key) },
+                member_ids: ids,
+            });
+        }
+
+        Ok(result)
     })
 }
 

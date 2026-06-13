@@ -120,8 +120,24 @@ fn phone_normalized(phone: &Option<String>) -> Option<String> {
 }
 
 fn find_local_member_id(conn: &rusqlite::Connection, remote_id: &str) -> Result<Option<i64>, DbError> {
+    if let Some(id) = conn
+        .query_row(
+            "SELECT id FROM members WHERE remote_id = ?1",
+            [remote_id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(DbError::from)?
+    {
+        return Ok(Some(id));
+    }
+
+    // Fallback: the id_map may already have this remote_id mapped to a local
+    // member row whose `members.remote_id` column wasn't backfilled (e.g. rows
+    // created before the remote_id column existed). Without this fallback,
+    // repeated pulls would insert a brand-new duplicate member row every time.
     conn.query_row(
-        "SELECT id FROM members WHERE remote_id = ?1",
+        "SELECT local_id FROM id_map WHERE entity_type = 'member' AND remote_id = ?1",
         [remote_id],
         |row| row.get(0),
     )

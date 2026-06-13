@@ -4,7 +4,7 @@ use crate::db::{
     create_member, delete_member, enqueue_sync_item, ensure_local_schema, has_attendance_today,
     has_attendance_on_date,
     import_pull_snapshot, list_center_lockers, get_attendance, get_dashboard_stats,
-    get_expiring_members, get_member_detail, get_pause_logs, get_payments, get_remote_id, list_members,
+    find_duplicate_member_candidates, get_expiring_members, get_member_detail, get_pause_logs, get_payments, get_remote_id, list_members,
     list_sync_queue, mark_sync_queue_error, pause_membership, purge_unsupported_sync_queue,
     repair_member_sync_queue, remove_sync_queue_item, resume_membership, set_sync_state, update_member,
     upsert_id_map, AppState, DbError, PullImportResult, PullSnapshot, RepairSyncQueueResult,
@@ -232,6 +232,14 @@ pub fn fetch_expiring_members(
     days: Option<i64>,
 ) -> Result<Vec<MemberListItem>, String> {
     get_expiring_members(&state, &center, days.unwrap_or(7)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn find_duplicate_members(
+    state: State<'_, AppState>,
+    center: String,
+) -> Result<Vec<crate::db::DuplicateMemberCandidateGroup>, String> {
+    find_duplicate_member_candidates(&state, &center).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
