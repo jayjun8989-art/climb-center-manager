@@ -321,6 +321,19 @@ export type MembershipCategory = "monthly" | "session" | "junior";
 export type LockerStatus = "empty" | "active" | "occupied" | "expiring" | "expired";
 export type LockerFilter = "all" | "empty" | "occupied" | "expiring";
 
+export interface DuplicateMemberCandidateGroup {
+  center: string;
+  name: string;
+  phone: string | null;
+  member_ids: number[];
+}
+
+export interface LocalDuplicateCleanupSummary {
+  groups_processed: number;
+  rows_hidden: number;
+  affected_names: string[];
+}
+
 export interface LockerListItem {
   id: number;
   locker_number: string;

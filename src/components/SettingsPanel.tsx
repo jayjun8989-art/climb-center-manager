@@ -1,12 +1,14 @@
-import { DatabaseBackup, Download, FolderOpen, KeyRound, Settings, Upload, X } from "lucide-react";
+import { DatabaseBackup, Download, FolderOpen, KeyRound, Settings, ShieldAlert, Upload, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { BackupInfo, ReportInfo, StorageInfo } from "../types";
+import type { BackupInfo, Center, DuplicateMemberCandidateGroup, LocalDuplicateCleanupSummary, ReportInfo, StorageInfo } from "../types";
 import type { SyncStatus } from "../sync/types";
 import { checkForUpdate, getAppVersion, installUpdate, UPDATER_ENDPOINT, type UpdateCheckOutcome } from "../lib/updater";
 import type { Update } from "@tauri-apps/plugin-updater";
+import { api } from "../api/client";
 
 interface SettingsPanelProps {
   open: boolean;
+  center?: Center;
   onClose: () => void;
   backupInfo: BackupInfo | null;
   storageInfo: StorageInfo | null;
@@ -38,6 +40,7 @@ interface SettingsPanelProps {
 }
 export function SettingsPanel({
   open,
+  center,
   onClose,
   backupInfo,
   storageInfo,
@@ -76,6 +79,12 @@ export function SettingsPanel({
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savingAccount, setSavingAccount] = useState(false);
+  const [cleanupBusy, setCleanupBusy] = useState(false);
+  const [cleanupConfirmOpen, setCleanupConfirmOpen] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState<LocalDuplicateCleanupSummary | null>(null);
+  const [duplicatesOpen, setDuplicatesOpen] = useState(false);
+  const [duplicateGroups, setDuplicateGroups] = useState<DuplicateMemberCandidateGroup[]>([]);
+  const [duplicatesLoading, setDuplicatesLoading] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -170,6 +179,39 @@ export function SettingsPanel({
       }
     } finally {
       setInstallingUpdate(false);
+    }
+  }
+
+  async function handleRunCleanup() {
+    if (!center) return;
+    setCleanupBusy(true);
+    try {
+      const result = await api.cleanupLocalDuplicates(center);
+      setCleanupResult(result);
+      setCleanupConfirmOpen(false);
+      onNotify(
+        result.rows_hidden > 0
+          ? `로컬 중복 정리 완료: ${result.groups_processed}개 그룹, ${result.rows_hidden}건 숨김 처리됨.`
+          : "정리할 로컬 중복 항목이 없습니다.",
+      );
+    } catch (error) {
+      onNotify(error instanceof Error ? error.message : String(error));
+    } finally {
+      setCleanupBusy(false);
+    }
+  }
+
+  async function handleOpenDuplicates() {
+    if (!center) return;
+    setDuplicatesOpen(true);
+    setDuplicatesLoading(true);
+    try {
+      const groups = await api.findDuplicateMembers(center);
+      setDuplicateGroups(groups);
+    } catch (error) {
+      onNotify(error instanceof Error ? error.message : String(error));
+    } finally {
+      setDuplicatesLoading(false);
     }
   }
 
@@ -428,8 +470,105 @@ export function SettingsPanel({
             </button>
           </div>
           )}
+
+          {center && (
+            <div className="rounded-2xl border border-[var(--border)] p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <ShieldAlert size={16} className="text-amber-500" />
+                로컬 중복 회원 정리
+              </div>
+              <p className="mt-1 text-[11px] leading-relaxed text-[var(--muted)]">
+                과거 동기화 오류로 내 PC에만 같은 회원이 여러 줄로 보일 수 있습니다. 아래 기능은
+                로컬 DB에서만 중복 행을 "숨김" 처리하며, 데이터 삭제나 Supabase 변경은 전혀
+                일어나지 않습니다.
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <button className="btn btn-secondary" onClick={() => void handleOpenDuplicates()}>
+                  중복 회원 진단
+                </button>
+                <button
+                  className="btn btn-primary"
+                  disabled={cleanupBusy}
+                  onClick={() => setCleanupConfirmOpen(true)}
+                >
+                  서버 기준 로컬 정리
+                </button>
+              </div>
+              {cleanupResult && (
+                <div className="mt-2 text-[11px] text-[var(--muted)]">
+                  최근 결과: {cleanupResult.groups_processed}개 그룹 처리, {cleanupResult.rows_hidden}건 숨김
+                  {cleanupResult.affected_names.length > 0 &&
+                    ` (${cleanupResult.affected_names.join(", ")})`}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
+
+      {cleanupConfirmOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4">
+          <div className="glass-panel w-full max-w-sm rounded-[1.25rem] p-5">
+            <h3 className="text-lg font-bold">서버 기준 로컬 정리</h3>
+            <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">
+              내 PC의 로컬 DB에서, 같은 회원으로 보이는 중복 행 중 대표 1건만 남기고 나머지는
+              "숨김" 처리합니다. 행은 삭제되지 않으며, Supabase 서버 데이터는 전혀 변경되지
+              않습니다. 계속하시겠습니까?
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                className="btn btn-secondary"
+                onClick={() => setCleanupConfirmOpen(false)}
+                disabled={cleanupBusy}
+              >
+                취소
+              </button>
+              <button className="btn btn-primary" onClick={() => void handleRunCleanup()} disabled={cleanupBusy}>
+                {cleanupBusy ? "처리 중..." : "정리 실행"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {duplicatesOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4">
+          <div className="glass-panel flex max-h-[80vh] w-full max-w-lg flex-col rounded-[1.25rem] p-5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold">중복 회원 진단</h3>
+              <button className="btn btn-secondary !px-3" onClick={() => setDuplicatesOpen(false)}>
+                <X size={16} />
+              </button>
+            </div>
+            <p className="mt-1 text-[11px] text-[var(--muted)]">
+              같은 센터에서 이름/연락처가 동일한 로컬 회원 행 그룹입니다 (읽기 전용 진단 정보).
+            </p>
+            <div className="mt-3 flex-1 overflow-y-auto">
+              {duplicatesLoading ? (
+                <p className="text-sm text-[var(--muted)]">불러오는 중...</p>
+              ) : duplicateGroups.length === 0 ? (
+                <p className="text-sm text-[var(--muted)]">중복 후보가 없습니다.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {duplicateGroups.map((group, idx) => (
+                    <li key={idx} className="rounded-xl border border-[var(--border)] p-3 text-sm">
+                      <div className="font-semibold">
+                        {group.name} <span className="text-[var(--muted)]">({group.center})</span>
+                      </div>
+                      <div className="text-[11px] text-[var(--muted)]">
+                        연락처: {group.phone ?? "없음"} · {group.member_ids.length}건
+                      </div>
+                      <div className="mt-1 text-[11px] text-[var(--muted)]">
+                        ID: {group.member_ids.join(", ")}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

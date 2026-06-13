@@ -72,6 +72,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_members,
             commands::find_duplicate_members,
+            commands::cleanup_local_duplicates_cmd,
             commands::get_member_by_id,
             commands::add_member,
             commands::edit_member,

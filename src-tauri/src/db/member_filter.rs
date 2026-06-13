@@ -61,7 +61,8 @@ pub fn inactive_30_clause(today: &str) -> String {
           AND (
             {latest_end} IS NULL
             OR {latest_end} < date('{today}', '-30 days')
-          )"
+          )
+          AND COALESCE(m.hidden_locally, 0) = 0 AND COALESCE(m.is_local_duplicate, 0) = 0"
     )
 }
 
@@ -73,7 +74,8 @@ pub fn count_regular_members_sql() -> String {
             WHERE member_id = m.id AND status IN ('active', 'paused')
             ORDER BY CASE status WHEN 'active' THEN 0 ELSE 1 END, id DESC LIMIT 1
          )
-         WHERE m.center = ?1 AND m.deleted_at IS NULL AND ({}) = 'regular'",
+         WHERE m.center = ?1 AND m.deleted_at IS NULL AND ({}) = 'regular'
+           AND COALESCE(m.hidden_locally, 0) = 0 AND COALESCE(m.is_local_duplicate, 0) = 0",
         normalized_member_type_sql()
     )
 }
@@ -86,7 +88,8 @@ pub fn count_junior_members_sql() -> String {
             WHERE member_id = m.id AND status IN ('active', 'paused')
             ORDER BY CASE status WHEN 'active' THEN 0 ELSE 1 END, id DESC LIMIT 1
          )
-         WHERE m.center = ?1 AND m.deleted_at IS NULL AND ({}) = 'junior'",
+         WHERE m.center = ?1 AND m.deleted_at IS NULL AND ({}) = 'junior'
+           AND COALESCE(m.hidden_locally, 0) = 0 AND COALESCE(m.is_local_duplicate, 0) = 0",
         normalized_member_type_sql()
     )
 }

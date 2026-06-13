@@ -1,6 +1,6 @@
 use rusqlite::{Connection, Result as SqlResult};
 
-const LATEST_SCHEMA_VERSION: i64 = 9;
+const LATEST_SCHEMA_VERSION: i64 = 10;
 
 const SYNC_TABLES: &[&str] = &[
     "members",
@@ -54,6 +54,10 @@ pub fn ensure_local_schema(conn: &Connection) -> SqlResult<()> {
     add_column_if_missing(conn, "members", "locker_memo", "TEXT")?;
 
     add_column_if_missing(conn, "members", "member_no", "INTEGER")?;
+
+    // v10: local-only hide/quarantine flags for duplicate cleanup (no server impact).
+    add_column_if_missing(conn, "members", "hidden_locally", "INTEGER NOT NULL DEFAULT 0")?;
+    add_column_if_missing(conn, "members", "is_local_duplicate", "INTEGER NOT NULL DEFAULT 0")?;
 
     add_column_if_missing(conn, "attendance_logs", "canceled_at", "TEXT")?;
     add_column_if_missing(conn, "attendance_logs", "canceled_by", "TEXT")?;

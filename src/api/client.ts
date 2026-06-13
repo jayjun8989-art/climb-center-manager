@@ -18,6 +18,8 @@ import type {
   StorageInfo,
   SyncQueueItem,
   SyncStatus,
+  DuplicateMemberCandidateGroup,
+  LocalDuplicateCleanupSummary,
 } from "../types";
 import {
   defaultBackupInfo,
@@ -293,5 +295,19 @@ export const api = {
 
   fetchSyncQueue(limit = 50): Promise<SyncQueueItem[]> {
     return readCommand("fetch_sync_queue", { limit }, () => fallbackSyncQueue(limit));
+  },
+
+  findDuplicateMembers(center: Center): Promise<DuplicateMemberCandidateGroup[]> {
+    return readCommand("find_duplicate_members", { center }, () => []);
+  },
+
+  cleanupLocalDuplicates(center: Center): Promise<LocalDuplicateCleanupSummary> {
+    return writeCommand(
+      "cleanup_local_duplicates_cmd",
+      { center },
+      () => {
+        throw new Error("브라우저 미리보기에서는 로컬 중복 정리를 지원하지 않습니다.");
+      },
+    );
   },
 };

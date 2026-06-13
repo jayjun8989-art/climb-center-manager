@@ -866,6 +866,7 @@ export default function App() {
 
       <SettingsPanel
         open={settingsOpen}
+        center={center}
         onClose={() => setSettingsOpen(false)}
         backupInfo={backupInfo}
         storageInfo={storageInfo}

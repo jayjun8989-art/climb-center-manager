@@ -398,6 +398,11 @@ fn map_list_item(row: &Row<'_>, today: NaiveDate) -> Result<MemberListItem, rusq
     })
 }
 
+/// Excludes members that have been locally hidden/quarantined as duplicates
+/// (local-only flags; never affects Supabase or sync).
+const HIDDEN_DUP_FILTER: &str =
+    " AND COALESCE(m.hidden_locally, 0) = 0 AND COALESCE(m.is_local_duplicate, 0) = 0";
+
 const LIST_SELECT: &str = "
     SELECT
         m.id, m.name, m.phone, m.member_type, m.center, m.memo, m.status, m.deleted_at,
@@ -435,7 +440,7 @@ pub fn lookup_member_for_self_checkin(
         let active_sub = active_membership_subquery();
         let sql = format!(
             "{LIST_SELECT}{active_sub}
-             WHERE m.member_no = ?1 AND m.center = ?2 AND m.deleted_at IS NULL"
+             WHERE m.member_no = ?1 AND m.center = ?2 AND m.deleted_at IS NULL{HIDDEN_DUP_FILTER}"
         );
         let item = conn
             .query_row(&sql, params![member_no, center], |row| {
@@ -588,7 +593,7 @@ pub fn list_members(
         let count_sql = format!(
             "SELECT COUNT(*) FROM members m
              LEFT JOIN memberships ms ON ms.id = {active_sub}
-             WHERE m.center = ?1{group_clause}{status_clause}{search_clause}"
+             WHERE m.center = ?1{group_clause}{status_clause}{search_clause}{HIDDEN_DUP_FILTER}"
         );
 
         let mut count_bind: Vec<Box<dyn rusqlite::types::ToSql>> = vec![Box::new(center.to_string())];
@@ -602,7 +607,7 @@ pub fn list_members(
         let offset = (page - 1).max(0) * page_size;
         let list_sql = format!(
             "{LIST_SELECT}{active_sub}
-             WHERE m.center = ?1{group_clause}{status_clause}{search_clause}
+             WHERE m.center = ?1{group_clause}{status_clause}{search_clause}{HIDDEN_DUP_FILTER}
              ORDER BY m.name COLLATE NOCASE ASC LIMIT ? OFFSET ?"
         );
 
@@ -656,6 +661,7 @@ pub fn find_duplicate_member_candidates(
             "SELECT center, name, IFNULL(phone, '') AS phone_key, GROUP_CONCAT(id) AS ids, COUNT(*) AS cnt
              FROM members
              WHERE center = ?1 AND deleted_at IS NULL
+               AND COALESCE(hidden_locally, 0) = 0 AND COALESCE(is_local_duplicate, 0) = 0
              GROUP BY center, name, phone_key
              HAVING cnt > 1",
         )?;
@@ -723,6 +729,253 @@ pub fn find_duplicate_member_candidates(
         }
 
         Ok(result)
+    })
+}
+
+#[derive(serde::Serialize)]
+pub struct LocalDuplicateCleanupSummary {
+    pub groups_processed: i64,
+    pub rows_hidden: i64,
+    pub affected_names: Vec<String>,
+}
+
+/// Hides (quarantines) local-only duplicate member rows, keeping exactly one
+/// "best" representative per detected duplicate group.
+///
+/// Two kinds of groups are considered:
+///  1. Members sharing the same non-empty `remote_id` (the same Supabase row
+///     was pulled into multiple local rows).
+///  2. Members sharing the same fingerprint (center + name + phone) per the
+///     existing `find_duplicate_member_candidates` detection, for rows
+///     without a usable remote_id match.
+///
+/// For each group, all rows except the representative get
+/// `hidden_locally = 1, is_local_duplicate = 1`. No rows are deleted, no
+/// sync_queue entries are created, and Supabase is never contacted. This is
+/// idempotent: rows already hidden are left as-is and excluded from future
+/// group detection.
+pub fn cleanup_local_duplicates(
+    state: &AppState,
+    center: &str,
+) -> Result<LocalDuplicateCleanupSummary, DbError> {
+    state.with_conn(|conn| {
+        super::ensure_schema::ensure_local_schema(conn).map_err(DbError::from)?;
+
+        let today_date = today_date();
+        let active_sub = active_membership_subquery();
+
+        // Helper to fetch (updated_at, has_remote_id, has_membership, created_at, name)
+        // for scoring representatives.
+        struct Candidate {
+            id: i64,
+            name: String,
+            has_remote_id: bool,
+            updated_at: String,
+            has_membership: bool,
+            created_at: String,
+        }
+
+        let fetch_candidate = |conn: &Connection, id: i64| -> Result<Option<Candidate>, DbError> {
+            let row = conn
+                .query_row(
+                    "SELECT m.id, m.name, m.remote_id, m.updated_at, m.created_at,
+                            EXISTS(SELECT 1 FROM memberships WHERE member_id = m.id) AS has_ms
+                     FROM members m
+                     WHERE m.id = ?1 AND m.deleted_at IS NULL",
+                    params![id],
+                    |row| {
+                        let remote_id: Option<String> = row.get(2)?;
+                        Ok(Candidate {
+                            id: row.get(0)?,
+                            name: row.get(1)?,
+                            has_remote_id: remote_id.map(|s| !s.is_empty()).unwrap_or(false),
+                            updated_at: row.get(3)?,
+                            created_at: row.get(4)?,
+                            has_membership: row.get::<_, i64>(5)? != 0,
+                        })
+                    },
+                )
+                .optional()?;
+            Ok(row)
+        };
+
+        // Picks the index of the best representative within a group of candidates,
+        // using the same priority order as normalizeMembers.ts / v1.0.27:
+        // remote_id present > most recently updated > has membership rows > created_at (earliest).
+        let pick_representative = |candidates: &[Candidate]| -> usize {
+            let mut best = 0usize;
+            for i in 1..candidates.len() {
+                let a = &candidates[i];
+                let b = &candidates[best];
+                let better = if a.has_remote_id != b.has_remote_id {
+                    a.has_remote_id
+                } else if a.updated_at != b.updated_at {
+                    a.updated_at > b.updated_at
+                } else if a.has_membership != b.has_membership {
+                    a.has_membership
+                } else if a.created_at != b.created_at {
+                    a.created_at < b.created_at
+                } else {
+                    a.id < b.id
+                };
+                if better {
+                    best = i;
+                }
+            }
+            best
+        };
+
+        let mut groups_processed: i64 = 0;
+        let mut rows_hidden: i64 = 0;
+        let mut affected_names: Vec<String> = Vec::new();
+        let mut processed_ids: std::collections::HashSet<i64> = std::collections::HashSet::new();
+
+        // --- Pass 1: group by shared remote_id ---
+        let mut stmt = conn.prepare(
+            "SELECT remote_id, GROUP_CONCAT(id) AS ids, COUNT(*) AS cnt
+             FROM members
+             WHERE center = ?1 AND deleted_at IS NULL
+               AND remote_id IS NOT NULL AND remote_id != ''
+               AND COALESCE(hidden_locally, 0) = 0 AND COALESCE(is_local_duplicate, 0) = 0
+             GROUP BY remote_id
+             HAVING cnt > 1",
+        )?;
+        let remote_groups: Vec<(String, String)> = stmt
+            .query_map(params![center], |row| {
+                let remote_id: String = row.get(0)?;
+                let ids_csv: String = row.get(1)?;
+                Ok((remote_id, ids_csv))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(stmt);
+
+        for (_remote_id, ids_csv) in remote_groups {
+            let ids: Vec<i64> = ids_csv
+                .split(',')
+                .filter_map(|s| s.trim().parse::<i64>().ok())
+                .collect();
+            if ids.len() < 2 {
+                continue;
+            }
+
+            let mut candidates = Vec::new();
+            for id in &ids {
+                if let Some(c) = fetch_candidate(conn, *id)? {
+                    candidates.push(c);
+                }
+            }
+            if candidates.len() < 2 {
+                continue;
+            }
+
+            let rep_idx = pick_representative(&candidates);
+            groups_processed += 1;
+            for (i, cand) in candidates.iter().enumerate() {
+                processed_ids.insert(cand.id);
+                if i == rep_idx {
+                    continue;
+                }
+                conn.execute(
+                    "UPDATE members SET hidden_locally = 1, is_local_duplicate = 1, updated_at = updated_at
+                     WHERE id = ?1",
+                    params![cand.id],
+                )?;
+                rows_hidden += 1;
+                affected_names.push(cand.name.clone());
+            }
+        }
+
+        // --- Pass 2: group by fingerprint (center + name + phone), matching the
+        // existing v1.0.26 dedup-candidate definition, for rows not already
+        // covered by a remote_id group above ---
+        // dedup definition: center+name+phone+member_type+membership type/end_date/status).
+        let mut stmt = conn.prepare(
+            "SELECT center, name, IFNULL(phone, '') AS phone_key, GROUP_CONCAT(id) AS ids, COUNT(*) AS cnt
+             FROM members
+             WHERE center = ?1 AND deleted_at IS NULL
+               AND COALESCE(hidden_locally, 0) = 0 AND COALESCE(is_local_duplicate, 0) = 0
+             GROUP BY center, name, phone_key
+             HAVING cnt > 1",
+        )?;
+        let fingerprint_groups: Vec<Vec<i64>> = stmt
+            .query_map(params![center], |row| {
+                let ids_csv: String = row.get(3)?;
+                let ids: Vec<i64> = ids_csv
+                    .split(',')
+                    .filter_map(|s| s.trim().parse::<i64>().ok())
+                    .collect();
+                Ok(ids)
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(stmt);
+
+        for ids in fingerprint_groups {
+            // Skip any ids already handled in pass 1.
+            let ids: Vec<i64> = ids.into_iter().filter(|id| !processed_ids.contains(id)).collect();
+            if ids.len() < 2 {
+                continue;
+            }
+
+            // Further refine using the full membership fingerprint (member_type,
+            // membership end_date/status) so we don't merge genuinely distinct
+            // people who happen to share name+phone.
+            let mut by_fp: std::collections::HashMap<String, Vec<i64>> = std::collections::HashMap::new();
+            for id in &ids {
+                let sql = format!(
+                    "{LIST_SELECT}{active_sub}
+                     WHERE m.id = ?1 AND m.deleted_at IS NULL"
+                );
+                if let Some(item) = conn
+                    .query_row(&sql, params![*id], |row| map_list_item(row, today_date))
+                    .optional()?
+                {
+                    let fp = format!(
+                        "{}|{}|{}|{}",
+                        item.member_type.clone(),
+                        item.membership_type.clone().unwrap_or_default(),
+                        item.end_date.clone().unwrap_or_default(),
+                        item.status.clone()
+                    );
+                    by_fp.entry(fp).or_default().push(*id);
+                }
+            }
+
+            for (_fp, group_ids) in by_fp {
+                if group_ids.len() < 2 {
+                    continue;
+                }
+                let mut candidates = Vec::new();
+                for id in &group_ids {
+                    if let Some(c) = fetch_candidate(conn, *id)? {
+                        candidates.push(c);
+                    }
+                }
+                if candidates.len() < 2 {
+                    continue;
+                }
+
+                let rep_idx = pick_representative(&candidates);
+                groups_processed += 1;
+                for (i, cand) in candidates.iter().enumerate() {
+                    if i == rep_idx {
+                        continue;
+                    }
+                    conn.execute(
+                        "UPDATE members SET hidden_locally = 1, is_local_duplicate = 1, updated_at = updated_at
+                         WHERE id = ?1",
+                        params![cand.id],
+                    )?;
+                    rows_hidden += 1;
+                    affected_names.push(cand.name.clone());
+                }
+            }
+        }
+
+        Ok(LocalDuplicateCleanupSummary {
+            groups_processed,
+            rows_hidden,
+            affected_names,
+        })
     })
 }
 
@@ -1415,13 +1668,16 @@ pub fn get_dashboard_stats(
             .format("%Y-%m-%d")
             .to_string();
 
+        let total_members_sql = format!(
+            "SELECT COUNT(*) FROM members m WHERE m.center = ?1 AND m.deleted_at IS NULL{HIDDEN_DUP_FILTER}"
+        );
         let total_members: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM members WHERE center = ?1 AND deleted_at IS NULL",
+            &total_members_sql,
             params![center],
             |r| r.get(0),
         )?;
 
-        let active_members: i64 = conn.query_row(
+        let active_members_sql = format!(
             "SELECT COUNT(*) FROM members m
              LEFT JOIN memberships ms ON ms.id = (
                 SELECT id FROM memberships WHERE member_id = m.id AND status IN ('active', 'paused')
@@ -1431,18 +1687,24 @@ pub fn get_dashboard_stats(
                 m.status = 'paused' OR ms.status = 'paused'
                 OR (ms.pass_type = 'period' AND ms.end_date IS NOT NULL AND ms.end_date >= ?2)
                 OR (ms.pass_type = 'count' AND IFNULL(ms.remaining_count, 0) > 0)
-             )",
+             ){HIDDEN_DUP_FILTER}"
+        );
+        let active_members: i64 = conn.query_row(
+            &active_members_sql,
             params![center, today],
             |r| r.get(0),
         )?;
 
+        let paused_members_sql = format!(
+            "SELECT COUNT(*) FROM members m WHERE m.center = ?1 AND m.deleted_at IS NULL AND m.status = 'paused'{HIDDEN_DUP_FILTER}"
+        );
         let paused_members: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM members WHERE center = ?1 AND deleted_at IS NULL AND status = 'paused'",
+            &paused_members_sql,
             params![center],
             |r| r.get(0),
         )?;
 
-        let expiring_soon: i64 = conn.query_row(
+        let expiring_soon_sql = format!(
             "SELECT COUNT(*) FROM members m
              INNER JOIN memberships ms ON ms.id = (
                 SELECT id FROM memberships WHERE member_id = m.id AND status = 'active'
@@ -1451,7 +1713,10 @@ pub fn get_dashboard_stats(
              WHERE m.center = ?1 AND m.deleted_at IS NULL AND (
                 (ms.pass_type = 'period' AND ms.end_date IS NOT NULL AND ms.end_date >= ?2 AND ms.end_date <= ?3)
                 OR (ms.pass_type = 'count' AND IFNULL(ms.remaining_count, 0) > 0 AND IFNULL(ms.remaining_count, 0) <= 2)
-             )",
+             ){HIDDEN_DUP_FILTER}"
+        );
+        let expiring_soon: i64 = conn.query_row(
+            &expiring_soon_sql,
             params![center, today, expiring_limit],
             |r| r.get(0),
         )?;
