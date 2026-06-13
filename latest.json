@@ -1,11 +1,11 @@
 {
     "platforms":  {
                       "windows-x86_64":  {
-                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVFaUWx1SVpWSWJscmtTUUFvTW9kQU5KRTFJMFBWNTdXRlhhZ09ySG5uSC90djRnZjdZcXlTT1VwbzIrRUh6enIwb1IrUkpHR2RWMDBkVkZJK1FpdUFFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMjU3MzkzCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4yM194NjQtc2V0dXAuZXhlCldXSTFIampwZmpoL3FWalZTclZnQmRWbHFxakpSTlBPSUdsNUFMSkEzdityMW5kVXJHQXZlYm9GcVZEUmxNbWV5K0gvaXRkc0MzKzRJY1NKbUpvN0F3PT0K",
-                                             "url":  "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.23/ClimbCenterManager_1.0.23_x64-setup.exe"
+                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVJBd3FIVXMzRlByNTExeU52akVBVDZzZHREdXRTckdaMmdUQ1R3NU9HcXJ0VU9JSGFhdnU5bGVpVWY0cjdvanJUbkVlc1k4cFNJTENnSHlMb0x6M1FzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMzE2MzcyCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4yNF94NjQtc2V0dXAuZXhlCk9hb1VnM0EzZFBCSTY0N1FHeDVCVWFXUytYa0JQZnNENjdUenErQ1IybnB4Y3RQWm9lWmlvSkRENFY1eklTVzVEWjlNOWNUK0dXMjVIWS9idVpZZ0RRPT0K",
+                                             "url":  "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.24/ClimbCenterManager_1.0.24_x64-setup.exe"
                                          }
                   },
-    "pub_date":  "2026-06-12T09:43:44Z",
-    "version":  "1.0.23",
-    "notes":  "회원권 등록에 2개월 옵션 추가, 출석체크에 날짜 선택 기능 추가(지난 날짜 출석/차감 가능)"
+    "pub_date":  "2026-06-13T00:00:00Z",
+    "version":  "1.0.24",
+    "notes":  "출석 체크 날짜 선택 오류 수정, 과거 날짜 출석 입력 지원, 한글 상태 라벨 깨짐 수정, 회원 목록 중복 표시 수정"
 }
