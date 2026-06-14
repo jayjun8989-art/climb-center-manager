@@ -25,6 +25,7 @@ import {
 import { hasUnifiedCenterAccess } from "../lib/permissions";
 import { isTauriApp } from "../lib/tauri";
 import { pullFromSupabase } from "../sync/engine";
+import { resolveCenterIdsForCenters } from "../lib/supabase/centers";
 
 interface MemberRosterPanelProps {
   permissions: PermissionSet;
@@ -158,7 +159,10 @@ export function MemberRosterPanel({
     }
     setExporting(true);
     try {
-      await pullFromSupabase({ onlyIfEmpty: false });
+      const centerIds = permissions.enforced
+        ? await resolveCenterIdsForCenters(accessibleCenters)
+        : undefined;
+      await pullFromSupabase({ onlyIfEmpty: false, centerIds });
       const latest = await fetchMemberRoster();
       setRows(latest);
       const scoped = latest.filter((row) =>

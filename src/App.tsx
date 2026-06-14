@@ -31,6 +31,7 @@ import {
 } from "./lib/supabase/auth";
 import { normalizeCenterLoginId } from "./lib/supabase/credentials";
 import { fetchMyCenterRoles } from "./lib/supabase/roles";
+import { resolveCenterIdsForCenters } from "./lib/supabase/centers";
 import { checkForUpdate } from "./lib/updater";
 import { formatAppError, logAppError } from "./utils/errors";
 import { resolveMemberLocalId } from "./utils/member";
@@ -115,7 +116,27 @@ export default function App() {
     [auth.user?.email, roles, rolesLoading, rolesError],
   );
 
-  const sync = useSync(auth.isAuthenticated, syncContext);
+  const [allowedCenterIds, setAllowedCenterIds] = useState<string[] | undefined>(undefined);
+
+  useEffect(() => {
+    if (!permissions.enforced) {
+      setAllowedCenterIds(undefined);
+      return;
+    }
+    if (accessibleCenters.length === 0) {
+      setAllowedCenterIds([]);
+      return;
+    }
+    let cancelled = false;
+    resolveCenterIdsForCenters(accessibleCenters).then((ids) => {
+      if (!cancelled) setAllowedCenterIds(ids);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessibleCenters, permissions.enforced]);
+
+  const sync = useSync(auth.isAuthenticated, syncContext, allowedCenterIds);
 
   const refreshReportInfo = useCallback(async () => {
     const info = await api.fetchReportInfo();

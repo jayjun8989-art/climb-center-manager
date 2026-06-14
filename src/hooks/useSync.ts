@@ -14,7 +14,7 @@ import type { PullRunResult, SyncPhase, SyncRunResult, SyncStatus } from "../syn
 
 const SYNC_INTERVAL_MS = 60_000;
 
-export function useSync(enabled: boolean, syncContext: SyncErrorContext) {
+export function useSync(enabled: boolean, syncContext: SyncErrorContext, centerIds?: string[]) {
   const [configured] = useState(isSupabaseConfigured());
   const [online, setOnline] = useState(false);
   const [status, setStatus] = useState<SyncStatus | null>(null);
@@ -72,7 +72,7 @@ export function useSync(enabled: boolean, syncContext: SyncErrorContext) {
   }, [configured, enabled, refreshStatus]);
 
   const pullNow = useCallback(
-    async (options?: { onlyIfEmpty?: boolean }) => {
+    async (options?: { onlyIfEmpty?: boolean; centerIds?: string[] }) => {
       if (!configured || runningRef.current) return null;
       if (!enabled) {
         return {
@@ -91,7 +91,10 @@ export function useSync(enabled: boolean, syncContext: SyncErrorContext) {
       runningRef.current = true;
       setPhase("pulling");
       try {
-        const result = await pullFromSupabase(options);
+        const result = await pullFromSupabase({
+          onlyIfEmpty: options?.onlyIfEmpty,
+          centerIds: options?.centerIds ?? centerIds,
+        });
         setLastPullResult(result);
         setPhase(result.errors.length > 0 ? "error" : "idle");
         await refreshStatus();
@@ -116,7 +119,7 @@ export function useSync(enabled: boolean, syncContext: SyncErrorContext) {
         runningRef.current = false;
       }
     },
-    [configured, enabled, refreshStatus],
+    [configured, enabled, refreshStatus, centerIds],
   );
 
   useEffect(() => {

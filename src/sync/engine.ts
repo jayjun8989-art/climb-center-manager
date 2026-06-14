@@ -743,6 +743,10 @@ export async function pullFromSupabase(options?: {
     return emptyResult({ message: "서버 연결을 확인해주세요." });
   }
 
+  if (options?.centerIds && options.centerIds.length === 0) {
+    return emptyResult({ message: "현재 계정에 연결된 센터 권한이 없습니다." });
+  }
+
   const centerIds =
     options?.centerIds ?? Object.values(await resolveCenterIds().catch(() => CENTER_IDS_FALLBACK()));
 

@@ -66,3 +66,9 @@ export function centerCodeFromId(id: string): Center | null {
 export function resetCenterIdCache() {
   resolvedCenterIds = null;
 }
+
+/** Resolve center UUIDs for a given set of allowed center codes (e.g. the logged-in account's accessible centers). */
+export async function resolveCenterIdsForCenters(centers: Center[]): Promise<string[]> {
+  const ids = await resolveCenterIds().catch(() => CENTER_IDS);
+  return centers.map((code) => ids[code]).filter((id): id is string => Boolean(id));
+}

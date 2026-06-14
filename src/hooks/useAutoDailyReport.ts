@@ -3,6 +3,7 @@ import { fetchMemberRoster } from "../lib/roster/fetchRoster";
 import { exportRosterReports, hasReportsForToday } from "../lib/reports/exportExcel";
 import { hasUnifiedCenterAccess } from "../lib/permissions";
 import { pullFromSupabase, checkOnline } from "../sync/engine";
+import { resolveCenterIdsForCenters } from "../lib/supabase/centers";
 import type { Center, UserCenterRoleRow } from "../types";
 
 export function useAutoDailyReport(options: {
@@ -23,7 +24,8 @@ export function useAutoDailyReport(options: {
         const online = await checkOnline();
         if (!online) return;
         if (await hasReportsForToday()) return;
-        await pullFromSupabase({ onlyIfEmpty: false });
+        const centerIds = await resolveCenterIdsForCenters(options.accessibleCenters);
+        await pullFromSupabase({ onlyIfEmpty: false, centerIds });
         const rows = await fetchMemberRoster();
         const result = await exportRosterReports(rows, {
           accessibleCenters: options.accessibleCenters,
