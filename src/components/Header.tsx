@@ -99,7 +99,9 @@ export function Header({
 
       {showMemberFilters && (
       <div className="mt-4 flex flex-wrap gap-2">
-        {(Object.keys(MEMBER_GROUP_LABELS) as MemberGroupFilter[]).map((group) => (
+        {(Object.keys(MEMBER_GROUP_LABELS) as MemberGroupFilter[])
+          .filter((group) => group !== "no_member_no")
+          .map((group) => (
           <button
             key={group}
             className={`btn ${memberGroup === group ? "btn-primary" : "btn-secondary"}`}

@@ -7,9 +7,10 @@ use crate::db::{
     cleanup_local_duplicates, find_duplicate_member_candidates, get_expiring_members, get_member_detail, get_pause_logs, get_payments, get_remote_id, list_members,
     list_sync_queue, mark_sync_queue_error, pause_membership, purge_unsupported_sync_queue,
     repair_member_sync_queue, remove_sync_queue_item, resume_membership, set_sync_state, update_member,
-    upsert_id_map, AppState, DbError, PullImportResult, PullSnapshot, RepairSyncQueueResult,
-    SyncQueueItem, SyncStatus,
+    upsert_id_map, AppState, CenterMappingCorrection, CenterMappingMember, CenterMappingRepairResult,
+    DbError, PullImportResult, PullSnapshot, RepairSyncQueueResult, SyncQueueItem, SyncStatus,
 };
+use crate::db::{list_members_with_remote_id, repair_center_mapping};
 use crate::models::{
     AttendanceLog, BackupInfo, BackupResult, DashboardStats, LockerListItem, MemberDetail,
     MemberInput, MemberListItem, MutationResult, PaginatedMembers, PauseLog, Payment, StorageInfo,
@@ -374,6 +375,19 @@ pub fn get_sync_diagnostics(state: State<'_, AppState>) -> Result<crate::db::Syn
 #[tauri::command]
 pub fn repair_sync_queue(state: State<'_, AppState>) -> Result<RepairSyncQueueResult, String> {
     repair_member_sync_queue(&state).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_center_mapping_members(state: State<'_, AppState>) -> Result<Vec<CenterMappingMember>, String> {
+    list_members_with_remote_id(&state).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn repair_center_mapping_cmd(
+    state: State<'_, AppState>,
+    corrections: Vec<CenterMappingCorrection>,
+) -> Result<CenterMappingRepairResult, String> {
+    repair_center_mapping(&state, &corrections).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

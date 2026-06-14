@@ -101,6 +101,8 @@ pub fn run() {
             commands::get_sync_diagnostics,
             commands::fetch_sync_queue,
             commands::repair_sync_queue,
+            commands::get_center_mapping_members,
+            commands::repair_center_mapping_cmd,
             commands::purge_unsupported_sync_queue_cmd,
             commands::complete_sync_queue_item,
             commands::fail_sync_queue_item,

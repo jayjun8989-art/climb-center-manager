@@ -289,6 +289,38 @@ export interface SyncDiagnostics {
   problem_members: SyncDiagnosticMember[];
 }
 
+export interface CenterMappingMember {
+  local_id: number;
+  name: string;
+  center: string;
+  remote_id: string;
+  member_no: number | null;
+  has_pending_insert: boolean;
+}
+
+export interface CenterMappingCorrection {
+  local_id: number;
+  correct_center: string;
+}
+
+export interface CenterMappingRepairResult {
+  repaired: number;
+  skipped: number;
+}
+
+export type CenterMappingStatus = "정상" | "불일치" | "확인 필요";
+
+export interface CenterMappingDiagnosticRow {
+  local_id: number;
+  name: string;
+  remote_id: string;
+  local_center: string;
+  supabase_center_id: string | null;
+  supabase_center_code: string | null;
+  display_center: string;
+  status: CenterMappingStatus;
+}
+
 export type MemberStatus = "active" | "expiring" | "expired" | "depleted" | "paused";
 
 export interface UserCenterRoleRow {

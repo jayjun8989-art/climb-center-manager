@@ -21,6 +21,9 @@ import type {
   SyncStatus,
   DuplicateMemberCandidateGroup,
   LocalDuplicateCleanupSummary,
+  CenterMappingMember,
+  CenterMappingCorrection,
+  CenterMappingRepairResult,
 } from "../types";
 import {
   defaultBackupInfo,
@@ -316,6 +319,18 @@ export const api = {
 
   findDuplicateMembers(center: Center): Promise<DuplicateMemberCandidateGroup[]> {
     return readCommand("find_duplicate_members", { center }, () => []);
+  },
+
+  fetchCenterMappingMembers(): Promise<CenterMappingMember[]> {
+    return readCommand("get_center_mapping_members", {}, () => []);
+  },
+
+  repairCenterMapping(corrections: CenterMappingCorrection[]): Promise<CenterMappingRepairResult> {
+    return writeCommand(
+      "repair_center_mapping_cmd",
+      { corrections },
+      () => ({ repaired: 0, skipped: 0 }),
+    );
   },
 
   cleanupLocalDuplicates(center: Center): Promise<LocalDuplicateCleanupSummary> {

@@ -1,6 +1,6 @@
 [package]
 name = "climb-center-manager"
-version = "1.0.32"
+version = "1.0.33"
 description = "클라이밍 센터 회원관리 프로그램"
 authors = ["you"]
 edition = "2021"

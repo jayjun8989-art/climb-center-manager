@@ -690,6 +690,117 @@ pub fn get_sync_diagnostics(state: &AppState) -> Result<SyncDiagnostics, DbError
     })
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CenterMappingMember {
+    pub local_id: i64,
+    pub name: String,
+    pub center: String,
+    pub remote_id: String,
+    pub member_no: Option<i64>,
+    pub has_pending_insert: bool,
+}
+
+/// Members with a remote_id, for cross-checking against Supabase `members.center_id`.
+/// Excludes members with a pending (unsynced) insert in sync_queue, since those
+/// haven't been verified against the server yet.
+pub fn list_members_with_remote_id(state: &AppState) -> Result<Vec<CenterMappingMember>, DbError> {
+    state.with_conn(|conn| {
+        let mut stmt = conn.prepare(
+            "SELECT m.id, m.name, m.center, m.remote_id, m.member_no,
+                    EXISTS(
+                        SELECT 1 FROM sync_queue sq
+                        WHERE sq.entity_type = 'member'
+                          AND sq.entity_local_id = m.id
+                          AND sq.operation = 'insert'
+                          AND sq.last_error IS NULL
+                    ) AS has_pending_insert
+             FROM members m
+             WHERE m.deleted_at IS NULL
+               AND m.remote_id IS NOT NULL AND m.remote_id != ''",
+        )?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(CenterMappingMember {
+                    local_id: row.get(0)?,
+                    name: row.get(1)?,
+                    center: row.get(2)?,
+                    remote_id: row.get(3)?,
+                    member_no: row.get(4)?,
+                    has_pending_insert: row.get::<_, i64>(5)? != 0,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    })
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CenterMappingCorrection {
+    pub local_id: i64,
+    pub correct_center: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CenterMappingRepairResult {
+    pub repaired: i64,
+    pub skipped: i64,
+}
+
+/// Repairs local `members.center` for members confirmed mismatched vs Supabase.
+/// Skips members with a pending unsynced insert (no remote verification yet) and
+/// any center value that isn't a known code ('ONCLE'/'GRABIT').
+pub fn repair_center_mapping(
+    state: &AppState,
+    corrections: &[CenterMappingCorrection],
+) -> Result<CenterMappingRepairResult, DbError> {
+    let mut repaired = 0_i64;
+    let mut skipped = 0_i64;
+
+    state.with_conn(|conn| {
+        for correction in corrections {
+            if correction.correct_center != "ONCLE" && correction.correct_center != "GRABIT" {
+                skipped += 1;
+                continue;
+            }
+
+            let has_pending_insert: bool = conn.query_row(
+                "SELECT EXISTS(
+                    SELECT 1 FROM sync_queue sq
+                    JOIN members m ON m.id = sq.entity_local_id
+                    WHERE sq.entity_type = 'member'
+                      AND sq.entity_local_id = ?1
+                      AND sq.operation = 'insert'
+                      AND sq.last_error IS NULL
+                 )
+                 OR (
+                    (SELECT remote_id FROM members WHERE id = ?1) IS NULL
+                    OR (SELECT remote_id FROM members WHERE id = ?1) = ''
+                 )",
+                rusqlite::params![correction.local_id],
+                |row| row.get::<_, i64>(0).map(|v| v != 0),
+            )?;
+
+            if has_pending_insert {
+                skipped += 1;
+                continue;
+            }
+
+            let updated = conn.execute(
+                "UPDATE members SET center = ?1 WHERE id = ?2 AND deleted_at IS NULL",
+                rusqlite::params![correction.correct_center, correction.local_id],
+            )?;
+            if updated > 0 {
+                repaired += 1;
+            } else {
+                skipped += 1;
+            }
+        }
+        Ok(())
+    })?;
+
+    Ok(CenterMappingRepairResult { repaired, skipped })
+}
+
 pub fn upsert_id_map(
     state: &AppState,
     entity_type: &str,

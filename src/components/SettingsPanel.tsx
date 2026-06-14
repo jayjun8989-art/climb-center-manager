@@ -1,6 +1,7 @@
 import { DatabaseBackup, Download, FolderOpen, KeyRound, RefreshCw, Settings, ShieldAlert, Upload, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { BackupInfo, Center, DuplicateMemberCandidateGroup, LocalDuplicateCleanupSummary, ReportInfo, StorageInfo, SyncDiagnostics } from "../types";
+import type { BackupInfo, Center, CenterMappingDiagnosticRow, DuplicateMemberCandidateGroup, LocalDuplicateCleanupSummary, ReportInfo, StorageInfo, SyncDiagnostics } from "../types";
+import { fetchCenterMappingDiagnostics, buildCenterMappingCorrections } from "../sync/centerMappingDiagnostics";
 import type { SyncStatus } from "../sync/types";
 import { checkForUpdate, getAppVersion, installUpdate, UPDATER_ENDPOINT, type UpdateCheckOutcome } from "../lib/updater";
 import type { Update } from "@tauri-apps/plugin-updater";
@@ -92,6 +93,10 @@ export function SettingsPanel({
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
   const [retryBusy, setRetryBusy] = useState(false);
   const [verifyBusyId, setVerifyBusyId] = useState<number | null>(null);
+
+  const [centerMappingRows, setCenterMappingRows] = useState<CenterMappingDiagnosticRow[] | null>(null);
+  const [centerMappingLoading, setCenterMappingLoading] = useState(false);
+  const [centerMappingRepairBusy, setCenterMappingRepairBusy] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -251,6 +256,37 @@ export function SettingsPanel({
       onNotify(error instanceof Error ? error.message : String(error));
     } finally {
       setRetryBusy(false);
+    }
+  }
+
+  async function handleRefreshCenterMapping() {
+    setCenterMappingLoading(true);
+    try {
+      const rows = await fetchCenterMappingDiagnostics();
+      setCenterMappingRows(rows);
+    } catch (error) {
+      onNotify(error instanceof Error ? error.message : String(error));
+    } finally {
+      setCenterMappingLoading(false);
+    }
+  }
+
+  async function handleRepairCenterMapping() {
+    if (!centerMappingRows) return;
+    const corrections = buildCenterMappingCorrections(centerMappingRows);
+    if (corrections.length === 0) {
+      onNotify("보정할 항목이 없습니다.");
+      return;
+    }
+    setCenterMappingRepairBusy(true);
+    try {
+      const result = await api.repairCenterMapping(corrections);
+      onNotify(`센터 매핑 보정 완료: ${result.repaired}건 수정, ${result.skipped}건 건너뜀`);
+      await handleRefreshCenterMapping();
+    } catch (error) {
+      onNotify(error instanceof Error ? error.message : String(error));
+    } finally {
+      setCenterMappingRepairBusy(false);
     }
   }
 
@@ -665,6 +701,92 @@ export function SettingsPanel({
                     </tbody>
                   </table>
                 </div>
+              )}
+            </div>
+          )}
+
+          {center && (
+            <div className="rounded-2xl border border-[var(--border)] p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <RefreshCw size={16} className="text-sky-500" />
+                  센터 매핑 진단
+                </div>
+                <button
+                  className="btn btn-secondary !px-3"
+                  disabled={centerMappingLoading}
+                  onClick={() => void handleRefreshCenterMapping()}
+                >
+                  {centerMappingLoading ? "확인 중..." : "센터 매핑 확인"}
+                </button>
+              </div>
+
+              <p className="mt-2 text-[11px] text-[var(--muted)]">
+                Supabase에 등록된(remote_id 있는) 회원의 센터 코드와 로컬 센터 값을 비교합니다.
+                동기화 대기중인 신규 회원은 제외됩니다.
+              </p>
+
+              {centerMappingRows && (
+                <>
+                  <div className="mt-3 text-[11px] text-[var(--muted)]">
+                    불일치: <span className="font-semibold text-[var(--text)]">
+                      {centerMappingRows.filter((r) => r.status === "불일치").length}
+                    </span>
+                    {" · "}확인 필요: <span className="font-semibold text-[var(--text)]">
+                      {centerMappingRows.filter((r) => r.status === "확인 필요").length}
+                    </span>
+                    {" · "}정상: <span className="font-semibold text-[var(--text)]">
+                      {centerMappingRows.filter((r) => r.status === "정상").length}
+                    </span>
+                  </div>
+
+                  {centerMappingRows.some((r) => r.status === "불일치") && (
+                    <div className="mt-2">
+                      <button
+                        className="btn btn-primary"
+                        disabled={centerMappingRepairBusy}
+                        onClick={() => void handleRepairCenterMapping()}
+                      >
+                        {centerMappingRepairBusy ? "보정 중..." : "서버 기준 센터 매핑 보정"}
+                      </button>
+                    </div>
+                  )}
+
+                  {centerMappingRows.filter((r) => r.status !== "정상").length > 0 && (
+                    <div className="mt-3 max-h-64 overflow-auto rounded-xl border border-[var(--border)]">
+                      <table className="w-full text-left text-[11px]">
+                        <thead className="sticky top-0 bg-[var(--panel-strong)]">
+                          <tr>
+                            <th className="px-2 py-1">이름</th>
+                            <th className="px-2 py-1">local id</th>
+                            <th className="px-2 py-1">remote_id</th>
+                            <th className="px-2 py-1">로컬 센터</th>
+                            <th className="px-2 py-1">Supabase center_id</th>
+                            <th className="px-2 py-1">Supabase 센터</th>
+                            <th className="px-2 py-1">화면 표시 센터</th>
+                            <th className="px-2 py-1">상태</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {centerMappingRows
+                            .filter((r) => r.status !== "정상")
+                            .map((r) => (
+                              <tr key={r.local_id} className="border-t border-[var(--border)]">
+                                <td className="px-2 py-1">{r.name}</td>
+                                <td className="px-2 py-1">{r.local_id}</td>
+                                <td className="px-2 py-1 max-w-[100px] truncate" title={r.remote_id}>{r.remote_id}</td>
+                                <td className="px-2 py-1">{r.local_center}</td>
+                                <td className="px-2 py-1 max-w-[100px] truncate" title={r.supabase_center_id ?? ""}>{r.supabase_center_id ?? "-"}</td>
+                                <td className="px-2 py-1">{r.supabase_center_code ?? "-"}</td>
+                                <td className="px-2 py-1">{r.display_center}</td>
+                                <td className="px-2 py-1">{r.status}</td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
