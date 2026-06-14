@@ -1,11 +1,11 @@
 {
     "platforms":  {
                       "windows-x86_64":  {
-                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVk5Sjc3aHdkeExHSnB1QkFXbndvOGUyS3ZQcUEvUVlWaTdZbHVqc3Vkcnl6YjF1bFZidkFHRkp2aCt0bzVXakJwY0hlQ2V3SXc1Z1U1VFU1aGVhMndZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMzUwODEzCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4zMl94NjQtc2V0dXAuZXhlClkydG1CV21wSjZ1YVlaUVgxN1JaRlRkS2E3RkUraExDODF0RzFDb01WRWt6NHFycGJ2c1hXMGNRcGcyM0lCdjIrb0hoQlhiZnh0allXQzBkWTQ4YkF3PT0K",
-                                             "url":  "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.32/ClimbCenterManager_1.0.32_x64-setup.exe"
+                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVJrYXlMWVhGYmNySzlTZU04S0I5eUxhcGYyU3Y4VCtNaEJZUVh0bFdRS0E1bER1T05pb0VPRm1UQzZMeGtZQUZFRUJsQW5VZ0swanlkQ2JZYTN2c2dZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxNDE3NDQzCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4zM194NjQtc2V0dXAuZXhlCmhUUnJFaWhZWnBXTzZ2a3Z3WlRuU1BCVXprNjFOOUhEdjVxQThvM2FBdUpoR1ExOVlrQWJLd2szNFZmM3N1ck9tTnVHS3VXbWxJVVZ5T2FEQTBVeUJnPT0K",
+                                             "url":  "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.33/ClimbCenterManager_1.0.33_x64-setup.exe"
                                          }
                   },
     "pub_date":  "2026-06-13T00:00:00Z",
-    "version":  "1.0.32",
-    "notes":  "동기화 안정화(remote_id 없는 회원/회원권 자동 업로드, blocked 출석 자동 재시도), 회원번호 로직 개선, 회원권 횟수/기간 임의 설정 기능 추가"
+    "version":  "1.0.33",
+    "notes":  "센터별 회원 표시/동기화 분리 강화, center_id 매핑 진단 및 보정 추가, ONCLE/GRABIT 필터 권한 안정화, 상단 회원번호 없음 카운트 제거"
 }
