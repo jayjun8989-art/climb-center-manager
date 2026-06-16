@@ -1,11 +1,11 @@
 {
-  "version": "1.0.37",
+  "version": "1.0.38",
   "pub_date": "2026-06-16T00:00:00Z",
-  "notes": "서버 기준 강제 불러오기 추가, 서버-local-화면 count 불일치 자동 감지, auto-pull 재시도 로직 강화, pull 단계별 로그 개선, 설정 화면 빌드 날짜/커밋 표시 추가",
+  "notes": "강제 불러오기 local SQLite upsert 실패 진단 강화, members/memberships remote_id 기준 upsert 안정화, 서버-local-화면 count 불일치 실패 처리 개선",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWNtekNjY1VjaVdIL0xsVUtZcEFIaFRmVWhpeTdLdUt4bjB6VkdrWFZ0SThZK0RIVlBoMzEzQ3FMZVZuV0JSUmFaVUhYZFR1ZFRBRmpIbi8zOHAzYlFVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxNTk2MjQ5CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4zN194NjQtc2V0dXAuZXhlCmhTb2dqMFpMYU14a0dabGVKSU5lYlViNS9DaHhhNDYwVWk3L0d1RGxseEdQZnBhT0pxWGZ2WExvbEZjaTBISHlFSEdlNmNxL0pwNTkvMk1sQWpuWURBPT0K",
-      "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.37/ClimbCenterManager_1.0.37_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVZLNWpQR1QzWmlYN0tMa2dxTkxzNDloMVh3QUJWaTNrUFFrV3ZFSGU1aHIxN3J0Tmd5Q3paNGpaWW5pWVo0Z2hpQXFicFVaYTJuYXdUWFdyNWxsamdJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxNTk4NTU4CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4zOF94NjQtc2V0dXAuZXhlCmk5dzlQMkFPdklCemtWdTRuclRuY1k5ZysrNWxTN2pBM3ZJdkhaV3hMY3pvUVNHOXNRR0lCTDdZKzNOcVI2cnVmdUIyNEMyb1REY2pOY00vTWhFUUNnPT0K",
+      "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.38/ClimbCenterManager_1.0.38_x64-setup.exe"
     }
   }
 }
