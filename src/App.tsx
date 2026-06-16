@@ -959,8 +959,43 @@ export default function App() {
               ) {
                 window.dispatchEvent(new CustomEvent("climb-sync-pull-complete"));
               }
+              // Post-pull mismatch warning
+              if (result?.pullDiagnostics) {
+                const totalServer = Object.values(result.pullDiagnostics).reduce((s, d) => s + d.serverCount, 0);
+                const totalLocal = (result.importedMembers ?? 0) + (result.updatedMembers ?? 0);
+                if (totalServer > 0 && totalLocal < totalServer * 0.8) {
+                  setToast(`서버 회원 ${totalServer}명 중 이 PC에는 ${totalLocal}명만 반영됩니다. 설정 > 서버 기준 강제 불러오기를 실행해보세요.`);
+                }
+              }
             })
             .catch((error) => setToast(formatAppError(error)));
+        }}
+        onForcePullFromSupabase={async () => {
+          const result = await sync.pullNow({ forceRefresh: true });
+          if (!result) throw new Error("강제 불러오기에 실패했습니다.");
+          if (
+            result.importedMembers > 0 ||
+            result.updatedMembers > 0 ||
+            result.importedMemberships > 0
+          ) {
+            window.dispatchEvent(new CustomEvent("climb-sync-pull-complete"));
+          }
+          // Total server count from diagnostics
+          const serverCount = result.pullDiagnostics
+            ? Object.values(result.pullDiagnostics).reduce((s, d) => s + d.serverCount, 0)
+            : 0;
+          const localCount = result.importedMembers + result.updatedMembers;
+          // Query display count from local DB
+          let displayCount = localCount;
+          try {
+            const memberResult = await api.getMembers({ center, search: "", memberGroup: "all", statusFilter: "all", page: 1, pageSize: 1 });
+            displayCount = memberResult.total;
+          } catch {
+            // ignore
+          }
+          const centerLabel = center;
+          const message = `강제 불러오기 완료: 서버 ${centerLabel} 회원 ${serverCount}명 확인 → 로컬 ${localCount}명 반영 → 화면 표시 ${displayCount}명`;
+          return { serverCount, localCount, displayCount, message };
         }}
         onPushToSupabase={
           permissions.canSyncPush

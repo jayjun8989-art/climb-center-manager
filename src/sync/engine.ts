@@ -690,9 +690,31 @@ async function countLocalMembers(): Promise<number> {
   return (await safeInvoke<number>("count_local_members")) ?? 0;
 }
 
+async function countLocalMembersForCenters(centerCodes: Center[]): Promise<number> {
+  if (centerCodes.length === 0) return 0;
+  // Use the Tauri command that returns per-center counts and sum only the relevant ones
+  type LocalCenterCounts = {
+    oncleMembers: number;
+    grabitMembers: number;
+    oncleHidden: number;
+    grabitHidden: number;
+    oncleMemberships: number;
+    grabitMemberships: number;
+    oncleLocalDuplicate: number;
+    grabitLocalDuplicate: number;
+  };
+  const counts = await safeInvoke<LocalCenterCounts>("get_center_member_counts");
+  if (!counts) return 0;
+  let total = 0;
+  if (centerCodes.includes("ONCLE")) total += counts.oncleMembers;
+  if (centerCodes.includes("GRABIT")) total += counts.grabitMembers;
+  return total;
+}
+
 /** Pull members/memberships/attendance/lockers from Supabase into local SQLite cache. */
 export async function pullFromSupabase(options?: {
   onlyIfEmpty?: boolean;
+  forceRefresh?: boolean;
   centerIds?: string[];
 }): Promise<PullRunResult> {
   const emptyResult = (
@@ -733,9 +755,19 @@ export async function pullFromSupabase(options?: {
     });
   }
 
-  const localCount = await countLocalMembers();
-  if (options?.onlyIfEmpty && localCount > 0) {
-    return emptyResult({ message: "로컬 회원 데이터가 이미 있습니다." });
+  // forceRefresh bypasses onlyIfEmpty check entirely
+  if (!options?.forceRefresh && options?.onlyIfEmpty) {
+    // Check center-specific local count (not total) so that test members from
+    // another center don't prevent pulling this account's actual center data.
+    const centerCodesToCheck = (options.centerIds ?? [])
+      .map((id) => centerCodeFromId(id))
+      .filter((c): c is Center => c !== null);
+    const localCount = centerCodesToCheck.length > 0
+      ? await countLocalMembersForCenters(centerCodesToCheck)
+      : await countLocalMembers();
+    if (localCount > 0) {
+      return emptyResult({ message: "로컬 회원 데이터가 이미 있습니다." });
+    }
   }
 
   const supabase = getSupabaseClient();

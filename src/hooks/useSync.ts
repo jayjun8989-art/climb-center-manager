@@ -72,7 +72,7 @@ export function useSync(enabled: boolean, syncContext: SyncErrorContext, centerI
   }, [configured, enabled, refreshStatus]);
 
   const pullNow = useCallback(
-    async (options?: { onlyIfEmpty?: boolean; centerIds?: string[] }) => {
+    async (options?: { onlyIfEmpty?: boolean; forceRefresh?: boolean; centerIds?: string[] }) => {
       if (!configured || runningRef.current) return null;
       if (!enabled) {
         return {
@@ -93,6 +93,7 @@ export function useSync(enabled: boolean, syncContext: SyncErrorContext, centerI
       try {
         const result = await pullFromSupabase({
           onlyIfEmpty: options?.onlyIfEmpty,
+          forceRefresh: options?.forceRefresh,
           centerIds: options?.centerIds ?? centerIds,
         });
         setLastPullResult(result);
@@ -142,8 +143,14 @@ export function useSync(enabled: boolean, syncContext: SyncErrorContext, centerI
       return;
     }
     if (!configured || autoPullAttemptedRef.current) return;
+    // Only mark attempted AFTER pull runs — not before. This allows retry if
+    // centerIds were not yet resolved on the first render cycle.
+    if (centerIds === undefined) {
+      // centerIds not yet resolved; wait for next render with resolved value
+      return;
+    }
     autoPullAttemptedRef.current = true;
-    pullNow({ onlyIfEmpty: true })
+    pullNow({ onlyIfEmpty: true, centerIds })
       .then((result) => {
         if (
           result &&
@@ -155,7 +162,7 @@ export function useSync(enabled: boolean, syncContext: SyncErrorContext, centerI
         }
       })
       .catch(() => undefined);
-  }, [configured, enabled, pullNow]);
+  }, [configured, enabled, pullNow, centerIds]);
 
   const repairQueue = useCallback(async () => {
     const result = await repairSyncQueue();

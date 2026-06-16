@@ -39,6 +39,7 @@ interface SettingsPanelProps {
   syncStatus?: SyncStatus | null;
   syncBusy?: boolean;
   onPullFromSupabase?: () => void;
+  onForcePullFromSupabase?: () => Promise<{ serverCount: number; localCount: number; displayCount: number; message: string }>;
   onPushToSupabase?: () => void;
   allowedCenterIds?: string[];
 }
@@ -72,6 +73,7 @@ export function SettingsPanel({
   syncStatus = null,
   syncBusy = false,
   onPullFromSupabase,
+  onForcePullFromSupabase,
   onPushToSupabase,
   allowedCenterIds,
 }: SettingsPanelProps) {
@@ -102,6 +104,15 @@ export function SettingsPanel({
 
   const [verifyReport, setVerifyReport] = useState<SyncVerificationReport | null>(null);
   const [verifyReportLoading, setVerifyReportLoading] = useState(false);
+
+  const [forcePullBusy, setForcePullBusy] = useState(false);
+  const [forcePullResult, setForcePullResult] = useState<{
+    serverCount: number;
+    localCount: number;
+    displayCount: number;
+    message: string;
+    warning?: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -337,6 +348,25 @@ export function SettingsPanel({
       onNotify(error instanceof Error ? error.message : String(error));
     } finally {
       setVerifyBusyId(null);
+    }
+  }
+
+  async function handleForcePull() {
+    if (!onForcePullFromSupabase) return;
+    setForcePullBusy(true);
+    setForcePullResult(null);
+    try {
+      const result = await onForcePullFromSupabase();
+      let warning: string | undefined;
+      if (result.serverCount > 0 && result.localCount < result.serverCount * 0.9) {
+        warning = `서버 회원 ${result.serverCount}명 중 ${result.localCount}명만 반영됨 — upsert 오류 가능성`;
+      }
+      setForcePullResult({ ...result, warning });
+      onNotify(result.message);
+    } catch (error) {
+      onNotify(error instanceof Error ? error.message : String(error));
+    } finally {
+      setForcePullBusy(false);
     }
   }
 
@@ -686,7 +716,29 @@ export function SettingsPanel({
                   <ShieldAlert size={16} />
                   {verifyReportLoading ? "검증 중..." : "동기화 검증 리포트"}
                 </button>
+                {onForcePullFromSupabase && (
+                  <button
+                    className="btn btn-primary sm:col-span-2"
+                    disabled={forcePullBusy || syncBusy}
+                    onClick={() => void handleForcePull()}
+                  >
+                    <Download size={18} />
+                    {forcePullBusy ? "강제 불러오기 중..." : "서버 기준 강제 불러오기"}
+                  </button>
+                )}
               </div>
+              {forcePullResult && (
+                <div className={`mt-3 rounded-xl border p-3 text-[11px] ${forcePullResult.warning ? "border-amber-500/40 bg-amber-500/10 text-amber-600" : "border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]"}`}>
+                  <div className="font-semibold text-[var(--text)]">강제 불러오기 결과</div>
+                  <div>서버 회원: <span className="font-semibold text-[var(--text)]">{forcePullResult.serverCount}명</span></div>
+                  <div>로컬 반영: <span className="font-semibold text-[var(--text)]">{forcePullResult.localCount}명</span></div>
+                  <div>화면 표시: <span className="font-semibold text-[var(--text)]">{forcePullResult.displayCount}명</span></div>
+                  {forcePullResult.warning && (
+                    <div className="mt-1 font-semibold">{forcePullResult.warning}</div>
+                  )}
+                  <div className="mt-1 text-[var(--muted)]">{forcePullResult.message}</div>
+                </div>
+              )}
 
               {verifyReport && (
                 <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 text-[11px]">
