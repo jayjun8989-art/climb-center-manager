@@ -3,6 +3,138 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { isTauriApp } from "./tauri";
 
+export type UpdateDiagnosticResult = {
+  currentVersion: string;
+  buildDate: string;
+  buildCommit: string;
+  endpoint: string;
+  fetchSuccess: boolean;
+  fetchError: string | null;
+  remoteVersion: string | null;
+  remotePubDate: string | null;
+  signaturePresent: boolean | null;
+  downloadUrl: string | null;
+  downloadUrlAccessible: boolean | null;
+  versionComparison: "newer" | "same" | "older" | null;
+  updateAvailable: boolean;
+  failureReason: string | null;
+  releaseUrl: string;
+};
+
+function compareSemver(a: string, b: string): -1 | 0 | 1 {
+  const parse = (v: string) => v.replace(/^v/, "").split(".").map(Number);
+  const [aMaj, aMin, aPatch] = parse(a);
+  const [bMaj, bMin, bPatch] = parse(b);
+  for (const [x, y] of [[aMaj, bMaj], [aMin, bMin], [aPatch, bPatch]] as [number, number][]) {
+    if (x > y) return 1;
+    if (x < y) return -1;
+  }
+  return 0;
+}
+
+export async function runUpdateDiagnostic(opts: {
+  buildDate: string;
+  buildCommit: string;
+}): Promise<UpdateDiagnosticResult> {
+  const releaseUrl =
+    "https://github.com/jayjun8989-art/climb-center-manager/releases/latest";
+
+  const currentVersion = await getAppVersion();
+  const result: UpdateDiagnosticResult = {
+    currentVersion,
+    buildDate: opts.buildDate,
+    buildCommit: opts.buildCommit,
+    endpoint: UPDATER_ENDPOINT,
+    fetchSuccess: false,
+    fetchError: null,
+    remoteVersion: null,
+    remotePubDate: null,
+    signaturePresent: null,
+    downloadUrl: null,
+    downloadUrlAccessible: null,
+    versionComparison: null,
+    updateAvailable: false,
+    failureReason: null,
+    releaseUrl,
+  };
+
+  // 1. Fetch latest.json
+  let json: unknown;
+  try {
+    const res = await fetch(UPDATER_ENDPOINT, { cache: "no-store" });
+    if (!res.ok) {
+      result.fetchError = `HTTP ${res.status} ${res.statusText}`;
+      result.failureReason = `latest.json 다운로드 실패 (${result.fetchError})`;
+      return result;
+    }
+    json = await res.json();
+    result.fetchSuccess = true;
+  } catch (e) {
+    result.fetchError = e instanceof Error ? e.message : String(e);
+    result.failureReason = result.fetchError.includes("fetch")
+      ? `네트워크 오류 — 인터넷 연결을 확인하세요 (${result.fetchError})`
+      : `latest.json 다운로드 실패: ${result.fetchError}`;
+    return result;
+  }
+
+  // 2. Parse
+  if (typeof json !== "object" || json === null || !("version" in json)) {
+    result.failureReason = "latest.json 파싱 실패 — 예상 형식이 아닙니다";
+    return result;
+  }
+  const latestJson = json as Record<string, unknown>;
+  result.remoteVersion = typeof latestJson.version === "string" ? latestJson.version : null;
+  result.remotePubDate = typeof latestJson.pub_date === "string" ? latestJson.pub_date : null;
+
+  const platforms = latestJson.platforms as Record<string, unknown> | undefined;
+  const winPlatform = platforms?.["windows-x86_64"] as Record<string, unknown> | undefined;
+  result.signaturePresent = typeof winPlatform?.signature === "string" && winPlatform.signature.length > 0;
+  result.downloadUrl = typeof winPlatform?.url === "string" ? winPlatform.url : null;
+
+  if (!result.remoteVersion) {
+    result.failureReason = "latest.json에 version 필드가 없습니다";
+    return result;
+  }
+
+  // 3. Compare versions
+  const cmp = compareSemver(result.remoteVersion, currentVersion);
+  result.versionComparison = cmp === 1 ? "newer" : cmp === 0 ? "same" : "older";
+
+  if (result.versionComparison === "same") {
+    result.failureReason = `latest.json의 버전(v${result.remoteVersion})이 현재 버전과 같습니다 — GitHub Release 반영이 아직 안 됐거나 이미 최신 버전입니다`;
+    return result;
+  }
+  if (result.versionComparison === "older") {
+    result.failureReason = `latest.json의 버전(v${result.remoteVersion})이 현재 버전(v${currentVersion})보다 낮습니다`;
+    return result;
+  }
+
+  // 4. Check signature
+  if (!result.signaturePresent) {
+    result.failureReason = "latest.json에 windows-x86_64 signature 필드가 없습니다 — .sig 파일이 릴리스에 업로드되지 않았을 수 있습니다";
+    return result;
+  }
+
+  // 5. Check download URL reachability (HEAD)
+  if (result.downloadUrl) {
+    try {
+      const headRes = await fetch(result.downloadUrl, { method: "HEAD", cache: "no-store" });
+      result.downloadUrlAccessible = headRes.ok;
+      if (!headRes.ok) {
+        result.failureReason = `다운로드 URL 접근 실패 (HTTP ${headRes.status}) — GitHub Release에 .exe 파일이 아직 업로드 중일 수 있습니다`;
+        return result;
+      }
+    } catch (e) {
+      result.downloadUrlAccessible = false;
+      result.failureReason = `다운로드 URL 네트워크 오류: ${e instanceof Error ? e.message : String(e)}`;
+      return result;
+    }
+  }
+
+  result.updateAvailable = true;
+  return result;
+}
+
 /** Must match src-tauri/tauri.conf.json plugins.updater.endpoints[0] */
 export const UPDATER_ENDPOINT =
   "https://github.com/jayjun8989-art/climb-center-manager/releases/latest/download/latest.json";

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import type { BackupInfo, Center, CenterMappingDiagnosticRow, DuplicateMemberCandidateGroup, LocalDuplicateCleanupSummary, ReportInfo, StorageInfo, SyncDiagnostics } from "../types";
 import { fetchCenterMappingDiagnostics, buildCenterMappingCorrections } from "../sync/centerMappingDiagnostics";
 import type { SyncStatus } from "../sync/types";
-import { checkForUpdate, getAppVersion, installUpdate, UPDATER_ENDPOINT, type UpdateCheckOutcome } from "../lib/updater";
+import { checkForUpdate, getAppVersion, installUpdate, runUpdateDiagnostic, UPDATER_ENDPOINT, type UpdateCheckOutcome, type UpdateDiagnosticResult } from "../lib/updater";
 import type { Update } from "@tauri-apps/plugin-updater";
 import { api } from "../api/client";
 import { repairSyncQueue, runSyncVerificationReport, type SyncVerificationReport } from "../sync/engine";
@@ -104,6 +104,9 @@ export function SettingsPanel({
 
   const [verifyReport, setVerifyReport] = useState<SyncVerificationReport | null>(null);
   const [verifyReportLoading, setVerifyReportLoading] = useState(false);
+
+  const [updateDiagnostic, setUpdateDiagnostic] = useState<UpdateDiagnosticResult | null>(null);
+  const [updateDiagnosticLoading, setUpdateDiagnosticLoading] = useState(false);
 
   const [forcePullBusy, setForcePullBusy] = useState(false);
   const [forcePullResult, setForcePullResult] = useState<{
@@ -207,6 +210,19 @@ export function SettingsPanel({
       }
     } finally {
       setInstallingUpdate(false);
+    }
+  }
+
+  async function handleRunUpdateDiagnostic() {
+    setUpdateDiagnosticLoading(true);
+    try {
+      const result = await runUpdateDiagnostic({
+        buildDate: __BUILD_DATE__,
+        buildCommit: __BUILD_COMMIT__,
+      });
+      setUpdateDiagnostic(result);
+    } finally {
+      setUpdateDiagnosticLoading(false);
     }
   }
 
@@ -484,6 +500,14 @@ export function SettingsPanel({
               >
                 현재 설치파일 버전 확인
               </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={updateDiagnosticLoading}
+                onClick={() => void handleRunUpdateDiagnostic()}
+              >
+                {updateDiagnosticLoading ? "진단 중..." : "업데이트 진단"}
+              </button>
             </div>
             {updateResult && updateResult.diagnostics.length > 0 && (
               <pre className="mt-3 max-h-40 overflow-auto rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 text-[11px] leading-relaxed text-[var(--muted)] whitespace-pre-wrap">
@@ -498,6 +522,83 @@ export function SettingsPanel({
             )}
             {updateResult?.kind === "error" && (
               <p className="mt-2 text-sm text-red-500">{updateResult.message}</p>
+            )}
+            {updateDiagnostic && (
+              <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 text-[11px]">
+                <div className="mb-2 font-semibold text-[var(--text)]">업데이트 진단 결과</div>
+                <div className="space-y-1 text-[var(--muted)]">
+                  <div>현재 버전: <span className="font-semibold text-[var(--text)]">v{updateDiagnostic.currentVersion}</span></div>
+                  <div>빌드 날짜: <span className="font-semibold text-[var(--text)]">{updateDiagnostic.buildDate}</span></div>
+                  <div>커밋: <span className="font-semibold text-[var(--text)]">{updateDiagnostic.buildCommit}</span></div>
+                  <div className="break-all">endpoint: <span className="text-[var(--text)]">{updateDiagnostic.endpoint}</span></div>
+                  <div>
+                    latest.json 다운로드:{" "}
+                    <span className={`font-semibold ${updateDiagnostic.fetchSuccess ? "text-green-600" : "text-red-500"}`}>
+                      {updateDiagnostic.fetchSuccess ? "성공" : `실패 — ${updateDiagnostic.fetchError}`}
+                    </span>
+                  </div>
+                  {updateDiagnostic.remoteVersion !== null && (
+                    <div>최신 버전: <span className="font-semibold text-[var(--text)]">v{updateDiagnostic.remoteVersion}</span></div>
+                  )}
+                  {updateDiagnostic.remotePubDate !== null && (
+                    <div>배포 날짜: <span className="font-semibold text-[var(--text)]">{updateDiagnostic.remotePubDate}</span></div>
+                  )}
+                  {updateDiagnostic.signaturePresent !== null && (
+                    <div>
+                      서명(signature):{" "}
+                      <span className={`font-semibold ${updateDiagnostic.signaturePresent ? "text-green-600" : "text-red-500"}`}>
+                        {updateDiagnostic.signaturePresent ? "있음" : "없음"}
+                      </span>
+                    </div>
+                  )}
+                  {updateDiagnostic.downloadUrl !== null && (
+                    <div className="break-all">다운로드 URL: <span className="text-[var(--text)]">{updateDiagnostic.downloadUrl}</span></div>
+                  )}
+                  {updateDiagnostic.downloadUrlAccessible !== null && (
+                    <div>
+                      URL 접근:{" "}
+                      <span className={`font-semibold ${updateDiagnostic.downloadUrlAccessible ? "text-green-600" : "text-red-500"}`}>
+                        {updateDiagnostic.downloadUrlAccessible ? "가능" : "실패"}
+                      </span>
+                    </div>
+                  )}
+                  {updateDiagnostic.versionComparison !== null && (
+                    <div>
+                      버전 비교:{" "}
+                      <span className={`font-semibold ${updateDiagnostic.versionComparison === "newer" ? "text-green-600" : "text-amber-500"}`}>
+                        {updateDiagnostic.versionComparison === "newer"
+                          ? `v${updateDiagnostic.remoteVersion}이 더 최신`
+                          : updateDiagnostic.versionComparison === "same"
+                          ? "현재 버전과 동일"
+                          : "현재 버전보다 낮음"}
+                      </span>
+                    </div>
+                  )}
+                  <div>
+                    업데이트 가능:{" "}
+                    <span className={`font-semibold ${updateDiagnostic.updateAvailable ? "text-green-600" : "text-amber-500"}`}>
+                      {updateDiagnostic.updateAvailable ? "예" : "아니오"}
+                    </span>
+                  </div>
+                  {updateDiagnostic.failureReason && (
+                    <div className="mt-1 rounded-lg bg-[var(--panel-strong)] p-2 text-amber-500">
+                      사유: {updateDiagnostic.failureReason}
+                    </div>
+                  )}
+                  <div className="mt-1">
+                    공식 릴리스:{" "}
+                    <a
+                      href={updateDiagnostic.releaseUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-blue-500 underline"
+                    >
+                      GitHub Releases
+                    </a>
+                    <span className="ml-1 text-[var(--muted)]">(자동 업데이트 실패 시 직접 설치 가능)</span>
+                  </div>
+                </div>
+              </div>
             )}
             <p className="mt-2 text-xs leading-relaxed text-[var(--muted)]">
               업데이트/재설치해도 회원 데이터는 Supabase와 AppData에 유지됩니다.
