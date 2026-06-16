@@ -535,3 +535,47 @@ pub fn get_center_member_counts(state: State<'_, AppState>) -> Result<CenterMemb
         })
     }).map_err(|e| e.to_string())
 }
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RawMemberCounts {
+    pub oncle_raw_total: i64,
+    pub oncle_deleted: i64,
+    pub oncle_hidden: i64,
+    pub oncle_is_duplicate: i64,
+    pub oncle_visible: i64,
+    pub grabit_raw_total: i64,
+    pub grabit_deleted: i64,
+    pub grabit_hidden: i64,
+    pub grabit_is_duplicate: i64,
+    pub grabit_visible: i64,
+    pub all_raw_total: i64,
+    pub distinct_centers: String,
+}
+
+#[tauri::command]
+pub fn get_raw_member_counts(state: State<'_, AppState>) -> Result<RawMemberCounts, String> {
+    state.with_conn(|conn| {
+        let count = |sql: &str| -> Result<i64, rusqlite::Error> {
+            conn.query_row(sql, [], |row| row.get(0))
+        };
+        let centers: Vec<String> = conn.prepare(
+            "SELECT DISTINCT COALESCE(center,'<null>') FROM members ORDER BY 1"
+        )?.query_map([], |row| row.get(0))?.collect::<Result<_,_>>()?;
+
+        Ok(RawMemberCounts {
+            oncle_raw_total: count("SELECT COUNT(*) FROM members WHERE center='ONCLE'")?,
+            oncle_deleted: count("SELECT COUNT(*) FROM members WHERE center='ONCLE' AND deleted_at IS NOT NULL")?,
+            oncle_hidden: count("SELECT COUNT(*) FROM members WHERE center='ONCLE' AND COALESCE(hidden_locally,0)=1")?,
+            oncle_is_duplicate: count("SELECT COUNT(*) FROM members WHERE center='ONCLE' AND COALESCE(is_local_duplicate,0)=1")?,
+            oncle_visible: count("SELECT COUNT(*) FROM members WHERE center='ONCLE' AND deleted_at IS NULL AND COALESCE(hidden_locally,0)=0 AND COALESCE(is_local_duplicate,0)=0")?,
+            grabit_raw_total: count("SELECT COUNT(*) FROM members WHERE center='GRABIT'")?,
+            grabit_deleted: count("SELECT COUNT(*) FROM members WHERE center='GRABIT' AND deleted_at IS NOT NULL")?,
+            grabit_hidden: count("SELECT COUNT(*) FROM members WHERE center='GRABIT' AND COALESCE(hidden_locally,0)=1")?,
+            grabit_is_duplicate: count("SELECT COUNT(*) FROM members WHERE center='GRABIT' AND COALESCE(is_local_duplicate,0)=1")?,
+            grabit_visible: count("SELECT COUNT(*) FROM members WHERE center='GRABIT' AND deleted_at IS NULL AND COALESCE(hidden_locally,0)=0 AND COALESCE(is_local_duplicate,0)=0")?,
+            all_raw_total: count("SELECT COUNT(*) FROM members")?,
+            distinct_centers: centers.join(", "),
+        })
+    }).map_err(|e| e.to_string())
+}

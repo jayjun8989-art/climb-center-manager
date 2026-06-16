@@ -280,7 +280,8 @@ fn upsert_member(
                 name = ?1, phone = ?2, phone_normalized = ?3, member_type = ?4, center = ?5,
                 parent_name = ?6, parent_phone = ?7, memo = ?8, address = ?9, status = ?10,
                 member_no = COALESCE(member_no, ?13),
-                updated_at = ?11, sync_status = 'synced', remote_updated_at = ?11
+                updated_at = ?11, sync_status = 'synced', remote_updated_at = ?11,
+                hidden_locally = 0, is_local_duplicate = 0
              WHERE id = ?12",
             params![
                 row.name.trim(),

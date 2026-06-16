@@ -1023,6 +1023,8 @@ export interface SyncVerificationCenterReport {
   localMembershipCount: number | null;
   localHiddenCount: number | null;
   localDuplicateCount: number | null;
+  localRawTotal: number | null;
+  localDeletedCount: number | null;
   allowed: boolean;
   serverQueryError: string | null;
 }
@@ -1121,10 +1123,28 @@ export async function runSyncVerificationReport(options?: {
     oncleLocalDuplicate: number;
     grabitLocalDuplicate: number;
   };
-  // Get local counts via Tauri command
+  type RawMemberCounts = {
+    oncleRawTotal: number;
+    oncleDeleted: number;
+    oncleHidden: number;
+    oncleIsDuplicate: number;
+    oncleVisible: number;
+    grabitRawTotal: number;
+    grabitDeleted: number;
+    grabitHidden: number;
+    grabitIsDuplicate: number;
+    grabitVisible: number;
+    allRawTotal: number;
+    distinctCenters: string;
+  };
+  // Get local counts via Tauri commands
   let localCounts: LocalCenterCounts | null = null;
+  let rawCounts: RawMemberCounts | null = null;
   if (isTauriApp()) {
-    localCounts = await safeInvoke<LocalCenterCounts>("get_center_member_counts");
+    [localCounts, rawCounts] = await Promise.all([
+      safeInvoke<LocalCenterCounts>("get_center_member_counts"),
+      safeInvoke<RawMemberCounts>("get_raw_member_counts"),
+    ]);
   }
 
   const localCountsByCenter: Record<string, {
@@ -1132,13 +1152,15 @@ export async function runSyncVerificationReport(options?: {
     memberships: number | null;
     hidden: number | null;
     duplicate: number | null;
+    rawTotal: number | null;
+    deleted: number | null;
   }> = {
     ONCLE: localCounts
-      ? { members: localCounts.oncleMembers, memberships: localCounts.oncleMemberships, hidden: localCounts.oncleHidden, duplicate: localCounts.oncleLocalDuplicate }
-      : { members: null, memberships: null, hidden: null, duplicate: null },
+      ? { members: localCounts.oncleMembers, memberships: localCounts.oncleMemberships, hidden: localCounts.oncleHidden, duplicate: localCounts.oncleLocalDuplicate, rawTotal: rawCounts?.oncleRawTotal ?? null, deleted: rawCounts?.oncleDeleted ?? null }
+      : { members: null, memberships: null, hidden: null, duplicate: null, rawTotal: null, deleted: null },
     GRABIT: localCounts
-      ? { members: localCounts.grabitMembers, memberships: localCounts.grabitMemberships, hidden: localCounts.grabitHidden, duplicate: localCounts.grabitLocalDuplicate }
-      : { members: null, memberships: null, hidden: null, duplicate: null },
+      ? { members: localCounts.grabitMembers, memberships: localCounts.grabitMemberships, hidden: localCounts.grabitHidden, duplicate: localCounts.grabitLocalDuplicate, rawTotal: rawCounts?.grabitRawTotal ?? null, deleted: rawCounts?.grabitDeleted ?? null }
+      : { members: null, memberships: null, hidden: null, duplicate: null, rawTotal: null, deleted: null },
   };
 
   for (const code of allCenterCodes) {
@@ -1180,24 +1202,36 @@ export async function runSyncVerificationReport(options?: {
       localMembershipCount: local?.memberships ?? null,
       localHiddenCount: local?.hidden ?? null,
       localDuplicateCount: local?.duplicate ?? null,
+      localRawTotal: local?.rawTotal ?? null,
+      localDeletedCount: local?.deleted ?? null,
       allowed,
       serverQueryError,
     };
     report.centers.push(centerReport);
 
     // Auto diagnosis
+    const localVisible = local?.members ?? null;
+    const localRaw = local?.rawTotal ?? null;
+    const localVisibleStr = localVisible !== null
+      ? (localRaw !== null && localRaw !== localVisible ? `원장 ${localRaw}명 / 표시 ${localVisible}명` : `${localVisible}명`)
+      : "N/A";
     if (!allowed) {
       diagnosis.push(`⚠ ${code}: 이 계정에 ${code} 센터 권한이 없습니다 (user_center_roles에 미등록).`);
     } else if (serverMemberCount === 0 && !serverQueryError) {
       diagnosis.push(`⚠ ${code}: Supabase에서 회원 0명 조회 → RLS 정책이 차단하고 있거나 데이터가 없습니다.`);
-    } else if (serverMemberCount !== null && serverMemberCount > 0 && (local?.members ?? 0) === 0) {
+    } else if (serverMemberCount !== null && serverMemberCount > 0 && (localVisible ?? 0) === 0 && (localRaw ?? 0) === 0) {
       diagnosis.push(`⚠ ${code}: 서버에는 ${serverMemberCount}명이 있지만 로컬에 0명. pull이 실패했거나 center mapping 오류입니다. 「Supabase에서 불러오기」를 다시 실행하세요.`);
-    } else if (serverMemberCount !== null && local?.members !== null) {
-      const diff = Math.abs(serverMemberCount - (local.members ?? 0));
+    } else if (serverMemberCount !== null && serverMemberCount > 0 && localRaw !== null && localRaw > 0 && (localVisible ?? 0) < localRaw) {
+      const hidden = local?.hidden ?? 0;
+      const dup = local?.duplicate ?? 0;
+      const del = local?.deleted ?? 0;
+      diagnosis.push(`△ ${code}: 서버 ${serverMemberCount}명 / ${localVisibleStr} (숨김 ${hidden}명, 중복 ${dup}명, 삭제됨 ${del}명)`);
+    } else if (serverMemberCount !== null && localVisible !== null) {
+      const diff = Math.abs(serverMemberCount - localVisible);
       if (diff === 0) {
-        diagnosis.push(`✓ ${code}: 서버 ${serverMemberCount}명 = 로컬 ${local.members}명 (정상)`);
+        diagnosis.push(`✓ ${code}: 서버 ${serverMemberCount}명 = ${localVisibleStr} (정상)`);
       } else {
-        diagnosis.push(`△ ${code}: 서버 ${serverMemberCount}명 vs 로컬 ${local.members}명 (차이 ${diff}명 — deleted_at 포함 여부 등)`);
+        diagnosis.push(`△ ${code}: 서버 ${serverMemberCount}명 vs ${localVisibleStr} (차이 ${diff}명)`);
       }
     }
 

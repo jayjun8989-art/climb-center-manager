@@ -774,11 +774,18 @@ export function SettingsPanel({
                         <div className="font-semibold text-[var(--text)]">{c.centerCode} {!c.allowed && <span className="text-red-500">✗ 권한없음</span>}</div>
                         <div className="grid grid-cols-2 gap-x-2 text-[var(--muted)]">
                           <div>서버 회원: <span className={`font-semibold ${c.serverMemberCount === 0 ? "text-amber-500" : "text-[var(--text)]"}`}>{c.serverMemberCount ?? "조회실패"}</span></div>
-                          <div>로컬 회원: <span className={`font-semibold ${(c.localMemberCount ?? 0) === 0 ? "text-amber-500" : "text-[var(--text)]"}`}>{c.localMemberCount ?? "N/A"}</span></div>
+                          <div>로컬 표시: <span className={`font-semibold ${(c.localMemberCount ?? 0) === 0 ? "text-amber-500" : "text-[var(--text)]"}`}>{c.localMemberCount ?? "N/A"}</span></div>
                           <div>서버 회원권: <span className="font-semibold text-[var(--text)]">{c.serverMembershipCount ?? "-"}</span></div>
                           <div>로컬 회원권: <span className="font-semibold text-[var(--text)]">{c.localMembershipCount ?? "N/A"}</span></div>
-                          <div>로컬 hidden: <span className="font-semibold text-[var(--text)]">{c.localHiddenCount ?? "-"}</span></div>
-                          <div>로컬 중복: <span className="font-semibold text-[var(--text)]">{c.localDuplicateCount ?? "-"}</span></div>
+                          {c.localRawTotal !== null && c.localRawTotal !== c.localMemberCount && (
+                            <div className="col-span-2 text-amber-500">로컬 원장 합계: <span className="font-semibold">{c.localRawTotal}명</span> (삭제됨 {c.localDeletedCount ?? 0}, hidden {c.localHiddenCount ?? 0}, 중복 {c.localDuplicateCount ?? 0})</div>
+                          )}
+                          {(c.localRawTotal === null || c.localRawTotal === c.localMemberCount) && (
+                            <>
+                              <div>로컬 hidden: <span className="font-semibold text-[var(--text)]">{c.localHiddenCount ?? "-"}</span></div>
+                              <div>로컬 중복: <span className="font-semibold text-[var(--text)]">{c.localDuplicateCount ?? "-"}</span></div>
+                            </>
+                          )}
                           {c.serverQueryError && (
                             <div className="col-span-2 text-red-500">서버 오류: {c.serverQueryError}</div>
                           )}

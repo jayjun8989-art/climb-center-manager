@@ -1,11 +1,11 @@
 {
-  "version": "1.0.39",
-  "pub_date": "2026-06-16T00:00:00Z",
-  "notes": "강제 불러오기 snapshot 타입 불일치 수정, 숫자 문자열 i64 변환 보강, import_pull_snapshot_cmd 진단 메시지 개선",
+  "version": "1.0.40",
+  "notes": "v1.0.40: 강제 불러오기 후 회원 표시 수 수정 (hidden_locally/is_local_duplicate 초기화), 동기화 검증 리포트에 원장 전체/표시 카운트 추가",
+  "pub_date": "2026-06-16T09:22:46.938Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWJKTE1LZFJKc3J4V0xYVkR4aXdwZU01eVBRcm1LNHhSLzJ4OTRua3dacHRnT2VzWnRxaDR4QStZWlhzNDJ6MjREb29OT1RUR3JYdU1jcklZc1FJRncwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxNTk5NzIzCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4zOV94NjQtc2V0dXAuZXhlCkdiT0t0bUlvMHhvdUd6eTJ4MjFYdW8yK3kwblRPNkFZQlNBNTFqRDB1ZHkvWTdKa2FTeW5QVnAxQWRGL0RIZ0VnSjMxTVpRWitLZmdjcUtmOGRFckJ3PT0K",
-      "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.39/ClimbCenterManager_1.0.39_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVlRcCt5d2ZoTm5vK0hESjNJNEIwQ3BsbzJlVFUweXlFQi90N0tJSE9YL1cxVkVMVUNUVmNOc2lBdHdBbDA2M2R0S201blVPemNYR0E2UzhuVWlTancwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxNjAxNzI2CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC40MF94NjQtc2V0dXAuZXhlCkc5TnRVS0FhbHcyNmNqSm03N2plaVpJaWFhYjFNZCtXRXl1M2Y1WC9NcUc5aWc5V0I4Q0Q0WXpHczZvQ3ZqdTU2VDFxNUZzdFp1R0tGTm9YYURkd0NnPT0K",
+      "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.40/ClimbCenterManager_1.0.40_x64-setup.exe"
     }
   }
 }

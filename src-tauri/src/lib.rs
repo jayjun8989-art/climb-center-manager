@@ -121,6 +121,7 @@ pub fn run() {
             commands::open_report_file,
             commands::open_reports_archive_folder,
             commands::get_center_member_counts,
+            commands::get_raw_member_counts,
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|error| {
