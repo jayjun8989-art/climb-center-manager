@@ -14,7 +14,7 @@ import {
   supabaseMemberTypeFromPayload,
 } from "./membershipMapping";
 import { formatSyncError, isPostgrestError } from "./errors";
-import { buildPullSnapshot, toInvokePullSnapshot } from "./pullMapping";
+import { buildPullSnapshot, toInvokePullSnapshot, findSnapshotTypeError } from "./pullMapping";
 import type { SyncErrorContext } from "./permissionContext";
 import type { PullCenterDiagnostics, PullRunResult, SyncQueueItem, SyncRunResult, SyncStatus } from "./types";
 
@@ -877,6 +877,24 @@ export async function pullFromSupabase(options?: {
     }),
   );
 
+  // Pre-flight: validate all numeric fields so we catch type mismatches before
+  // handing off to Rust (serde fails on string "505" where i64 is expected).
+  const typeErr = findSnapshotTypeError(snapshot);
+  if (typeErr) {
+    const detail = `snapshot 타입 오류: ${typeErr.path} = ${JSON.stringify(typeErr.value)} (${typeof typeErr.value}) — ${typeErr.expected} 숫자가 필요합니다`;
+    console.error("[pull] snapshot 타입 검증 실패", typeErr);
+    return emptyResult({
+      errors: [detail],
+      warnings,
+      message: `강제 불러오기 실패: ${detail}`,
+      pullDiagnostics,
+    });
+  }
+
+  console.info(
+    `[pull] snapshot 타입 검증 통과 · members=${snapshot.members.length} memberships=${snapshot.memberships.length}`,
+  );
+
   let importResult: {
     importedMembers: number;
     importedMemberships: number;
@@ -894,12 +912,17 @@ export async function pullFromSupabase(options?: {
     importResult = await invokeCommand("import_pull_snapshot_cmd", { snapshot });
     console.info("[pull] import_pull_snapshot_cmd 완료:", importResult);
   } catch (error) {
-    const detail = formatSyncError(error);
+    const raw = formatSyncError(error);
     console.error("[pull] import_pull_snapshot_cmd 실패", error);
+    // Distinguish Tauri arg deserialization errors from SQLite errors
+    const isArgError = raw.includes("invalid args") || raw.includes("invalid type") || raw.includes("expected i");
+    const detail = isArgError
+      ? `snapshot 타입 오류 — ${raw}`
+      : `SQLite upsert 오류 — ${raw}`;
     return emptyResult({
       errors: [detail],
       warnings,
-      message: `강제 불러오기 실패: SQLite upsert 오류 — ${detail}`,
+      message: `강제 불러오기 실패: ${detail}`,
       pullDiagnostics,
     });
   }

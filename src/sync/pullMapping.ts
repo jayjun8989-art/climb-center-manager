@@ -109,6 +109,60 @@ export type PullSnapshotPayload = {
   }>;
 };
 
+/** Supabase can return numeric columns as strings. Coerce to number or null. */
+function toIntOrNull(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return Math.round(n);
+}
+
+/** Coerce to number, fallback to 0. */
+function toIntOrZero(value: unknown): number {
+  return toIntOrNull(value) ?? 0;
+}
+
+/** Coerce to number or null, for optional floats (price). */
+function toFloatOrNull(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+export type SnapshotTypeError = { path: string; value: unknown; expected: string };
+
+/** Validate all numeric fields in a snapshot and return the first type error. */
+export function findSnapshotTypeError(payload: PullSnapshotPayload): SnapshotTypeError | null {
+  for (let i = 0; i < payload.members.length; i++) {
+    const m = payload.members[i];
+    if (m.memberNo !== null && m.memberNo !== undefined && typeof m.memberNo !== "number") {
+      return { path: `members[${i}].memberNo`, value: m.memberNo, expected: "number | null" };
+    }
+  }
+  for (let i = 0; i < payload.memberships.length; i++) {
+    const ms = payload.memberships[i];
+    if (typeof ms.usedCount !== "number") {
+      return { path: `memberships[${i}].usedCount`, value: ms.usedCount, expected: "number" };
+    }
+    if (ms.totalCount !== null && ms.totalCount !== undefined && typeof ms.totalCount !== "number") {
+      return { path: `memberships[${i}].totalCount`, value: ms.totalCount, expected: "number | null" };
+    }
+    if (ms.remainingCount !== null && ms.remainingCount !== undefined && typeof ms.remainingCount !== "number") {
+      return { path: `memberships[${i}].remainingCount`, value: ms.remainingCount, expected: "number | null" };
+    }
+    if (ms.price !== null && ms.price !== undefined && typeof ms.price !== "number") {
+      return { path: `memberships[${i}].price`, value: ms.price, expected: "number | null" };
+    }
+  }
+  for (let i = 0; i < payload.attendanceLogs.length; i++) {
+    const a = payload.attendanceLogs[i];
+    if (typeof a.deductedCount !== "number") {
+      return { path: `attendanceLogs[${i}].deductedCount`, value: a.deductedCount, expected: "number" };
+    }
+  }
+  return null;
+}
+
 function toLocalDateTime(value: string): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
@@ -185,7 +239,7 @@ export function buildPullSnapshot(input: {
       status: row.status,
       createdAt: toLocalDateTime(row.created_at),
       updatedAt: toLocalDateTime(row.updated_at),
-      memberNo: row.member_no ?? null,
+      memberNo: toIntOrNull(row.member_no),
     })),
     memberships: input.memberships.map((row) => ({
       remoteId: row.id,
@@ -194,11 +248,11 @@ export function buildPullSnapshot(input: {
       passType: row.pass_type,
       startDate: row.start_date,
       endDate: row.end_date,
-      totalCount: row.total_count,
-      usedCount: row.used_count,
-      remainingCount: row.remaining_count,
+      totalCount: toIntOrNull(row.total_count),
+      usedCount: toIntOrZero(row.used_count),
+      remainingCount: toIntOrNull(row.remaining_count),
       status: row.status,
-      price: row.price,
+      price: toFloatOrNull(row.price),
       createdAt: toLocalDateTime(row.created_at),
       updatedAt: toLocalDateTime(row.updated_at),
     })),
@@ -209,7 +263,7 @@ export function buildPullSnapshot(input: {
       center: centerOrThrow(row.center_id),
       checkinAt: toLocalDateTime(row.checkin_at),
       attendanceType: row.attendance_type,
-      deductedCount: row.deducted_count,
+      deductedCount: toIntOrZero(row.deducted_count),
       memo: row.memo,
       createdAt: toLocalDateTime(row.created_at),
     })),

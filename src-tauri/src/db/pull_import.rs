@@ -2,7 +2,57 @@ use crate::db::ops::refresh_all_statuses;
 use crate::db::status::{normalize_local_member_type, now_string};
 use crate::db::{AppState, DbError};
 use rusqlite::{params, OptionalExtension};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+
+// Flexible deserializers: accept both JSON numbers and numeric strings.
+// Supabase (or the JS runtime) sometimes serialises numeric columns as strings.
+
+fn deser_opt_i64<'de, D: Deserializer<'de>>(d: D) -> Result<Option<i64>, D::Error> {
+    let v: Option<serde_json::Value> = Option::deserialize(d)?;
+    match v {
+        None => Ok(None),
+        Some(serde_json::Value::Null) => Ok(None),
+        Some(serde_json::Value::Number(n)) => Ok(n.as_i64()),
+        Some(serde_json::Value::String(s)) if s.is_empty() => Ok(None),
+        Some(serde_json::Value::String(s)) => s.parse::<i64>().map(Some).map_err(serde::de::Error::custom),
+        Some(other) => Err(serde::de::Error::custom(format!("expected i64 or numeric string, got {other}"))),
+    }
+}
+
+fn deser_i32<'de, D: Deserializer<'de>>(d: D) -> Result<i32, D::Error> {
+    let v: serde_json::Value = serde_json::Value::deserialize(d)?;
+    match v {
+        serde_json::Value::Number(n) => n.as_i64().map(|x| x as i32).ok_or_else(|| serde::de::Error::custom("number out of i32 range")),
+        serde_json::Value::String(s) if s.is_empty() => Ok(0),
+        serde_json::Value::String(s) => s.parse::<i32>().map_err(serde::de::Error::custom),
+        serde_json::Value::Null => Ok(0),
+        other => Err(serde::de::Error::custom(format!("expected i32 or numeric string, got {other}"))),
+    }
+}
+
+fn deser_opt_i32<'de, D: Deserializer<'de>>(d: D) -> Result<Option<i32>, D::Error> {
+    let v: Option<serde_json::Value> = Option::deserialize(d)?;
+    match v {
+        None => Ok(None),
+        Some(serde_json::Value::Null) => Ok(None),
+        Some(serde_json::Value::Number(n)) => Ok(n.as_i64().map(|x| x as i32)),
+        Some(serde_json::Value::String(s)) if s.is_empty() => Ok(None),
+        Some(serde_json::Value::String(s)) => s.parse::<i32>().map(Some).map_err(serde::de::Error::custom),
+        Some(other) => Err(serde::de::Error::custom(format!("expected i32 or numeric string, got {other}"))),
+    }
+}
+
+fn deser_opt_f64<'de, D: Deserializer<'de>>(d: D) -> Result<Option<f64>, D::Error> {
+    let v: Option<serde_json::Value> = Option::deserialize(d)?;
+    match v {
+        None => Ok(None),
+        Some(serde_json::Value::Null) => Ok(None),
+        Some(serde_json::Value::Number(n)) => Ok(n.as_f64()),
+        Some(serde_json::Value::String(s)) if s.is_empty() => Ok(None),
+        Some(serde_json::Value::String(s)) => s.parse::<f64>().map(Some).map_err(serde::de::Error::custom),
+        Some(other) => Err(serde::de::Error::custom(format!("expected f64 or numeric string, got {other}"))),
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +70,7 @@ pub struct PullMemberRow {
     pub status: String,
     pub created_at: String,
     pub updated_at: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deser_opt_i64")]
     pub member_no: Option<i64>,
 }
 
@@ -35,10 +85,14 @@ pub struct PullMembershipRow {
     pub pass_type: String,
     pub start_date: String,
     pub end_date: Option<String>,
+    #[serde(default, deserialize_with = "deser_opt_i32")]
     pub total_count: Option<i32>,
+    #[serde(deserialize_with = "deser_i32")]
     pub used_count: i32,
+    #[serde(default, deserialize_with = "deser_opt_i32")]
     pub remaining_count: Option<i32>,
     pub status: String,
+    #[serde(default, deserialize_with = "deser_opt_f64")]
     pub price: Option<f64>,
     pub created_at: String,
     pub updated_at: String,
@@ -56,6 +110,7 @@ pub struct PullAttendanceRow {
     pub center: String,
     pub checkin_at: String,
     pub attendance_type: String,
+    #[serde(deserialize_with = "deser_i32")]
     pub deducted_count: i32,
     pub memo: Option<String>,
     pub created_at: String,
