@@ -1,14 +1,27 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { execSync } from "child_process";
 
 const host = process.env.TAURI_DEV_HOST;
+const buildDate = new Date().toISOString().slice(0, 16).replace("T", " ");
+const buildCommit = (() => {
+  try {
+    return execSync("git rev-parse --short HEAD").toString().trim();
+  } catch {
+    return "unknown";
+  }
+})();
 
 // https://tauri.app/start/frontend/vite/
 export default defineConfig(async () => ({
   plugins: [react(), tailwindcss()],
   clearScreen: false,
   base: "./",
+  define: {
+    __BUILD_DATE__: JSON.stringify(buildDate),
+    __BUILD_COMMIT__: JSON.stringify(buildCommit),
+  },
   esbuild: {
     charset: "utf8",
   },

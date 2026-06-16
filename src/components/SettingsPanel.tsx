@@ -454,6 +454,7 @@ export function SettingsPanel({
           <div className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--panel-strong)] px-4 py-3">
             <p className="text-sm font-semibold text-[var(--text)]">앱 버전</p>
             <p className="mt-1 text-sm text-[var(--muted)]">현재 버전: v{appVersion}</p>
+            <p className="mt-0.5 text-xs text-[var(--muted)]">빌드: {__BUILD_DATE__} / {__BUILD_COMMIT__}</p>
             <p className="mt-1 break-all text-xs text-[var(--muted)]">endpoint: {UPDATER_ENDPOINT}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               <button
