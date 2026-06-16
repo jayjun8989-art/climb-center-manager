@@ -1,11 +1,11 @@
 {
     "platforms":  {
                       "windows-x86_64":  {
-                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWRuQkl2UHQ5aWxuaXgydmVXZ1pMSnk3Tzl1b1RubEFJYjFycGxoTFo0RjBvMGpHQWZ5Q0s4T08yK3B4Q25QNnZrQWhndkllRlgrZ2ZnTmlJYmNIOEE0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxNTkzNTUyCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4zNV94NjQtc2V0dXAuZXhlClRucWYyLzVnWXdYUHJUM3F0NUtVejhQd2VHWFkrdGpveFMyZzFGMWs3ZGNUV0JQSFc5ckprOGRDc3BZbjExcHdsNHRwUkZBTk9EWitRVk9IelZoUkRnPT0K",
-                                             "url":  "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.35/ClimbCenterManager_1.0.35_x64-setup.exe"
+                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWFiL2k2S3RYb29qcGRtaldZV1BOUUhscVprSm1OVEd2TjEyd0JoQTBOcTl6SnpzbWdQaDNyY042KzMxbE5LdUFrY09qR3FBQ011NVFvamh6bzkrUXdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxNTk0Njk5CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4zNl94NjQtc2V0dXAuZXhlCnNpMG8wZEdXR3E0RlJPNVpMMGJyQnpGR2szbXZrRWY0Tkg5MnBLZ1lDNlNIVElWaWluWkVmL1NzUW80Z281ZlZlYTVmcGtod3lrTGI4aFdBekFHa0JRPT0K",
+                                             "url":  "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.36/ClimbCenterManager_1.0.36_x64-setup.exe"
                                          }
                   },
     "pub_date":  "2026-06-16T00:00:00Z",
-    "version":  "1.0.35",
-    "notes":  "동기화 검증 리포트 추가, 로그인 계정 기준 pull 범위 진단 강화, ONCLE/GRABIT 서버-local-화면 단계별 카운트 검증 추가"
+    "version":  "1.0.36",
+    "notes":  "서버 기준 강제 불러오기 추가, 서버-local-화면 count 불일치 자동 감지, auto-pull 재시도 로직 강화, pull 단계별 로그 개선"
 }
