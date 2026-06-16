@@ -16,7 +16,7 @@ import {
 import { formatSyncError, isPostgrestError } from "./errors";
 import { buildPullSnapshot, toInvokePullSnapshot } from "./pullMapping";
 import type { SyncErrorContext } from "./permissionContext";
-import type { PullRunResult, SyncQueueItem, SyncRunResult, SyncStatus } from "./types";
+import type { PullCenterDiagnostics, PullRunResult, SyncQueueItem, SyncRunResult, SyncStatus } from "./types";
 
 const DEVICE_ID_KEY = "device_id";
 
@@ -750,6 +750,16 @@ export async function pullFromSupabase(options?: {
   const centerIds =
     options?.centerIds ?? Object.values(await resolveCenterIds().catch(() => CENTER_IDS_FALLBACK()));
 
+  // Build per-center diagnostics skeleton
+  const pullDiagnostics: Record<string, PullCenterDiagnostics> = {};
+  for (const cid of centerIds) {
+    pullDiagnostics[cid] = { serverCount: 0, upsertAttempt: 0, upsertSuccess: 0, mappingFail: 0 };
+  }
+
+  console.info(
+    `[pull] 시작 · 계정: ${session.user.email} · centerIds: [${centerIds.join(", ")}]`,
+  );
+
   const membersRes = await supabase
     .from("members")
     .select(
@@ -763,13 +773,28 @@ export async function pullFromSupabase(options?: {
     return emptyResult({
       errors: [message],
       message,
+      pullDiagnostics,
     });
   }
 
+  // Record server counts per center
+  for (const row of membersRes.data ?? []) {
+    if (pullDiagnostics[row.center_id]) {
+      pullDiagnostics[row.center_id].serverCount += 1;
+    } else {
+      // center_id not in our map — mapping fail
+      pullDiagnostics[row.center_id] = { serverCount: 1, upsertAttempt: 0, upsertSuccess: 0, mappingFail: 1 };
+    }
+  }
+  console.info("[pull] 서버 회원 수 per center:", JSON.stringify(pullDiagnostics));
+
   const memberIds = (membersRes.data ?? []).map((row) => row.id);
   if (memberIds.length === 0) {
+    console.warn(
+      `[pull] 서버에서 0명 조회됨. centerIds=[${centerIds.join(", ")}] — RLS 권한 또는 데이터 없음.`,
+    );
     await updateSyncState("last_pull_at", nowIso());
-    return emptyResult({ message: "Supabase에 불러올 회원이 없습니다." });
+    return emptyResult({ message: "Supabase에 불러올 회원이 없습니다.", pullDiagnostics });
   }
 
   const warnings: string[] = [];
@@ -839,7 +864,17 @@ export async function pullFromSupabase(options?: {
       errors: [detail],
       warnings,
       message: `Supabase 데이터 불러오기에 실패했습니다: ${detail}`,
+      pullDiagnostics,
     });
+  }
+
+  // Record upsert success counts
+  const totalServerCount = Object.values(pullDiagnostics).reduce((sum, d) => sum + d.serverCount, 0);
+  const totalLocal = importResult.importedMembers + importResult.updatedMembers;
+  for (const cid of centerIds) {
+    if (pullDiagnostics[cid]) {
+      pullDiagnostics[cid].upsertAttempt = pullDiagnostics[cid].serverCount;
+    }
   }
 
   await updateSyncState("last_pull_at", nowIso());
@@ -849,6 +884,20 @@ export async function pullFromSupabase(options?: {
     importResult.importedMemberships +
     importResult.importedAttendance +
     importResult.importedLockers;
+
+  // Build diagnostic messages per center
+  const diagMessages: string[] = [];
+  for (const [cid, diag] of Object.entries(pullDiagnostics)) {
+    const centerCode = centerCodeFromId(cid) ?? cid.slice(0, 8);
+    if (diag.serverCount > 0 && diag.upsertSuccess === 0 && diag.mappingFail === 0) {
+      diagMessages.push(`불러오기 경고: 서버 ${centerCode} 회원 ${diag.serverCount}명이 있으나 로컬에 0명 저장됨`);
+    } else if (diag.serverCount === 0) {
+      diagMessages.push(`불러오기 경고: 서버 ${centerCode} 회원 0명 (RLS 권한 오류 또는 데이터 없음)`);
+    } else {
+      diagMessages.push(`불러오기 완료: 서버 ${centerCode} 회원 ${diag.serverCount}명 확인`);
+    }
+  }
+  console.info("[pull] 결과:", { totalServerCount, totalLocal, importResult, diagMessages });
 
   let message: string;
   if (totalImported > 0 || importResult.updatedMembers > 0) {
@@ -870,6 +919,7 @@ export async function pullFromSupabase(options?: {
     errors,
     warnings,
     message,
+    pullDiagnostics,
   };
 }
 
@@ -878,6 +928,214 @@ function CENTER_IDS_FALLBACK(): Record<Center, string> {
     ONCLE: centerIdForCode("ONCLE"),
     GRABIT: centerIdForCode("GRABIT"),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Sync Verification Report
+// ---------------------------------------------------------------------------
+
+export interface SyncVerificationCenterReport {
+  centerCode: string;
+  centerId: string | null;
+  serverMemberCount: number | null;
+  serverMembershipCount: number | null;
+  localMemberCount: number | null;
+  localMembershipCount: number | null;
+  localHiddenCount: number | null;
+  localDuplicateCount: number | null;
+  allowed: boolean;
+  serverQueryError: string | null;
+}
+
+export interface SyncVerificationReport {
+  loginEmail: string | null;
+  userCenterRoles: Array<{ center_id: string; role: string; center_code: string | null }>;
+  allowedCenterCodes: string[];
+  selectedCenterCode: string | null;
+  supabaseCenters: Array<{ id: string; code: string; name: string }>;
+  centers: SyncVerificationCenterReport[];
+  diagnosis: string[];
+  ranAt: string;
+}
+
+export async function runSyncVerificationReport(options?: {
+  selectedCenter?: string;
+  allowedCenterIds?: string[];
+}): Promise<SyncVerificationReport> {
+  const ranAt = new Date().toISOString();
+  const diagnosis: string[] = [];
+  const report: SyncVerificationReport = {
+    loginEmail: null,
+    userCenterRoles: [],
+    allowedCenterCodes: [],
+    selectedCenterCode: options?.selectedCenter ?? null,
+    supabaseCenters: [],
+    centers: [],
+    diagnosis,
+    ranAt,
+  };
+
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    diagnosis.push("⚠ Supabase 클라이언트를 초기화할 수 없습니다. 연결 설정 확인 필요.");
+    return report;
+  }
+
+  const session = await getSession();
+  if (!session) {
+    diagnosis.push("⚠ 로그인 세션이 없습니다. 로그인 후 다시 시도하세요.");
+    return report;
+  }
+
+  report.loginEmail = session.user.email ?? null;
+
+  // 1. Fetch user_center_roles
+  const { data: rolesData, error: rolesError } = await supabase
+    .from("user_center_roles")
+    .select("center_id, role")
+    .eq("user_id", session.user.id);
+
+  if (rolesError) {
+    diagnosis.push(`⚠ user_center_roles 조회 실패: ${rolesError.message}`);
+  } else {
+    const centerIdsMap = await resolveCenterIds().catch(() => CENTER_IDS_FALLBACK());
+    const codeById = Object.fromEntries(
+      Object.entries(centerIdsMap).map(([code, id]) => [id, code]),
+    );
+    report.userCenterRoles = (rolesData ?? []).map((r) => ({
+      center_id: r.center_id,
+      role: r.role as string,
+      center_code: codeById[r.center_id] ?? null,
+    }));
+    report.allowedCenterCodes = report.userCenterRoles
+      .map((r) => r.center_code)
+      .filter((c): c is string => c !== null);
+  }
+
+  // 2. Fetch Supabase centers list
+  const { data: centersData, error: centersError } = await supabase
+    .from("centers")
+    .select("id, code, name");
+
+  if (centersError) {
+    diagnosis.push(`⚠ centers 테이블 조회 실패: ${centersError.message}`);
+  } else {
+    report.supabaseCenters = (centersData ?? []).map((c) => ({
+      id: String(c.id),
+      code: String(c.code),
+      name: String(c.name),
+    }));
+  }
+
+  // 3. Per-center server + local counts
+  const centerIdsMap = await resolveCenterIds().catch(() => CENTER_IDS_FALLBACK());
+  const allCenterCodes: string[] = ["ONCLE", "GRABIT"];
+
+  type LocalCenterCounts = {
+    oncleMembers: number;
+    grabitMembers: number;
+    oncleMemberships: number;
+    grabitMemberships: number;
+    oncleHidden: number;
+    grabitHidden: number;
+    oncleLocalDuplicate: number;
+    grabitLocalDuplicate: number;
+  };
+  // Get local counts via Tauri command
+  let localCounts: LocalCenterCounts | null = null;
+  if (isTauriApp()) {
+    localCounts = await safeInvoke<LocalCenterCounts>("get_center_member_counts");
+  }
+
+  const localCountsByCenter: Record<string, {
+    members: number | null;
+    memberships: number | null;
+    hidden: number | null;
+    duplicate: number | null;
+  }> = {
+    ONCLE: localCounts
+      ? { members: localCounts.oncleMembers, memberships: localCounts.oncleMemberships, hidden: localCounts.oncleHidden, duplicate: localCounts.oncleLocalDuplicate }
+      : { members: null, memberships: null, hidden: null, duplicate: null },
+    GRABIT: localCounts
+      ? { members: localCounts.grabitMembers, memberships: localCounts.grabitMemberships, hidden: localCounts.grabitHidden, duplicate: localCounts.grabitLocalDuplicate }
+      : { members: null, memberships: null, hidden: null, duplicate: null },
+  };
+
+  for (const code of allCenterCodes) {
+    const centerId = centerIdsMap[code as "ONCLE" | "GRABIT"] ?? null;
+    const allowed = report.allowedCenterCodes.includes(code);
+    let serverMemberCount: number | null = null;
+    let serverMembershipCount: number | null = null;
+    let serverQueryError: string | null = null;
+
+    if (centerId) {
+      const { count: mc, error: me } = await supabase
+        .from("members")
+        .select("*", { count: "exact", head: true })
+        .eq("center_id", centerId)
+        .is("deleted_at", null);
+      if (me) {
+        serverQueryError = me.message;
+        diagnosis.push(`⚠ Supabase ${code} members 조회 실패: ${me.message} (RLS 차단 가능)`);
+      } else {
+        serverMemberCount = mc ?? 0;
+      }
+
+      const { count: msc, error: mse } = await supabase
+        .from("memberships")
+        .select("*", { count: "exact", head: true })
+        .eq("center_id", centerId);
+      if (!mse) {
+        serverMembershipCount = msc ?? 0;
+      }
+    }
+
+    const local = localCountsByCenter[code];
+    const centerReport: SyncVerificationCenterReport = {
+      centerCode: code,
+      centerId,
+      serverMemberCount,
+      serverMembershipCount,
+      localMemberCount: local?.members ?? null,
+      localMembershipCount: local?.memberships ?? null,
+      localHiddenCount: local?.hidden ?? null,
+      localDuplicateCount: local?.duplicate ?? null,
+      allowed,
+      serverQueryError,
+    };
+    report.centers.push(centerReport);
+
+    // Auto diagnosis
+    if (!allowed) {
+      diagnosis.push(`⚠ ${code}: 이 계정에 ${code} 센터 권한이 없습니다 (user_center_roles에 미등록).`);
+    } else if (serverMemberCount === 0 && !serverQueryError) {
+      diagnosis.push(`⚠ ${code}: Supabase에서 회원 0명 조회 → RLS 정책이 차단하고 있거나 데이터가 없습니다.`);
+    } else if (serverMemberCount !== null && serverMemberCount > 0 && (local?.members ?? 0) === 0) {
+      diagnosis.push(`⚠ ${code}: 서버에는 ${serverMemberCount}명이 있지만 로컬에 0명. pull이 실패했거나 center mapping 오류입니다. 「Supabase에서 불러오기」를 다시 실행하세요.`);
+    } else if (serverMemberCount !== null && local?.members !== null) {
+      const diff = Math.abs(serverMemberCount - (local.members ?? 0));
+      if (diff === 0) {
+        diagnosis.push(`✓ ${code}: 서버 ${serverMemberCount}명 = 로컬 ${local.members}명 (정상)`);
+      } else {
+        diagnosis.push(`△ ${code}: 서버 ${serverMemberCount}명 vs 로컬 ${local.members}명 (차이 ${diff}명 — deleted_at 포함 여부 등)`);
+      }
+    }
+
+    if (options?.selectedCenter === code && !allowed) {
+      diagnosis.push(`⚠ selected_center가 ${code}이지만 이 계정은 ${code} 권한이 없습니다.`);
+    }
+    if (options?.selectedCenter !== code && allowed && (local?.members ?? 0) > 0 && serverMemberCount !== null && serverMemberCount > 0) {
+      if (report.allowedCenterCodes.length === 1) {
+        diagnosis.push(`△ ${code}: 로컬에 ${code} 회원이 있지만 selected_center가 ${code}가 아닙니다. 센터 전환 필요.`);
+      }
+    }
+  }
+
+  if (diagnosis.length === 0) {
+    diagnosis.push("✓ 모든 항목이 정상입니다.");
+  }
+
+  return report;
 }
 
 /** @deprecated Use pushSyncQueue — pull merge is not implemented yet. */

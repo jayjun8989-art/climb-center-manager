@@ -6,7 +6,7 @@ import type { SyncStatus } from "../sync/types";
 import { checkForUpdate, getAppVersion, installUpdate, UPDATER_ENDPOINT, type UpdateCheckOutcome } from "../lib/updater";
 import type { Update } from "@tauri-apps/plugin-updater";
 import { api } from "../api/client";
-import { repairSyncQueue } from "../sync/engine";
+import { repairSyncQueue, runSyncVerificationReport, type SyncVerificationReport } from "../sync/engine";
 import { getSupabaseClient } from "../lib/supabase/client";
 
 interface SettingsPanelProps {
@@ -40,6 +40,7 @@ interface SettingsPanelProps {
   syncBusy?: boolean;
   onPullFromSupabase?: () => void;
   onPushToSupabase?: () => void;
+  allowedCenterIds?: string[];
 }
 export function SettingsPanel({
   open,
@@ -72,6 +73,7 @@ export function SettingsPanel({
   syncBusy = false,
   onPullFromSupabase,
   onPushToSupabase,
+  allowedCenterIds,
 }: SettingsPanelProps) {
   const [appVersion, setAppVersion] = useState("...");
   const [checkingUpdate, setCheckingUpdate] = useState(false);
@@ -97,6 +99,9 @@ export function SettingsPanel({
   const [centerMappingRows, setCenterMappingRows] = useState<CenterMappingDiagnosticRow[] | null>(null);
   const [centerMappingLoading, setCenterMappingLoading] = useState(false);
   const [centerMappingRepairBusy, setCenterMappingRepairBusy] = useState(false);
+
+  const [verifyReport, setVerifyReport] = useState<SyncVerificationReport | null>(null);
+  const [verifyReportLoading, setVerifyReportLoading] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -256,6 +261,21 @@ export function SettingsPanel({
       onNotify(error instanceof Error ? error.message : String(error));
     } finally {
       setRetryBusy(false);
+    }
+  }
+
+  async function handleRunVerifyReport() {
+    setVerifyReportLoading(true);
+    try {
+      const report = await runSyncVerificationReport({
+        selectedCenter: center,
+        allowedCenterIds,
+      });
+      setVerifyReport(report);
+    } catch (error) {
+      onNotify(error instanceof Error ? error.message : String(error));
+    } finally {
+      setVerifyReportLoading(false);
     }
   }
 
@@ -658,7 +678,59 @@ export function SettingsPanel({
                 >
                   {retryBusy ? "재시도 중..." : "실패 항목 다시 시도"}
                 </button>
+                <button
+                  className="btn btn-secondary sm:col-span-2"
+                  disabled={verifyReportLoading}
+                  onClick={() => void handleRunVerifyReport()}
+                >
+                  <ShieldAlert size={16} />
+                  {verifyReportLoading ? "검증 중..." : "동기화 검증 리포트"}
+                </button>
               </div>
+
+              {verifyReport && (
+                <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 text-[11px]">
+                  <div className="mb-2 font-semibold text-[var(--text)]">동기화 검증 리포트</div>
+                  <div className="space-y-1 text-[var(--muted)]">
+                    <div>계정: <span className="font-semibold text-[var(--text)]">{verifyReport.loginEmail ?? "-"}</span></div>
+                    <div>선택 센터: <span className="font-semibold text-[var(--text)]">{verifyReport.selectedCenterCode ?? "-"}</span></div>
+                    <div>허용 센터: <span className="font-semibold text-[var(--text)]">{verifyReport.allowedCenterCodes.join(", ") || "없음"}</span></div>
+                    <div className="mt-1">user_center_roles:
+                      {verifyReport.userCenterRoles.length === 0
+                        ? <span className="ml-1 text-amber-500">없음</span>
+                        : verifyReport.userCenterRoles.map((r, i) => (
+                          <span key={i} className="ml-1 text-[var(--text)]">{r.center_code ?? r.center_id.slice(0, 8)} ({r.role})</span>
+                        ))
+                      }
+                    </div>
+                  </div>
+                  <div className="mt-2 space-y-2">
+                    {verifyReport.centers.map((c) => (
+                      <div key={c.centerCode} className="rounded-lg border border-[var(--border)] p-2">
+                        <div className="font-semibold text-[var(--text)]">{c.centerCode} {!c.allowed && <span className="text-red-500">✗ 권한없음</span>}</div>
+                        <div className="grid grid-cols-2 gap-x-2 text-[var(--muted)]">
+                          <div>서버 회원: <span className={`font-semibold ${c.serverMemberCount === 0 ? "text-amber-500" : "text-[var(--text)]"}`}>{c.serverMemberCount ?? "조회실패"}</span></div>
+                          <div>로컬 회원: <span className={`font-semibold ${(c.localMemberCount ?? 0) === 0 ? "text-amber-500" : "text-[var(--text)]"}`}>{c.localMemberCount ?? "N/A"}</span></div>
+                          <div>서버 회원권: <span className="font-semibold text-[var(--text)]">{c.serverMembershipCount ?? "-"}</span></div>
+                          <div>로컬 회원권: <span className="font-semibold text-[var(--text)]">{c.localMembershipCount ?? "N/A"}</span></div>
+                          <div>로컬 hidden: <span className="font-semibold text-[var(--text)]">{c.localHiddenCount ?? "-"}</span></div>
+                          <div>로컬 중복: <span className="font-semibold text-[var(--text)]">{c.localDuplicateCount ?? "-"}</span></div>
+                          {c.serverQueryError && (
+                            <div className="col-span-2 text-red-500">서버 오류: {c.serverQueryError}</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 space-y-1">
+                    <div className="font-semibold text-[var(--text)]">진단 결과:</div>
+                    {verifyReport.diagnosis.map((d, i) => (
+                      <div key={i} className={d.startsWith("✓") ? "text-green-600" : d.startsWith("△") ? "text-amber-500" : "text-red-500"}>{d}</div>
+                    ))}
+                  </div>
+                  <div className="mt-1 text-[10px] text-[var(--muted)]">검증 시각: {verifyReport.ranAt}</div>
+                </div>
+              )}
 
               {diagnostics && diagnostics.problem_members.length > 0 && (
                 <div className="mt-3 max-h-64 overflow-auto rounded-xl border border-[var(--border)]">

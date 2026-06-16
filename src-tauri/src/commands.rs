@@ -486,3 +486,52 @@ pub fn open_reports_archive_folder(state: State<'_, AppState>) -> Result<(), Str
     tauri_plugin_opener::open_path(&archive, None::<&str>)
         .map_err(|e| format!("archive 폴더를 열 수 없습니다: {e}"))
 }
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CenterMemberCounts {
+    pub oncle_members: i64,
+    pub grabit_members: i64,
+    pub oncle_memberships: i64,
+    pub grabit_memberships: i64,
+    pub oncle_hidden: i64,
+    pub grabit_hidden: i64,
+    pub oncle_local_duplicate: i64,
+    pub grabit_local_duplicate: i64,
+}
+
+#[tauri::command]
+pub fn get_center_member_counts(state: State<'_, AppState>) -> Result<CenterMemberCounts, String> {
+    state.with_conn(|conn| {
+        let count = |sql: &str| -> Result<i64, rusqlite::Error> {
+            conn.query_row(sql, [], |row| row.get(0))
+        };
+
+        Ok(CenterMemberCounts {
+            oncle_members: count(
+                "SELECT COUNT(*) FROM members WHERE center = 'ONCLE' AND deleted_at IS NULL AND COALESCE(hidden_locally,0)=0 AND COALESCE(is_local_duplicate,0)=0"
+            )?,
+            grabit_members: count(
+                "SELECT COUNT(*) FROM members WHERE center = 'GRABIT' AND deleted_at IS NULL AND COALESCE(hidden_locally,0)=0 AND COALESCE(is_local_duplicate,0)=0"
+            )?,
+            oncle_memberships: count(
+                "SELECT COUNT(*) FROM memberships ms INNER JOIN members m ON m.id = ms.member_id WHERE m.center = 'ONCLE' AND m.deleted_at IS NULL AND COALESCE(m.hidden_locally,0)=0 AND COALESCE(m.is_local_duplicate,0)=0"
+            ).unwrap_or(0),
+            grabit_memberships: count(
+                "SELECT COUNT(*) FROM memberships ms INNER JOIN members m ON m.id = ms.member_id WHERE m.center = 'GRABIT' AND m.deleted_at IS NULL AND COALESCE(m.hidden_locally,0)=0 AND COALESCE(m.is_local_duplicate,0)=0"
+            ).unwrap_or(0),
+            oncle_hidden: count(
+                "SELECT COUNT(*) FROM members WHERE center = 'ONCLE' AND (COALESCE(hidden_locally,0)=1 OR COALESCE(is_local_duplicate,0)=1)"
+            ).unwrap_or(0),
+            grabit_hidden: count(
+                "SELECT COUNT(*) FROM members WHERE center = 'GRABIT' AND (COALESCE(hidden_locally,0)=1 OR COALESCE(is_local_duplicate,0)=1)"
+            ).unwrap_or(0),
+            oncle_local_duplicate: count(
+                "SELECT COUNT(*) FROM members WHERE center = 'ONCLE' AND COALESCE(is_local_duplicate,0)=1"
+            ).unwrap_or(0),
+            grabit_local_duplicate: count(
+                "SELECT COUNT(*) FROM members WHERE center = 'GRABIT' AND COALESCE(is_local_duplicate,0)=1"
+            ).unwrap_or(0),
+        })
+    }).map_err(|e| e.to_string())
+}

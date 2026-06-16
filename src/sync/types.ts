@@ -27,6 +27,13 @@ export interface SyncRunResult {
   message?: string;
 }
 
+export interface PullCenterDiagnostics {
+  serverCount: number;
+  upsertAttempt: number;
+  upsertSuccess: number;
+  mappingFail: number;
+}
+
 export interface PullRunResult {
   importedMembers: number;
   importedMemberships: number;
@@ -37,4 +44,5 @@ export interface PullRunResult {
   errors: string[];
   warnings: string[];
   message?: string;
+  pullDiagnostics?: Record<string, PullCenterDiagnostics>;
 }

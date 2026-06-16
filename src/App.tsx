@@ -123,6 +123,14 @@ export default function App() {
       setAllowedCenterIds(undefined);
       return;
     }
+    // Guard: while roles are still loading, don't pass an empty array —
+    // that would cause pullFromSupabase to abort with "센터 권한 없음" before
+    // roles have resolved. Keep undefined (= use fallback all-centers) until
+    // we have a confirmed non-empty list or confirmed-empty after loading.
+    if (rolesLoading) {
+      setAllowedCenterIds(undefined);
+      return;
+    }
     if (accessibleCenters.length === 0) {
       setAllowedCenterIds([]);
       return;
@@ -134,7 +142,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [accessibleCenters, permissions.enforced]);
+  }, [accessibleCenters, permissions.enforced, rolesLoading]);
 
   const sync = useSync(auth.isAuthenticated, syncContext, allowedCenterIds);
 
@@ -937,6 +945,7 @@ export default function App() {
         syncOnline={sync.online}
         syncStatus={sync.status}
         syncBusy={sync.phase === "pushing" || sync.phase === "pulling"}
+        allowedCenterIds={allowedCenterIds}
         onPullFromSupabase={() => {
           sync
             .pullNow()
