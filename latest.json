@@ -1,11 +1,11 @@
 {
     "platforms":  {
                       "windows-x86_64":  {
-                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVR5ZHo3SHluQWNuR1ZhVXUrNUEvWFJHUDRvSlZhWGJlRUk4Mll4aTlGSnNhVWE5cXhXYmNXN1QxemxielJ6ekVGaUJwZjRwVXJNdmsvcWlVNVJEcnd3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxNDIxNDE1CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4zNF94NjQtc2V0dXAuZXhlCnVoTldhRlhCNUFXMTE2Z2NMaG1lb0hiUDVseTVheUFVekRkZm11eklMZjBrMHFoTFgxdkdLWk93SlIzWmpGTzcwenQ3cVN2RHFJUUdQMUFLMWNoSER3PT0K",
-                                             "url":  "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.34/ClimbCenterManager_1.0.34_x64-setup.exe"
+                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWRuQkl2UHQ5aWxuaXgydmVXZ1pMSnk3Tzl1b1RubEFJYjFycGxoTFo0RjBvMGpHQWZ5Q0s4T08yK3B4Q25QNnZrQWhndkllRlgrZ2ZnTmlJYmNIOEE0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxNTkzNTUyCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4zNV94NjQtc2V0dXAuZXhlClRucWYyLzVnWXdYUHJUM3F0NUtVejhQd2VHWFkrdGpveFMyZzFGMWs3ZGNUV0JQSFc5ckprOGRDc3BZbjExcHdsNHRwUkZBTk9EWitRVk9IelZoUkRnPT0K",
+                                             "url":  "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.35/ClimbCenterManager_1.0.35_x64-setup.exe"
                                          }
                   },
-    "pub_date":  "2026-06-13T00:00:00Z",
-    "version":  "1.0.34",
-    "notes":  "Supabase 불러오기를 로그인 계정의 센터 권한(allowed_center_codes) 기준으로 제한, ONCLE/GRABIT 교차 표시 문제 근본 수정"
+    "pub_date":  "2026-06-16T00:00:00Z",
+    "version":  "1.0.35",
+    "notes":  "동기화 검증 리포트 추가, 로그인 계정 기준 pull 범위 진단 강화, ONCLE/GRABIT 서버-local-화면 단계별 카운트 검증 추가"
 }
