@@ -1,11 +1,11 @@
 {
-    "platforms":  {
-                      "windows-x86_64":  {
-                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWFiL2k2S3RYb29qcGRtaldZV1BOUUhscVprSm1OVEd2TjEyd0JoQTBOcTl6SnpzbWdQaDNyY042KzMxbE5LdUFrY09qR3FBQ011NVFvamh6bzkrUXdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxNTk0Njk5CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4zNl94NjQtc2V0dXAuZXhlCnNpMG8wZEdXR3E0RlJPNVpMMGJyQnpGR2szbXZrRWY0Tkg5MnBLZ1lDNlNIVElWaWluWkVmL1NzUW80Z281ZlZlYTVmcGtod3lrTGI4aFdBekFHa0JRPT0K",
-                                             "url":  "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.36/ClimbCenterManager_1.0.36_x64-setup.exe"
-                                         }
-                  },
-    "pub_date":  "2026-06-16T00:00:00Z",
-    "version":  "1.0.36",
-    "notes":  "서버 기준 강제 불러오기 추가, 서버-local-화면 count 불일치 자동 감지, auto-pull 재시도 로직 강화, pull 단계별 로그 개선"
+  "version": "1.0.37",
+  "pub_date": "2026-06-16T00:00:00Z",
+  "notes": "서버 기준 강제 불러오기 추가, 서버-local-화면 count 불일치 자동 감지, auto-pull 재시도 로직 강화, pull 단계별 로그 개선, 설정 화면 빌드 날짜/커밋 표시 추가",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWNtekNjY1VjaVdIL0xsVUtZcEFIaFRmVWhpeTdLdUt4bjB6VkdrWFZ0SThZK0RIVlBoMzEzQ3FMZVZuV0JSUmFaVUhYZFR1ZFRBRmpIbi8zOHAzYlFVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxNTk2MjQ5CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4zN194NjQtc2V0dXAuZXhlCmhTb2dqMFpMYU14a0dabGVKSU5lYlViNS9DaHhhNDYwVWk3L0d1RGxseEdQZnBhT0pxWGZ2WExvbEZjaTBISHlFSEdlNmNxL0pwNTkvMk1sQWpuWURBPT0K",
+      "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.37/ClimbCenterManager_1.0.37_x64-setup.exe"
+    }
+  }
 }
