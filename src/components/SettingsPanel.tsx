@@ -728,18 +728,29 @@ export function SettingsPanel({
                   </button>
                 )}
               </div>
-              {forcePullResult && (
-                <div className={`mt-3 rounded-xl border p-3 text-[11px] ${forcePullResult.warning ? "border-amber-500/40 bg-amber-500/10 text-amber-600" : "border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]"}`}>
-                  <div className="font-semibold text-[var(--text)]">강제 불러오기 결과</div>
-                  <div>서버 회원: <span className="font-semibold text-[var(--text)]">{forcePullResult.serverCount}명</span></div>
-                  <div>로컬 반영: <span className="font-semibold text-[var(--text)]">{forcePullResult.localCount}명</span></div>
-                  <div>화면 표시: <span className="font-semibold text-[var(--text)]">{forcePullResult.displayCount}명</span></div>
-                  {forcePullResult.warning && (
-                    <div className="mt-1 font-semibold">{forcePullResult.warning}</div>
-                  )}
-                  <div className="mt-1 text-[var(--muted)]">{forcePullResult.message}</div>
-                </div>
-              )}
+              {forcePullResult && (() => {
+                const isFailed = forcePullResult.serverCount > 0 && forcePullResult.localCount === 0;
+                const isWarning = !isFailed && (forcePullResult.warning || (forcePullResult.serverCount > 0 && forcePullResult.localCount < forcePullResult.serverCount * 0.95));
+                const borderClass = isFailed
+                  ? "border-red-500/40 bg-red-500/10 text-red-600"
+                  : isWarning
+                  ? "border-amber-500/40 bg-amber-500/10 text-amber-600"
+                  : "border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]";
+                return (
+                  <div className={`mt-3 rounded-xl border p-3 text-[11px] ${borderClass}`}>
+                    <div className={`font-semibold ${isFailed ? "text-red-600" : "text-[var(--text)]"}`}>
+                      {isFailed ? "강제 불러오기 실패" : "강제 불러오기 결과"}
+                    </div>
+                    <div>서버 회원: <span className="font-semibold text-[var(--text)]">{forcePullResult.serverCount}명</span></div>
+                    <div>로컬 반영: <span className={`font-semibold ${isFailed ? "text-red-600" : "text-[var(--text)]"}`}>{forcePullResult.localCount}명</span></div>
+                    <div>화면 표시: <span className="font-semibold text-[var(--text)]">{forcePullResult.displayCount}명</span></div>
+                    {forcePullResult.warning && (
+                      <div className="mt-1 font-semibold">{forcePullResult.warning}</div>
+                    )}
+                    <div className="mt-1">{forcePullResult.message}</div>
+                  </div>
+                );
+              })()}
 
               {verifyReport && (
                 <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 text-[11px]">

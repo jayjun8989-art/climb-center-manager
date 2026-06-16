@@ -884,28 +884,38 @@ export async function pullFromSupabase(options?: {
     importedLockers: number;
     updatedMembers: number;
     skipped: number;
+    failedMembers?: number;
+    failedMemberships?: number;
+    firstError?: string | null;
   };
 
   try {
-    console.debug("[pull] import_pull_snapshot_cmd payload", snapshot);
+    console.debug("[pull] import_pull_snapshot_cmd 시작 · members=%d memberships=%d", snapshot.members.length, snapshot.memberships.length);
     importResult = await invokeCommand("import_pull_snapshot_cmd", { snapshot });
+    console.info("[pull] import_pull_snapshot_cmd 완료:", importResult);
   } catch (error) {
     const detail = formatSyncError(error);
-    console.error("[pull] import_pull_snapshot_cmd failed", error, snapshot);
+    console.error("[pull] import_pull_snapshot_cmd 실패", error);
     return emptyResult({
       errors: [detail],
       warnings,
-      message: `Supabase 데이터 불러오기에 실패했습니다: ${detail}`,
+      message: `강제 불러오기 실패: SQLite upsert 오류 — ${detail}`,
       pullDiagnostics,
     });
   }
 
-  // Record upsert success counts
   const totalServerCount = Object.values(pullDiagnostics).reduce((sum, d) => sum + d.serverCount, 0);
   const totalLocal = importResult.importedMembers + importResult.updatedMembers;
+  const failedMembers = importResult.failedMembers ?? 0;
+
+  // Set upsertSuccess = totalLocal distributed proportionally across centers
   for (const cid of centerIds) {
     if (pullDiagnostics[cid]) {
       pullDiagnostics[cid].upsertAttempt = pullDiagnostics[cid].serverCount;
+      // Approximate per-center success if multiple centers; for single center it's exact.
+      pullDiagnostics[cid].upsertSuccess = centerIds.length === 1
+        ? totalLocal
+        : Math.round((pullDiagnostics[cid].serverCount / Math.max(totalServerCount, 1)) * totalLocal);
     }
   }
 
@@ -917,23 +927,38 @@ export async function pullFromSupabase(options?: {
     importResult.importedAttendance +
     importResult.importedLockers;
 
-  // Build diagnostic messages per center
+  // Collect upsert errors
+  if (importResult.firstError) {
+    errors.push(`upsert 실패 (첫 번째): ${importResult.firstError}`);
+  }
+  if (failedMembers > 0) {
+    const errMsg = `members upsert 실패 ${failedMembers}건 · 성공 ${totalLocal}건`;
+    errors.push(errMsg);
+    console.warn("[pull]", errMsg);
+  }
+
   const diagMessages: string[] = [];
   for (const [cid, diag] of Object.entries(pullDiagnostics)) {
     const centerCode = centerCodeFromId(cid) ?? cid.slice(0, 8);
-    if (diag.serverCount > 0 && diag.upsertSuccess === 0 && diag.mappingFail === 0) {
-      diagMessages.push(`불러오기 경고: 서버 ${centerCode} 회원 ${diag.serverCount}명이 있으나 로컬에 0명 저장됨`);
+    if (diag.serverCount > 0 && diag.upsertSuccess === 0) {
+      diagMessages.push(`불러오기 실패: 서버 ${centerCode} 회원 ${diag.serverCount}명 → 로컬 0명 저장됨`);
     } else if (diag.serverCount === 0) {
-      diagMessages.push(`불러오기 경고: 서버 ${centerCode} 회원 0명 (RLS 권한 오류 또는 데이터 없음)`);
+      diagMessages.push(`불러오기 경고: 서버 ${centerCode} 회원 0명`);
     } else {
-      diagMessages.push(`불러오기 완료: 서버 ${centerCode} 회원 ${diag.serverCount}명 확인`);
+      diagMessages.push(`불러오기 완료: 서버 ${centerCode} 회원 ${diag.serverCount}명 → 로컬 ${diag.upsertSuccess}명 저장`);
     }
   }
-  console.info("[pull] 결과:", { totalServerCount, totalLocal, importResult, diagMessages });
+  console.info("[pull] 결과:", { totalServerCount, totalLocal, failedMembers, importResult, diagMessages });
 
   let message: string;
-  if (totalImported > 0 || importResult.updatedMembers > 0) {
-    message = `불러오기 완료: 회원 ${importResult.importedMembers + importResult.updatedMembers}명 · 출석 ${importResult.importedAttendance}건 · 락카 ${importResult.importedLockers}건`;
+  if (totalServerCount > 0 && totalLocal === 0) {
+    const firstErr = importResult.firstError ?? errors[0] ?? "SQLite 컬럼 누락 또는 constraint 오류";
+    message = `강제 불러오기 실패: 서버 회원 ${totalServerCount}명을 조회했지만 로컬 DB에 0명만 반영되었습니다. 원인: ${firstErr}`;
+  } else if (totalImported > 0 || importResult.updatedMembers > 0) {
+    message = `불러오기 완료: 회원 ${totalLocal}명 · 출석 ${importResult.importedAttendance}건 · 락카 ${importResult.importedLockers}건`;
+    if (failedMembers > 0) {
+      message += ` (실패 ${failedMembers}건)`;
+    }
   } else {
     message = "변경할 데이터가 없습니다.";
   }

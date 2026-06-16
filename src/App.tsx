@@ -993,8 +993,17 @@ export default function App() {
           } catch {
             // ignore
           }
-          const centerLabel = center;
-          const message = `강제 불러오기 완료: 서버 ${centerLabel} 회원 ${serverCount}명 확인 → 로컬 ${localCount}명 반영 → 화면 표시 ${displayCount}명`;
+          // Use engine's message when it detected a failure (0 local from non-zero server)
+          let message: string;
+          if (serverCount > 0 && localCount === 0) {
+            // engine.ts sets result.message to the detailed failure reason
+            message = result.message;
+          } else {
+            message = `강제 불러오기 완료: 서버 ${center} 회원 ${serverCount}명 확인 → 로컬 ${localCount}명 반영 → 화면 표시 ${displayCount}명`;
+          }
+          if (result.errors && result.errors.length > 0) {
+            console.warn("[App] 강제 불러오기 오류:", result.errors);
+          }
           return { serverCount, localCount, displayCount, message };
         }}
         onPushToSupabase={

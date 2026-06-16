@@ -46,6 +46,10 @@ pub fn ensure_local_schema(conn: &Connection) -> SqlResult<()> {
         add_column_if_missing(conn, table, "remote_updated_at", "TEXT")?;
     }
 
+    // phone_normalized was in create_v2_schema but not in add_column migrations,
+    // causing all upsert INSERT/UPDATE to fail on existing v1 DBs.
+    add_column_if_missing(conn, "members", "phone_normalized", "TEXT")?;
+
     add_column_if_missing(conn, "members", "address", "TEXT")?;
     add_column_if_missing(conn, "members", "locker_number", "TEXT")?;
     add_column_if_missing(conn, "members", "locker_status", "TEXT NOT NULL DEFAULT 'empty'")?;

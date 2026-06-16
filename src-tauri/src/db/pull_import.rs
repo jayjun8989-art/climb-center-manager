@@ -97,6 +97,9 @@ pub struct PullImportResult {
     pub imported_lockers: i64,
     pub updated_members: i64,
     pub skipped: i64,
+    pub failed_members: i64,
+    pub failed_memberships: i64,
+    pub first_error: Option<String>,
 }
 
 pub fn count_active_members(state: &AppState) -> Result<i64, DbError> {
@@ -354,8 +357,13 @@ pub fn import_pull_snapshot(state: &AppState, snapshot: PullSnapshot) -> Result<
     let mut imported_attendance = 0_i64;
     let mut imported_lockers = 0_i64;
     let mut skipped = 0_i64;
+    let mut failed_members = 0_i64;
+    let mut failed_memberships = 0_i64;
+    let mut first_error: Option<String> = None;
 
     state.with_conn(|conn| {
+        // ensure_local_schema adds phone_normalized and other missing columns
+        // before any upsert is attempted — this is the fix for 0-member upsert.
         crate::db::ensure_local_schema(conn).map_err(DbError::from)?;
 
         let tx = conn.transaction()?;
@@ -372,16 +380,33 @@ pub fn import_pull_snapshot(state: &AppState, snapshot: PullSnapshot) -> Result<
                 skipped += 1;
                 continue;
             }
-            let (local_id, inserted) = upsert_member(&tx, row).map_err(|error| {
-                DbError::Message(format!("members 저장 실패 ({}/{}): {}", row.remote_id, row.name, error))
-            })?;
-            member_ids.insert(row.remote_id.clone(), local_id);
-            if inserted {
-                imported_members += 1;
-            } else {
-                updated_members += 1;
+            match upsert_member(&tx, row) {
+                Ok((local_id, inserted)) => {
+                    member_ids.insert(row.remote_id.clone(), local_id);
+                    if inserted {
+                        imported_members += 1;
+                    } else {
+                        updated_members += 1;
+                    }
+                }
+                Err(error) => {
+                    let msg = format!(
+                        "members 저장 실패 (remote_id={} name={} center={}): {}",
+                        row.remote_id, row.name, row.center, error
+                    );
+                    eprintln!("[pull_import] {}", msg);
+                    if first_error.is_none() {
+                        first_error = Some(msg);
+                    }
+                    failed_members += 1;
+                }
             }
         }
+
+        eprintln!(
+            "[pull_import] members: imported={} updated={} failed={} skipped={}",
+            imported_members, updated_members, failed_members, skipped
+        );
 
         for row in &snapshot.memberships {
             if !has_remote_id(&row.remote_id) {
@@ -405,15 +430,24 @@ pub fn import_pull_snapshot(state: &AppState, snapshot: PullSnapshot) -> Result<
                 skipped += 1;
                 continue;
             };
-            let (local_id, inserted) = upsert_membership(&tx, row, member_local_id).map_err(|error| {
-                DbError::Message(format!(
-                    "memberships 저장 실패 ({}): {}",
-                    row.remote_id, error
-                ))
-            })?;
-            membership_ids.insert(row.remote_id.clone(), local_id);
-            if inserted {
-                imported_memberships += 1;
+            match upsert_membership(&tx, row, member_local_id) {
+                Ok((local_id, inserted)) => {
+                    membership_ids.insert(row.remote_id.clone(), local_id);
+                    if inserted {
+                        imported_memberships += 1;
+                    }
+                }
+                Err(error) => {
+                    let msg = format!(
+                        "memberships 저장 실패 (remote_id={}): {}",
+                        row.remote_id, error
+                    );
+                    eprintln!("[pull_import] {}", msg);
+                    if first_error.is_none() {
+                        first_error = Some(msg);
+                    }
+                    failed_memberships += 1;
+                }
             }
         }
 
@@ -527,5 +561,8 @@ pub fn import_pull_snapshot(state: &AppState, snapshot: PullSnapshot) -> Result<
         imported_lockers,
         updated_members,
         skipped,
+        failed_members,
+        failed_memberships,
+        first_error,
     })
 }
