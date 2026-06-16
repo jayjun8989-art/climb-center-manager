@@ -997,7 +997,7 @@ export default function App() {
           let message: string;
           if (serverCount > 0 && localCount === 0) {
             // engine.ts sets result.message to the detailed failure reason
-            message = result.message;
+            message = result.message ?? `강제 불러오기 실패: 서버 회원 ${serverCount}명을 조회했지만 로컬 DB에 0명만 반영되었습니다.`;
           } else {
             message = `강제 불러오기 완료: 서버 ${center} 회원 ${serverCount}명 확인 → 로컬 ${localCount}명 반영 → 화면 표시 ${displayCount}명`;
           }
