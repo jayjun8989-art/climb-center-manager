@@ -34,7 +34,7 @@ import { fetchMyCenterRoles } from "./lib/supabase/roles";
 import { resolveCenterIdsForCenters } from "./lib/supabase/centers";
 import { checkForUpdate } from "./lib/updater";
 import { formatAppError, logAppError } from "./utils/errors";
-import { resolveMemberLocalId } from "./utils/member";
+import { memberMatchesGroupFilter, resolveMemberLocalId } from "./utils/member";
 import type {
   Center,
   DashboardStats,
@@ -208,12 +208,17 @@ export default function App() {
         page,
         pageSize,
       });
-      const deduped = normalizeMembers(result.members);
+      let deduped = normalizeMembers(result.members);
+      // Safety net: apply client-side filter after DB fetch to handle any
+      // SQL/serde edge cases (e.g. 'general' members with junior memberships).
+      if (memberGroup === "regular" || memberGroup === "junior") {
+        deduped = deduped.filter((m) => memberMatchesGroupFilter(m, memberGroup));
+      }
       const dedupedCount = deduped.length !== result.members.length
-        ? result.total - (result.members.length - deduped.length)
+        ? Math.min(result.total, deduped.length + (result.total - result.members.length))
         : result.total;
       setMembers(deduped);
-      setTotal(dedupedCount);
+      setTotal(deduped.length < dedupedCount ? deduped.length : dedupedCount);
       setSelectedMember((current) => {
         if (!current) return null;
         return deduped.find((member) => member.id === current.id) ?? current;
@@ -662,7 +667,7 @@ export default function App() {
           backupInfo={backupInfo}
           permissions={permissions}
           accessibleCenters={accessibleCenters}
-          showMemberFilters={activeView === "members"}
+          showMemberFilters={activeView === "members" || activeView === "memberships"}
           showStats={activeView === "members" || activeView === "expiring"}
         />
 
