@@ -175,9 +175,11 @@ pub fn backfill_member_remote_ids_from_id_map(state: &AppState) -> Result<(i64, 
                    AND (m.remote_id IS NULL OR m.remote_id = '')
                    AND i.remote_id IS NOT NULL AND i.remote_id != ''",
             )?;
-            stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            let collected: Vec<(i64, String)> = stmt
+                .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
                 .filter_map(|r| r.ok())
-                .collect()
+                .collect();
+            collected
         };
 
         let mut backfilled: i64 = 0;
