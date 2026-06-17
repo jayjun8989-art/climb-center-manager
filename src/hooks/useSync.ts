@@ -143,14 +143,14 @@ export function useSync(enabled: boolean, syncContext: SyncErrorContext, centerI
       return;
     }
     if (!configured || autoPullAttemptedRef.current) return;
-    // Only mark attempted AFTER pull runs — not before. This allows retry if
-    // centerIds were not yet resolved on the first render cycle.
     if (centerIds === undefined) {
       // centerIds not yet resolved; wait for next render with resolved value
       return;
     }
     autoPullAttemptedRef.current = true;
-    pullNow({ onlyIfEmpty: true, centerIds })
+    // Always pull on startup (no onlyIfEmpty) so server changes are reflected
+    // on every app launch, regardless of local data state.
+    pullNow({ centerIds })
       .then((result) => {
         if (
           result &&

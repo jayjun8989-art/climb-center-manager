@@ -157,6 +157,85 @@ pub struct PullImportResult {
     pub first_error: Option<String>,
 }
 
+/// Backfill members.remote_id from id_map for rows where remote_id is NULL.
+/// Called automatically after every pull to repair rows that slipped through
+/// the UPDATE path without getting their remote_id written to the members column.
+/// Returns (backfilled_count, conflict_count).
+pub fn backfill_member_remote_ids_from_id_map(state: &AppState) -> Result<(i64, i64), DbError> {
+    state.with_conn(|conn| {
+        let tx = conn.transaction()?;
+
+        // Find members whose remote_id is NULL but id_map has a mapping
+        let rows: Vec<(i64, String)> = {
+            let mut stmt = tx.prepare(
+                "SELECT m.id, i.remote_id
+                 FROM members m
+                 JOIN id_map i ON i.entity_type = 'member' AND i.local_id = m.id
+                 WHERE m.deleted_at IS NULL
+                   AND (m.remote_id IS NULL OR m.remote_id = '')
+                   AND i.remote_id IS NOT NULL AND i.remote_id != ''",
+            )?;
+            stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+                .filter_map(|r| r.ok())
+                .collect()
+        };
+
+        let mut backfilled: i64 = 0;
+        let mut conflicts: i64 = 0;
+
+        for (local_id, remote_id) in &rows {
+            // Double-check that members.remote_id is still NULL (race-free inside tx)
+            let current: Option<String> = tx
+                .query_row(
+                    "SELECT remote_id FROM members WHERE id = ?1",
+                    [local_id],
+                    |r| r.get(0),
+                )
+                .optional()?
+                .flatten();
+
+            if current.as_deref().map(|s| !s.is_empty()).unwrap_or(false) {
+                // Was filled between our SELECT and this point — skip
+                conflicts += 1;
+                continue;
+            }
+
+            tx.execute(
+                "UPDATE members SET remote_id = ?1, sync_status = 'synced' WHERE id = ?2",
+                params![remote_id, local_id],
+            )?;
+
+            // Remove any pending member insert/update queue items now that remote_id is set
+            tx.execute(
+                "DELETE FROM sync_queue WHERE entity_type = 'member' AND entity_local_id = ?1
+                 AND operation IN ('insert', 'update')",
+                [local_id],
+            )?;
+
+            // Unblock attendance items that were waiting for this member's remote_id
+            tx.execute(
+                "UPDATE sync_queue SET last_error = NULL, retry_count = 0
+                 WHERE entity_type = 'attendance' AND last_error IS NOT NULL
+                   AND json_extract(payload_json, '$.local_member_id') = ?1",
+                [local_id],
+            )?;
+
+            eprintln!(
+                "[backfill] local_id={} remote_id={} — remote_id restored from id_map",
+                local_id, remote_id
+            );
+            backfilled += 1;
+        }
+
+        tx.commit()?;
+        eprintln!(
+            "[backfill] complete: backfilled={} conflicts={}",
+            backfilled, conflicts
+        );
+        Ok((backfilled, conflicts))
+    })
+}
+
 pub fn count_active_members(state: &AppState) -> Result<i64, DbError> {
     state.with_conn(|conn| {
         conn.query_row(
@@ -275,13 +354,39 @@ fn upsert_member(
     let phone_norm = phone_normalized(&row.phone);
 
     if let Some(local_id) = find_local_member_id(conn, row)? {
+        // Check existing remote_id to detect conflicts before overwriting
+        let existing_remote_id: Option<String> = conn
+            .query_row(
+                "SELECT remote_id FROM members WHERE id = ?1",
+                [local_id],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(DbError::from)?
+            .flatten();
+
+        let has_conflict = existing_remote_id
+            .as_deref()
+            .map(|s| !s.is_empty() && s != row.remote_id.as_str())
+            .unwrap_or(false);
+
+        if has_conflict {
+            eprintln!(
+                "[pull_import] remote_id conflict: local_id={} name={} existing={} incoming={} — keeping existing",
+                local_id, row.name,
+                existing_remote_id.as_deref().unwrap_or(""),
+                row.remote_id
+            );
+        }
+
         conn.execute(
             "UPDATE members SET
                 name = ?1, phone = ?2, phone_normalized = ?3, member_type = ?4, center = ?5,
                 parent_name = ?6, parent_phone = ?7, memo = ?8, address = ?9, status = ?10,
                 member_no = COALESCE(member_no, ?13),
                 updated_at = ?11, sync_status = 'synced', remote_updated_at = ?11,
-                hidden_locally = 0, is_local_duplicate = 0
+                hidden_locally = 0, is_local_duplicate = 0,
+                remote_id = CASE WHEN (remote_id IS NULL OR remote_id = '') THEN ?14 ELSE remote_id END
              WHERE id = ?12",
             params![
                 row.name.trim(),
@@ -297,6 +402,7 @@ fn upsert_member(
                 row.updated_at,
                 local_id,
                 row.member_no,
+                row.remote_id,
             ],
         )?;
         conn.execute(
@@ -609,6 +715,13 @@ pub fn import_pull_snapshot(state: &AppState, snapshot: PullSnapshot) -> Result<
         refresh_all_statuses(conn)?;
         Ok(())
     })?;
+
+    // After transaction commits, backfill any members whose remote_id is still NULL
+    // but whose id_map entry was just written (covers the UPDATE fallback path).
+    let (backfilled, _) = backfill_member_remote_ids_from_id_map(state)
+        .unwrap_or_else(|e| { eprintln!("[pull_import] backfill failed: {}", e); (0, 0) });
+
+    eprintln!("[pull_import] post-pull backfill: {}", backfilled);
 
     Ok(PullImportResult {
         imported_members,

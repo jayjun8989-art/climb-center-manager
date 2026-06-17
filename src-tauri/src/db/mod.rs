@@ -19,7 +19,8 @@ pub use ensure_schema::ensure_local_schema;
 pub use locker::list_center_lockers;
 pub use ops::*;
 pub use pull_import::{
-    count_active_members, import_pull_snapshot, PullImportResult, PullSnapshot,
+    backfill_member_remote_ids_from_id_map, count_active_members, import_pull_snapshot,
+    PullImportResult, PullSnapshot,
 };
 pub use sync_local::{
     complete_member_push, enqueue_entity_op, enqueue_sync_item, fetch_sync_status,

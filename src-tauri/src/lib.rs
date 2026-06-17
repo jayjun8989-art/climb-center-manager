@@ -126,6 +126,7 @@ pub fn run() {
             commands::get_attendance_mismatch_diagnostic_cmd,
             commands::correct_member_remaining_count_cmd,
             commands::repair_status_mismatch_cmd,
+            commands::backfill_member_remote_ids_cmd,
             commands::requeue_member_for_upload_cmd,
             commands::exclude_member_from_upload_cmd,
             commands::set_member_hidden_locally_cmd,

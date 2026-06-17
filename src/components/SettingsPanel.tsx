@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type { AttendanceMismatchDiagnostic, BackupInfo, Center, CenterMappingDiagnosticRow, DuplicateMemberCandidateGroup, LocalDuplicateCleanupSummary, MemberMatchEntry, ReportInfo, ServerCenterConsistency, ServerMatchReport, StorageInfo, SyncDiagnostics, UploadVerificationReport } from "../types";
 import { fetchCenterMappingDiagnostics, buildCenterMappingCorrections } from "../sync/centerMappingDiagnostics";
 import type { SyncStatus } from "../sync/types";
+import { formatDateTimeSeoul } from "../lib/roster/time";
 import { checkForUpdate, getAppVersion, installUpdate, runUpdateDiagnostic, UPDATER_ENDPOINT, type UpdateCheckOutcome, type UpdateDiagnosticResult } from "../lib/updater";
 import type { Update } from "@tauri-apps/plugin-updater";
 import { api } from "../api/client";
@@ -1125,8 +1126,8 @@ export function SettingsPanel({
                     <div>출석: <span className="font-semibold">{serverConsistency.local_attendance}</span></div>
                     <div>대기 중: <span className={`font-semibold ${serverConsistency.local_pending > 0 ? "text-amber-500" : ""}`}>{serverConsistency.local_pending}</span></div>
                     <div>실패: <span className={`font-semibold ${serverConsistency.local_failed > 0 ? "text-red-500" : ""}`}>{serverConsistency.local_failed}</span></div>
-                    <div>마지막 서버→PC: <span className="font-semibold">{serverConsistency.last_pull_at ?? "없음"}</span></div>
-                    <div>마지막 PC→서버: <span className="font-semibold">{serverConsistency.last_push_at ?? "없음"}</span></div>
+                    <div>마지막 서버→PC: <span className="font-semibold">{formatDateTimeSeoul(serverConsistency.last_pull_at) || "없음"}</span></div>
+                    <div>마지막 PC→서버: <span className="font-semibold">{formatDateTimeSeoul(serverConsistency.last_push_at) || "없음"}</span></div>
                   </div>
                 </div>
               )}
@@ -1229,12 +1230,12 @@ export function SettingsPanel({
             </p>
             {canSyncPush && (
               <p className="mt-1">
-                마지막 업로드: {syncStatus?.last_push_at ?? "-"}
+                마지막 업로드: {formatDateTimeSeoul(syncStatus?.last_push_at) || "-"}
               </p>
             )}
             {canSyncPull && (
               <p className="mt-1">
-                마지막 불러오기: {syncStatus?.last_pull_at ?? "-"}
+                마지막 불러오기: {formatDateTimeSeoul(syncStatus?.last_pull_at) || "-"}
               </p>
             )}
             {canBackupRestore && backupInfo?.last_backup_at && (

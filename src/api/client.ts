@@ -397,4 +397,8 @@ export const api = {
   getServerCenterConsistency(center: Center): Promise<ServerCenterConsistency> {
     return getServerCenterConsistency(center);
   },
+
+  backfillMemberRemoteIds(): Promise<[number, number]> {
+    return invokeCommand<[number, number]>("backfill_member_remote_ids_cmd");
+  },
 };

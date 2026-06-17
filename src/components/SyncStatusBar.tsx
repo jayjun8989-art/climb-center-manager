@@ -1,5 +1,6 @@
 import { Cloud, CloudOff, LoaderCircle, LogOut, RefreshCw, Wrench } from "lucide-react";
 import type { SyncPhase, SyncRunResult, SyncStatus } from "../sync/types";
+import { formatDateTimeSeoul } from "../lib/roster/time";
 
 interface SyncStatusBarProps {
   configured: boolean;
@@ -64,7 +65,7 @@ export function SyncStatusBar({
           <span className="text-xs text-[var(--muted)]">
             대기 {pending}건
             {failed > 0 ? ` · 실패 ${failed}건` : ""}
-            {status?.last_push_at ? ` · 마지막 동기화 ${status.last_push_at}` : ""}
+            {status?.last_push_at ? ` · 마지막 동기화 ${formatDateTimeSeoul(status.last_push_at)}` : ""}
           </span>
         </div>
 

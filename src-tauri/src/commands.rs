@@ -1,7 +1,8 @@
 use crate::backup::{create_backup, get_backup_info, restore_backup};
 use crate::db::{
     cancel_attendance, check_attendance_with_options, complete_member_push, correct_member_remaining_count,
-    count_active_members, create_member, delete_member, enqueue_sync_item, ensure_local_schema,
+    backfill_member_remote_ids_from_id_map, count_active_members, create_member, delete_member,
+    enqueue_sync_item, ensure_local_schema,
     get_attendance_mismatch_diagnostic, get_upload_verification_report, has_attendance_today,
     has_attendance_on_date, import_pull_snapshot, list_center_lockers, get_attendance, get_dashboard_stats,
     cleanup_local_duplicates, find_duplicate_member_candidates, get_expiring_members, get_member_detail,
@@ -617,6 +618,13 @@ pub fn repair_status_mismatch_cmd(
     state: State<'_, AppState>,
 ) -> Result<i64, String> {
     repair_status_mismatch(&state).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn backfill_member_remote_ids_cmd(
+    state: State<'_, AppState>,
+) -> Result<(i64, i64), String> {
+    backfill_member_remote_ids_from_id_map(&state).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
