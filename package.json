@@ -1,7 +1,7 @@
 {
   "name": "climb-center-manager",
   "private": true,
-  "version": "1.0.46",
+  "version": "1.0.47",
   "type": "module",
   "description": "?�라?�밍 ?�터 ?�원관�??�로그램",
   "scripts": {

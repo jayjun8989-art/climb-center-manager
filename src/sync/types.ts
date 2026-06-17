@@ -28,7 +28,8 @@ export interface SyncRunResult {
 }
 
 export interface PullCenterDiagnostics {
-  serverCount: number;
+  serverCount: number;   // rows actually fetched (after pagination)
+  serverTotal?: number;  // COUNT from server (no row limit) — may be undefined
   upsertAttempt: number;
   upsertSuccess: number;
   mappingFail: number;
@@ -45,4 +46,6 @@ export interface PullRunResult {
   warnings: string[];
   message?: string;
   pullDiagnostics?: Record<string, PullCenterDiagnostics>;
+  /** Total rows fetched from server across all pages (may differ from COUNT if RLS limits results) */
+  fetchedTotal?: number;
 }

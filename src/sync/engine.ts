@@ -20,6 +20,41 @@ import type { PullCenterDiagnostics, PullRunResult, SyncQueueItem, SyncRunResult
 
 const DEVICE_ID_KEY = "device_id";
 
+// ---------------------------------------------------------------------------
+// Pagination helper — fetches all rows from Supabase bypassing the 1000-row
+// PostgREST default limit by issuing repeated .range() requests.
+// ---------------------------------------------------------------------------
+const PULL_PAGE_SIZE = 500;
+
+async function fetchAllPages<T>(
+  queryFn: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+): Promise<T[]> {
+  const result: T[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await queryFn(from, from + PULL_PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    const rows = data ?? [];
+    result.push(...rows);
+    if (rows.length < PULL_PAGE_SIZE) break;
+    from += PULL_PAGE_SIZE;
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Test-data detection — blocks upload of clearly invalid/test member entries.
+// ---------------------------------------------------------------------------
+const TEST_DATA_NAMES = new Set(["ddd", "dddd", "dfdfd", "주니어", "주니어 1"]);
+const TEST_DATA_PHONES = new Set(["ddd", "ddff", "ㅎㅎㅎㅎ", "ㅈㅈㅈ"]);
+
+function isTestDataMember(name: string, phone: string | null | undefined): boolean {
+  return (
+    TEST_DATA_NAMES.has(name.trim()) ||
+    TEST_DATA_PHONES.has((phone ?? "").trim())
+  );
+}
+
 type MemberSyncPayload = MemberInput & {
   center: Center;
   center_id?: string;
@@ -424,8 +459,36 @@ export async function pushMemberQueueItem(
 
   const row = memberRowFromPayload(payload, centerId);
 
+  // Block upload of test/garbage data patterns
+  if (isTestDataMember(row.name, row.phone)) {
+    return {
+      ok: false,
+      error: formatSyncFailure(item, "등록 차단", {
+        message: `테스트 데이터로 감지됨 (이름: "${row.name}", 전화: "${row.phone ?? "없음"}") — 수동 확인 후 업로드 제외 처리가 필요합니다.`,
+      }, payload.center),
+    };
+  }
+
   try {
     if (operation === "insert") {
+      // Server duplicate check before inserting a new member
+      const phone = row.phone?.replace(/[^0-9]/g, "") ?? null;
+      if (phone && phone.length >= 7) {
+        const { count: dupCount } = await supabase
+          .from("members")
+          .select("*", { count: "exact", head: true })
+          .eq("center_id", centerId)
+          .like("phone", `%${phone.slice(-7)}%`)
+          .is("deleted_at", null);
+        if ((dupCount ?? 0) > 0) {
+          return {
+            ok: false,
+            error: formatSyncFailure(item, "등록 차단", {
+              message: `서버에 동일 연락처 후보 ${dupCount}명 존재 — 수동 확인 후 "서버 회원 매칭 연결"을 먼저 진행하세요.`,
+            }, payload.center),
+          };
+        }
+      }
       const data = await upsertRemoteMember(supabase, row, centerId, payload.phone);
       await upsertRemoteMembership(supabase, payload, data.id, centerId);
       await completeMemberPush(item.id, item.entity_local_id, data.id, data.updated_at);
@@ -646,7 +709,15 @@ export async function pushSyncQueue(syncContext?: SyncErrorContext): Promise<Syn
   const errors: string[] = [];
 
   // Step 1: process all "member" items first (includes membership upserts).
-  const memberItems = queue.filter((item) => item.entity_type === "member");
+  // Auto-push skips already-failed items (last_error !== null) to prevent
+  // retry storms that flood the server with duplicate test/garbage data.
+  const memberItems = queue.filter(
+    (item) => item.entity_type === "member" && item.last_error === null,
+  );
+  const memberItemsFailed = queue.filter(
+    (item) => item.entity_type === "member" && item.last_error !== null,
+  );
+  skipped += memberItemsFailed.length;
   const attendanceItems = queue.filter((item) => item.entity_type === "attendance");
   const otherItems = queue.filter(
     (item) => item.entity_type !== "member" && item.entity_type !== "attendance",
@@ -1022,35 +1093,38 @@ export async function pullFromSupabase(options?: {
     `[pull] 시작 · 계정: ${session.user.email} · centerIds: [${centerIds.join(", ")}]`,
   );
 
-  const membersRes = await supabase
-    .from("members")
-    .select(
-      "id, center_id, name, phone, address, member_type, parent_name, parent_phone, memo, status, created_at, updated_at, member_no",
-    )
-    .in("center_id", centerIds)
-    .is("deleted_at", null);
-  if (membersRes.error) {
-    const message = formatSyncError(membersRes.error);
-    console.error("[pull] members fetch failed", membersRes.error);
-    return emptyResult({
-      errors: [message],
-      message,
-      pullDiagnostics,
-    });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let membersRows: any[] = [];
+  try {
+    membersRows = await fetchAllPages((from, to) =>
+      supabase
+        .from("members")
+        .select(
+          "id, center_id, name, phone, address, member_type, parent_name, parent_phone, memo, status, created_at, updated_at, member_no",
+        )
+        .in("center_id", centerIds)
+        .is("deleted_at", null)
+        .range(from, to),
+    );
+  } catch (err) {
+    const message = formatSyncError(err);
+    console.error("[pull] members fetch failed", err);
+    return emptyResult({ errors: [message], message, pullDiagnostics });
   }
 
+  console.info(`[pull] 서버 회원 총 ${membersRows.length}명 페이지네이션 완료`);
+
   // Record server counts per center
-  for (const row of membersRes.data ?? []) {
+  for (const row of membersRows) {
     if (pullDiagnostics[row.center_id]) {
       pullDiagnostics[row.center_id].serverCount += 1;
     } else {
-      // center_id not in our map — mapping fail
       pullDiagnostics[row.center_id] = { serverCount: 1, upsertAttempt: 0, upsertSuccess: 0, mappingFail: 1 };
     }
   }
   console.info("[pull] 서버 회원 수 per center:", JSON.stringify(pullDiagnostics));
 
-  const memberIds = (membersRes.data ?? []).map((row) => row.id);
+  const memberIds = membersRows.map((row) => row.id);
   if (memberIds.length === 0) {
     console.warn(
       `[pull] 서버에서 0명 조회됨. centerIds=[${centerIds.join(", ")}] — RLS 권한 또는 데이터 없음.`,
@@ -1062,48 +1136,69 @@ export async function pullFromSupabase(options?: {
   const warnings: string[] = [];
   const errors: string[] = [];
 
-  const membershipsRes = await supabase
-    .from("memberships")
-    .select(
-      "id, member_id, center_id, membership_type, pass_type, start_date, end_date, total_count, used_count, remaining_count, status, price, created_at, updated_at",
-    )
-    .in("center_id", centerIds);
-  if (membershipsRes.error) {
-    const message = formatSyncError(membershipsRes.error);
-    console.warn("[pull] memberships fetch failed", membershipsRes.error);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let membershipsRows: any[] = [];
+  try {
+    membershipsRows = await fetchAllPages((from, to) =>
+      supabase
+        .from("memberships")
+        .select(
+          "id, member_id, center_id, membership_type, pass_type, start_date, end_date, total_count, used_count, remaining_count, status, price, created_at, updated_at",
+        )
+        .in("center_id", centerIds)
+        .range(from, to),
+    );
+    console.info(`[pull] 회원권 총 ${membershipsRows.length}건 페이지네이션 완료`);
+  } catch (err) {
+    const message = formatSyncError(err);
+    console.warn("[pull] memberships fetch failed", err);
     warnings.push(`회원권 데이터는 불러오지 못했습니다: ${message}`);
   }
 
-  const attendanceRes = await supabase
-    .from("attendance_logs")
-    .select(
-      "id, member_id, membership_id, center_id, checkin_at, attendance_type, deducted_count, memo, created_at",
-    )
-    .in("center_id", centerIds)
-    .is("canceled_at", null);
-  if (attendanceRes.error) {
-    const message = formatSyncError(attendanceRes.error);
-    console.warn("[pull] attendance fetch failed", attendanceRes.error);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let attendanceRows: any[] = [];
+  try {
+    attendanceRows = await fetchAllPages((from, to) =>
+      supabase
+        .from("attendance_logs")
+        .select(
+          "id, member_id, membership_id, center_id, checkin_at, attendance_type, deducted_count, memo, created_at",
+        )
+        .in("center_id", centerIds)
+        .is("canceled_at", null)
+        .range(from, to),
+    );
+    console.info(`[pull] 출석 총 ${attendanceRows.length}건 페이지네이션 완료`);
+  } catch (err) {
+    const message = formatSyncError(err);
+    console.warn("[pull] attendance fetch failed", err);
     warnings.push(`출석 데이터는 불러오지 못했습니다: ${message}`);
   }
 
-  const lockersRes = await supabase
-    .from("lockers")
-    .select("member_id, center_id, locker_number, status, start_date, end_date, memo")
-    .in("center_id", centerIds)
-    .not("member_id", "is", null);
-  if (lockersRes.error) {
-    const message = formatSyncError(lockersRes.error);
-    console.warn("[pull] lockers fetch failed", lockersRes.error);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let lockersRows: any[] = [];
+  try {
+    lockersRows = await fetchAllPages((from, to) =>
+      supabase
+        .from("lockers")
+        .select("member_id, center_id, locker_number, status, start_date, end_date, memo")
+        .in("center_id", centerIds)
+        .not("member_id", "is", null)
+        .range(from, to),
+    );
+    console.info(`[pull] 락카 총 ${lockersRows.length}건 페이지네이션 완료`);
+  } catch (err) {
+    const message = formatSyncError(err);
+    console.warn("[pull] lockers fetch failed", err);
     warnings.push(`락카 데이터는 불러오지 못했지만 회원관리 기능은 사용할 수 있습니다. (${message})`);
   }
 
   const snapshot = toInvokePullSnapshot(
     buildPullSnapshot({
-      members: membersRes.data ?? [],
-      memberships: membershipsRes.data ?? [],
-      attendanceLogs: attendanceRes.data ?? [],
-      lockers: lockersRes.data ?? [],
+      members: membersRows,
+      memberships: membershipsRows,
+      attendanceLogs: attendanceRows,
+      lockers: lockersRows,
     }),
   );
 
@@ -1230,6 +1325,7 @@ export async function pullFromSupabase(options?: {
     warnings,
     message,
     pullDiagnostics,
+    fetchedTotal: membersRows.length,
   };
 }
 
