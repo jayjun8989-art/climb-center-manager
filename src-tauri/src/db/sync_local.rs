@@ -816,3 +816,270 @@ pub fn upsert_id_map(
         Ok(())
     })
 }
+
+// ── Upload Verification Report ────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize)]
+pub struct UploadLocalMember {
+    pub local_id: i64,
+    pub name: String,
+    pub center: String,
+    pub member_no: Option<i64>,
+    pub member_type: String,
+    pub sync_status: String,
+    pub remote_id: Option<String>,
+    pub has_membership: bool,
+    pub attendance_count: i64,
+    pub can_upload: bool,
+    pub upload_block_reason: Option<String>,
+    pub last_attempt: Option<String>,
+    pub last_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct UploadLocalMembership {
+    pub local_id: i64,
+    pub member_local_id: i64,
+    pub member_name: String,
+    pub membership_type: String,
+    pub start_date: String,
+    pub end_date: Option<String>,
+    pub total_count: Option<i64>,
+    pub remaining_count: Option<i64>,
+    pub remote_id: Option<String>,
+    pub can_upload: bool,
+    pub upload_block_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct UploadLocalAttendance {
+    pub local_id: i64,
+    pub member_name: String,
+    pub member_local_id: i64,
+    pub member_has_remote_id: bool,
+    pub checkin_at: String,
+    pub source: Option<String>,
+    pub deducted_count: i64,
+    pub remote_id: Option<String>,
+    pub can_upload: bool,
+    pub upload_block_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct UploadVerificationReport {
+    pub queue_pending: i64,
+    pub queue_failed: i64,
+    pub queue_blocked: i64,
+    pub members_no_remote_id: i64,
+    pub memberships_no_remote_id: i64,
+    pub attendance_no_remote_id: i64,
+    pub payments_no_remote_id: i64,
+    pub pause_logs_no_remote_id: i64,
+    pub status_mismatch_count: i64,
+    pub uploadable_count: i64,
+    pub blocked_upload_count: i64,
+    pub local_only_members: Vec<UploadLocalMember>,
+    pub local_only_memberships: Vec<UploadLocalMembership>,
+    pub local_only_attendance: Vec<UploadLocalAttendance>,
+}
+
+pub fn get_upload_verification_report(state: &AppState) -> Result<UploadVerificationReport, DbError> {
+    state.with_conn(|conn| {
+        let queue_pending: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NULL",
+            [], |row| row.get(0),
+        )?;
+        let queue_failed: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL AND retry_count < 5",
+            [], |row| row.get(0),
+        )?;
+        let queue_blocked: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL AND retry_count >= 5",
+            [], |row| row.get(0),
+        )?;
+        let members_no_remote_id: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM members WHERE deleted_at IS NULL
+             AND (remote_id IS NULL OR remote_id = '')",
+            [], |row| row.get(0),
+        )?;
+        let memberships_no_remote_id: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM memberships ms
+             JOIN members m ON m.id = ms.member_id
+             WHERE m.deleted_at IS NULL AND (ms.remote_id IS NULL OR ms.remote_id = '')",
+            [], |row| row.get(0),
+        )?;
+        let attendance_no_remote_id: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM attendance_logs al
+             JOIN members m ON m.id = al.member_id
+             WHERE m.deleted_at IS NULL AND al.canceled_at IS NULL
+               AND (al.remote_id IS NULL OR al.remote_id = '')",
+            [], |row| row.get(0),
+        )?;
+        let payments_no_remote_id: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM payments p
+             JOIN members m ON m.id = p.member_id
+             WHERE m.deleted_at IS NULL AND (p.remote_id IS NULL OR p.remote_id = '')",
+            [], |row| row.get(0),
+        ).unwrap_or(0);
+        let pause_logs_no_remote_id: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM pause_logs pl
+             JOIN members m ON m.id = pl.member_id
+             WHERE m.deleted_at IS NULL AND (pl.remote_id IS NULL OR pl.remote_id = '')",
+            [], |row| row.get(0),
+        ).unwrap_or(0);
+        let status_mismatch_count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM members WHERE deleted_at IS NULL
+             AND (remote_id IS NULL OR remote_id = '') AND sync_status = 'synced'",
+            [], |row| row.get(0),
+        )?;
+
+        // Local-only members
+        let mut stmt = conn.prepare(
+            "SELECT m.id, m.name, m.center, m.member_no,
+                    COALESCE(m.member_type, 'general'),
+                    COALESCE(m.sync_status, 'pending'),
+                    m.remote_id,
+                    (SELECT COUNT(*) FROM memberships ms2 WHERE ms2.member_id = m.id) AS has_ms,
+                    (SELECT COUNT(*) FROM attendance_logs al2
+                     WHERE al2.member_id = m.id AND al2.canceled_at IS NULL) AS att_count,
+                    sq.created_at, sq.last_error
+             FROM members m
+             LEFT JOIN sync_queue sq
+               ON sq.entity_type = 'member' AND sq.entity_local_id = m.id
+             WHERE m.deleted_at IS NULL AND (m.remote_id IS NULL OR m.remote_id = '')
+             GROUP BY m.id
+             ORDER BY m.id DESC
+             LIMIT 50",
+        )?;
+        let local_only_members: Vec<UploadLocalMember> = stmt.query_map([], |row| {
+            let has_ms: i64 = row.get(7)?;
+            let last_error: Option<String> = row.get(10)?;
+            let sync_status: String = row.get(5)?;
+            let (can_upload, upload_block_reason) = if last_error.is_some() {
+                (false, last_error.clone().map(|e| format!("동기화 오류: {e}")))
+            } else if sync_status == "error" {
+                (false, Some("동기화 상태 오류".to_string()))
+            } else {
+                (true, None)
+            };
+            Ok(UploadLocalMember {
+                local_id: row.get(0)?,
+                name: row.get(1)?,
+                center: row.get(2)?,
+                member_no: row.get(3)?,
+                member_type: row.get(4)?,
+                sync_status,
+                remote_id: row.get(6)?,
+                has_membership: has_ms > 0,
+                attendance_count: row.get(8)?,
+                can_upload,
+                upload_block_reason,
+                last_attempt: row.get(9)?,
+                last_error,
+            })
+        })?.collect::<Result<Vec<_>, _>>()?;
+
+        // Local-only memberships
+        let mut stmt2 = conn.prepare(
+            "SELECT ms.id, ms.member_id, m.name, COALESCE(ms.membership_type, ''),
+                    ms.start_date, ms.end_date, ms.total_count, ms.remaining_count, ms.remote_id,
+                    m.remote_id AS member_remote_id
+             FROM memberships ms
+             JOIN members m ON m.id = ms.member_id
+             WHERE m.deleted_at IS NULL AND (ms.remote_id IS NULL OR ms.remote_id = '')
+             ORDER BY ms.id DESC
+             LIMIT 50",
+        )?;
+        let local_only_memberships: Vec<UploadLocalMembership> = stmt2.query_map([], |row| {
+            let member_remote_id: Option<String> = row.get(9)?;
+            let (can_upload, upload_block_reason) = match member_remote_id.as_deref() {
+                None | Some("") => (false, Some("연결 회원 remote_id 없음 — 회원 업로드 먼저 필요".to_string())),
+                _ => (true, None),
+            };
+            Ok(UploadLocalMembership {
+                local_id: row.get(0)?,
+                member_local_id: row.get(1)?,
+                member_name: row.get(2)?,
+                membership_type: row.get(3)?,
+                start_date: row.get(4)?,
+                end_date: row.get(5)?,
+                total_count: row.get(6)?,
+                remaining_count: row.get(7)?,
+                remote_id: row.get(8)?,
+                can_upload,
+                upload_block_reason,
+            })
+        })?.collect::<Result<Vec<_>, _>>()?;
+
+        // Local-only attendance
+        let mut stmt3 = conn.prepare(
+            "SELECT al.id, m.name, al.member_id, m.remote_id,
+                    al.checkin_at, al.source, al.deducted_count, al.remote_id
+             FROM attendance_logs al
+             JOIN members m ON m.id = al.member_id
+             WHERE m.deleted_at IS NULL AND al.canceled_at IS NULL
+               AND (al.remote_id IS NULL OR al.remote_id = '')
+             ORDER BY al.id DESC
+             LIMIT 50",
+        )?;
+        let local_only_attendance: Vec<UploadLocalAttendance> = stmt3.query_map([], |row| {
+            let member_remote_id: Option<String> = row.get(3)?;
+            let member_has_remote_id = !matches!(member_remote_id.as_deref(), None | Some(""));
+            let (can_upload, upload_block_reason) = if !member_has_remote_id {
+                (false, Some("연결 회원 remote_id 없음".to_string()))
+            } else {
+                (true, None)
+            };
+            Ok(UploadLocalAttendance {
+                local_id: row.get(0)?,
+                member_name: row.get(1)?,
+                member_local_id: row.get(2)?,
+                member_has_remote_id,
+                checkin_at: row.get(4)?,
+                source: row.get(5)?,
+                deducted_count: row.get(6)?,
+                remote_id: row.get(7)?,
+                can_upload,
+                upload_block_reason,
+            })
+        })?.collect::<Result<Vec<_>, _>>()?;
+
+        let uploadable_count = local_only_members.iter().filter(|m| m.can_upload).count() as i64
+            + local_only_memberships.iter().filter(|m| m.can_upload).count() as i64
+            + local_only_attendance.iter().filter(|a| a.can_upload).count() as i64;
+        let blocked_upload_count = local_only_members.iter().filter(|m| !m.can_upload).count() as i64
+            + local_only_memberships.iter().filter(|m| !m.can_upload).count() as i64
+            + local_only_attendance.iter().filter(|a| !a.can_upload).count() as i64;
+
+        Ok(UploadVerificationReport {
+            queue_pending,
+            queue_failed,
+            queue_blocked,
+            members_no_remote_id,
+            memberships_no_remote_id,
+            attendance_no_remote_id,
+            payments_no_remote_id,
+            pause_logs_no_remote_id,
+            status_mismatch_count,
+            uploadable_count,
+            blocked_upload_count,
+            local_only_members,
+            local_only_memberships,
+            local_only_attendance,
+        })
+    })
+}
+
+/// Fix members that have remote_id IS NULL but sync_status = 'synced' → reset to 'pending'
+pub fn repair_status_mismatch(state: &AppState) -> Result<i64, DbError> {
+    state.with_conn(|conn| {
+        let count = conn.execute(
+            "UPDATE members SET sync_status = 'pending'
+             WHERE deleted_at IS NULL
+               AND (remote_id IS NULL OR remote_id = '')
+               AND sync_status = 'synced'",
+            [],
+        )?;
+        Ok(count as i64)
+    })
+}

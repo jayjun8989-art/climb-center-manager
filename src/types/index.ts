@@ -376,6 +376,79 @@ export interface PermissionSet {
 
 export type MembershipCategory = "monthly" | "session" | "junior";
 
+export interface UploadLocalMember {
+  local_id: number;
+  name: string;
+  center: string;
+  member_no: number | null;
+  member_type: string;
+  sync_status: string;
+  remote_id: string | null;
+  has_membership: boolean;
+  attendance_count: number;
+  can_upload: boolean;
+  upload_block_reason: string | null;
+  last_attempt: string | null;
+  last_error: string | null;
+}
+
+export interface UploadLocalMembership {
+  local_id: number;
+  member_local_id: number;
+  member_name: string;
+  membership_type: string;
+  start_date: string;
+  end_date: string | null;
+  total_count: number | null;
+  remaining_count: number | null;
+  remote_id: string | null;
+  can_upload: boolean;
+  upload_block_reason: string | null;
+}
+
+export interface UploadLocalAttendance {
+  local_id: number;
+  member_name: string;
+  member_local_id: number;
+  member_has_remote_id: boolean;
+  checkin_at: string;
+  source: string | null;
+  deducted_count: number;
+  remote_id: string | null;
+  can_upload: boolean;
+  upload_block_reason: string | null;
+}
+
+export interface UploadVerificationReport {
+  queue_pending: number;
+  queue_failed: number;
+  queue_blocked: number;
+  members_no_remote_id: number;
+  memberships_no_remote_id: number;
+  attendance_no_remote_id: number;
+  payments_no_remote_id: number;
+  pause_logs_no_remote_id: number;
+  status_mismatch_count: number;
+  uploadable_count: number;
+  blocked_upload_count: number;
+  local_only_members: UploadLocalMember[];
+  local_only_memberships: UploadLocalMembership[];
+  local_only_attendance: UploadLocalAttendance[];
+}
+
+export interface AttendanceMismatchDiagnostic {
+  member_id: number;
+  member_name: string;
+  membership_id: number | null;
+  membership_type: string | null;
+  total_count: number | null;
+  current_remaining: number | null;
+  attendance_deducted_sum: number;
+  expected_remaining: number | null;
+  mismatch: boolean;
+  diff: number;
+}
+
 export type LockerStatus = "empty" | "active" | "occupied" | "expiring" | "expired";
 export type LockerFilter = "all" | "empty" | "occupied" | "expiring";
 

@@ -1,4 +1,5 @@
 import type {
+  AttendanceMismatchDiagnostic,
   AttendanceLog,
   BackupInfo,
   BackupResult,
@@ -24,6 +25,7 @@ import type {
   CenterMappingMember,
   CenterMappingCorrection,
   CenterMappingRepairResult,
+  UploadVerificationReport,
 } from "../types";
 import {
   defaultBackupInfo,
@@ -341,5 +343,27 @@ export const api = {
         throw new Error("브라우저 미리보기에서는 로컬 중복 정리를 지원하지 않습니다.");
       },
     );
+  },
+
+  getUploadVerificationReport(): Promise<UploadVerificationReport> {
+    return readCommand("get_upload_verification_report_cmd", {}, () => {
+      throw new Error("브라우저 미리보기에서는 지원하지 않습니다.");
+    });
+  },
+
+  getAttendanceMismatchDiagnostic(memberId: number): Promise<AttendanceMismatchDiagnostic> {
+    return readCommand("get_attendance_mismatch_diagnostic_cmd", { memberId }, () => {
+      throw new Error("브라우저 미리보기에서는 지원하지 않습니다.");
+    });
+  },
+
+  correctMemberRemainingCount(memberId: number): Promise<MutationResult<MemberListItem>> {
+    return writeCommand("correct_member_remaining_count_cmd", { memberId }, () => {
+      throw new Error("브라우저 미리보기에서는 지원하지 않습니다.");
+    });
+  },
+
+  repairStatusMismatch(): Promise<number> {
+    return writeCommand("repair_status_mismatch_cmd", {}, () => 0);
   },
 };

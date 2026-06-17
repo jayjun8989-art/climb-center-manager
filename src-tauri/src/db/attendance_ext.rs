@@ -1,6 +1,7 @@
 use crate::db::{AppState, DbError};
 use crate::models::{AttendanceLog, MemberListItem, Membership};
 use rusqlite::{params, OptionalExtension};
+use serde::Serialize;
 
 use super::ops::{get_active_membership, get_member, get_member_list_item_by_id, refresh_member_status};
 use super::status::{attendance_type_for_member, compute_membership_status, now_string, parse_date, today_date, today_string};
@@ -297,6 +298,130 @@ pub fn cancel_attendance(
 
     refresh_member_status(state, member_id)?;
     get_member_list_item_by_id(state, member_id)
+}
+
+// ── Attendance / Membership mismatch diagnostic ───────────────────────────────
+
+#[derive(Debug, Serialize)]
+pub struct AttendanceMismatchDiagnostic {
+    pub member_id: i64,
+    pub member_name: String,
+    pub membership_id: Option<i64>,
+    pub membership_type: Option<String>,
+    pub total_count: Option<i64>,
+    pub current_remaining: Option<i64>,
+    pub attendance_deducted_sum: i64,
+    pub expected_remaining: Option<i64>,
+    pub mismatch: bool,
+    pub diff: i64,
+}
+
+pub fn get_attendance_mismatch_diagnostic(
+    state: &AppState,
+    member_id: i64,
+) -> Result<AttendanceMismatchDiagnostic, DbError> {
+    state.with_conn(|conn| {
+        let member_name: String = conn.query_row(
+            "SELECT name FROM members WHERE id = ?1 AND deleted_at IS NULL",
+            params![member_id],
+            |row| row.get(0),
+        ).map_err(|_| DbError::Message("회원을 찾을 수 없습니다.".into()))?;
+
+        // Latest count-type membership (prefer active)
+        let ms_row: Option<(i64, String, Option<i64>, Option<i64>)> = conn.query_row(
+            "SELECT id, membership_type, total_count, remaining_count
+             FROM memberships
+             WHERE member_id = ?1 AND pass_type = 'count'
+             ORDER BY CASE WHEN status = 'active' THEN 0 ELSE 1 END, end_date DESC
+             LIMIT 1",
+            params![member_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        ).optional()?;
+
+        let (membership_id, membership_type, total_count, current_remaining) =
+            match ms_row {
+                Some((id, mtype, total, rem)) => (Some(id), Some(mtype), total, rem),
+                None => (None, None, None, None),
+            };
+
+        let deducted_sum: i64 = match membership_id {
+            Some(mid) => conn.query_row(
+                "SELECT COALESCE(SUM(deducted_count), 0) FROM attendance_logs
+                 WHERE membership_id = ?1 AND canceled_at IS NULL",
+                params![mid],
+                |row| row.get(0),
+            )?,
+            None => 0,
+        };
+
+        let expected_remaining = total_count.map(|t| t - deducted_sum);
+        let current_val = current_remaining.unwrap_or(0);
+        let expected_val = expected_remaining.unwrap_or(current_val);
+        let diff = current_val - expected_val;
+        let mismatch = diff != 0 && total_count.is_some();
+
+        Ok(AttendanceMismatchDiagnostic {
+            member_id,
+            member_name,
+            membership_id,
+            membership_type,
+            total_count,
+            current_remaining,
+            attendance_deducted_sum: deducted_sum,
+            expected_remaining,
+            mismatch,
+            diff,
+        })
+    })
+}
+
+pub fn correct_member_remaining_count(
+    state: &AppState,
+    member_id: i64,
+) -> Result<MemberListItem, DbError> {
+    let diag = get_attendance_mismatch_diagnostic(state, member_id)?;
+
+    if let (Some(membership_id), Some(expected)) = (diag.membership_id, diag.expected_remaining) {
+        state.with_conn(|conn| {
+            let tx = conn.transaction()?;
+            let now = super::status::now_string();
+
+            let used: i64 = tx.query_row(
+                "SELECT COALESCE(SUM(deducted_count), 0) FROM attendance_logs
+                 WHERE membership_id = ?1 AND canceled_at IS NULL",
+                params![membership_id],
+                |row| row.get(0),
+            )?;
+
+            let new_status = if expected <= 0 { "finished" } else { "active" };
+            tx.execute(
+                "UPDATE memberships SET remaining_count = ?1, used_count = ?2,
+                         status = ?3, updated_at = ?4 WHERE id = ?5",
+                params![expected, used, new_status, now, membership_id],
+            )?;
+
+            super::member_edit_log::insert_member_edit_log(
+                &*tx, member_id, "update", Some("system"),
+                &format!(
+                    "잔여 횟수 출석 기록 기준 보정: {} → {}",
+                    diag.current_remaining.unwrap_or(0),
+                    expected
+                ),
+            )?;
+            tx.commit()?;
+            Ok(())
+        })?;
+
+        // Enqueue server sync for the corrected membership
+        if let Ok(payload_json) = super::sync_local::build_member_sync_payload_json(state, member_id) {
+            if let Ok(payload_value) = serde_json::from_str::<serde_json::Value>(&payload_json) {
+                let _ = super::sync_local::enqueue_entity_op(state, "member", member_id, "update", &payload_value);
+            }
+        }
+    }
+
+    super::ops::refresh_member_status(state, member_id)?;
+    super::ops::get_member_list_item_by_id(state, member_id)
 }
 
 pub fn map_attendance_row(row: &rusqlite::Row<'_>) -> Result<AttendanceLog, rusqlite::Error> {

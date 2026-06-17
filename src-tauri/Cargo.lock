@@ -490,7 +490,7 @@ dependencies = [
 
 [[package]]
 name = "climb-center-manager"
-version = "1.0.34"
+version = "1.0.43"
 dependencies = [
  "chrono",
  "rusqlite",

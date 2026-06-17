@@ -1,6 +1,6 @@
 [package]
 name = "climb-center-manager"
-version = "1.0.42"
+version = "1.0.43"
 description = "?�라?�밍 ?�터 ?�원관�??�로그램"
 authors = ["you"]
 edition = "2021"

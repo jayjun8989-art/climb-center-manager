@@ -1,6 +1,6 @@
-import { DatabaseBackup, Download, FolderOpen, KeyRound, RefreshCw, Settings, ShieldAlert, Upload, X } from "lucide-react";
+import { AlertTriangle, DatabaseBackup, Download, FolderOpen, KeyRound, RefreshCw, Settings, ShieldAlert, Upload, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { BackupInfo, Center, CenterMappingDiagnosticRow, DuplicateMemberCandidateGroup, LocalDuplicateCleanupSummary, ReportInfo, StorageInfo, SyncDiagnostics } from "../types";
+import type { AttendanceMismatchDiagnostic, BackupInfo, Center, CenterMappingDiagnosticRow, DuplicateMemberCandidateGroup, LocalDuplicateCleanupSummary, ReportInfo, StorageInfo, SyncDiagnostics, UploadVerificationReport } from "../types";
 import { fetchCenterMappingDiagnostics, buildCenterMappingCorrections } from "../sync/centerMappingDiagnostics";
 import type { SyncStatus } from "../sync/types";
 import { checkForUpdate, getAppVersion, installUpdate, runUpdateDiagnostic, UPDATER_ENDPOINT, type UpdateCheckOutcome, type UpdateDiagnosticResult } from "../lib/updater";
@@ -107,6 +107,14 @@ export function SettingsPanel({
 
   const [updateDiagnostic, setUpdateDiagnostic] = useState<UpdateDiagnosticResult | null>(null);
   const [updateDiagnosticLoading, setUpdateDiagnosticLoading] = useState(false);
+
+  const [uploadReport, setUploadReport] = useState<UploadVerificationReport | null>(null);
+  const [uploadReportLoading, setUploadReportLoading] = useState(false);
+  const [repairingMismatch, setRepairingMismatch] = useState(false);
+  const [mismatchDiag, setMismatchDiag] = useState<AttendanceMismatchDiagnostic | null>(null);
+  const [mismatchMemberId, setMismatchMemberId] = useState("");
+  const [mismatchLoading, setMismatchLoading] = useState(false);
+  const [correctingRemaining, setCorrectingRemaining] = useState(false);
 
   const [forcePullBusy, setForcePullBusy] = useState(false);
   const [forcePullResult, setForcePullResult] = useState<{
@@ -386,6 +394,68 @@ export function SettingsPanel({
     }
   }
 
+  async function handleRunUploadReport() {
+    setUploadReportLoading(true);
+    try {
+      const report = await api.getUploadVerificationReport();
+      setUploadReport(report);
+    } catch (error) {
+      onNotify(error instanceof Error ? error.message : String(error));
+    } finally {
+      setUploadReportLoading(false);
+    }
+  }
+
+  async function handleRepairMismatch() {
+    setRepairingMismatch(true);
+    try {
+      const count = await api.repairStatusMismatch();
+      onNotify(count > 0 ? `상태 불일치 ${count}건 보정 완료 (sync_status → pending)` : "보정할 항목이 없습니다.");
+      const report = await api.getUploadVerificationReport();
+      setUploadReport(report);
+    } catch (error) {
+      onNotify(error instanceof Error ? error.message : String(error));
+    } finally {
+      setRepairingMismatch(false);
+    }
+  }
+
+  async function handleMismatchDiagnose() {
+    const id = parseInt(mismatchMemberId.trim(), 10);
+    if (!id || isNaN(id)) {
+      onNotify("회원 local ID를 정확히 입력해주세요.");
+      return;
+    }
+    setMismatchLoading(true);
+    try {
+      const result = await api.getAttendanceMismatchDiagnostic(id);
+      setMismatchDiag(result);
+    } catch (error) {
+      onNotify(error instanceof Error ? error.message : String(error));
+    } finally {
+      setMismatchLoading(false);
+    }
+  }
+
+  async function handleCorrectRemaining() {
+    if (!mismatchDiag) return;
+    const confirmed = window.confirm(
+      `${mismatchDiag.member_name}의 잔여 횟수를 ${mismatchDiag.current_remaining}회 → ${mismatchDiag.expected_remaining}회로 보정합니다. 계속하시겠습니까?`
+    );
+    if (!confirmed) return;
+    setCorrectingRemaining(true);
+    try {
+      await api.correctMemberRemainingCount(mismatchDiag.member_id);
+      onNotify(`${mismatchDiag.member_name} 잔여 횟수 보정 완료.`);
+      const updated = await api.getAttendanceMismatchDiagnostic(mismatchDiag.member_id);
+      setMismatchDiag(updated);
+    } catch (error) {
+      onNotify(error instanceof Error ? error.message : String(error));
+    } finally {
+      setCorrectingRemaining(false);
+    }
+  }
+
   if (!open) return null;
 
   return (
@@ -603,6 +673,217 @@ export function SettingsPanel({
             <p className="mt-2 text-xs leading-relaxed text-[var(--muted)]">
               업데이트/재설치해도 회원 데이터는 Supabase와 AppData에 유지됩니다.
             </p>
+          </div>
+
+          {/* ── 업로드 검증 리포트 ── */}
+          <div className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--panel-strong)] px-4 py-4">
+            <div className="mb-3 flex items-center gap-2">
+              <Upload size={18} className="text-sky-500" />
+              <p className="text-sm font-semibold text-[var(--text)]">업로드 검증 리포트</p>
+            </div>
+            <p className="mb-3 text-xs text-[var(--muted)]">
+              이 PC에만 있고 Supabase 서버에 아직 업로드되지 않은 데이터를 확인합니다.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="btn btn-secondary text-sm"
+                disabled={uploadReportLoading}
+                onClick={() => void handleRunUploadReport()}
+              >
+                <RefreshCw size={14} className={uploadReportLoading ? "animate-spin" : ""} />
+                {uploadReportLoading ? "분석 중..." : "업로드 검증 리포트"}
+              </button>
+              {uploadReport && uploadReport.status_mismatch_count > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-secondary text-sm"
+                  disabled={repairingMismatch}
+                  onClick={() => void handleRepairMismatch()}
+                >
+                  {repairingMismatch ? "보정 중..." : "상태 불일치 보정"}
+                </button>
+              )}
+            </div>
+            {uploadReport && (
+              <div className="mt-3 space-y-2 text-xs">
+                {/* 판정 메시지 */}
+                {uploadReport.queue_pending === 0 && uploadReport.queue_failed === 0 &&
+                  uploadReport.queue_blocked === 0 && uploadReport.members_no_remote_id === 0 ? (
+                  <div className="rounded-lg bg-emerald-500/10 px-3 py-2 text-emerald-600">
+                    업로드 누락 없음: 이 PC의 변경사항은 모두 서버와 동기화되었습니다.
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {uploadReport.members_no_remote_id > 0 && (
+                      <div className="rounded-lg bg-amber-500/10 px-3 py-2 text-amber-600">
+                        서버 ID가 없는 로컬 전용 회원 {uploadReport.members_no_remote_id}명이 있습니다. 테스트 회원인지 실제 회원인지 확인 후 Supabase로 동기화하세요.
+                      </div>
+                    )}
+                    {uploadReport.status_mismatch_count > 0 && (
+                      <div className="rounded-lg bg-red-500/10 px-3 py-2 text-red-500">
+                        상태 불일치: remote_id가 없는데 synced로 표시된 항목 {uploadReport.status_mismatch_count}건. 위 "상태 불일치 보정" 버튼으로 보정하세요.
+                      </div>
+                    )}
+                    {uploadReport.queue_failed > 0 && (
+                      <div className="rounded-lg bg-red-500/10 px-3 py-2 text-red-500">
+                        동기화 실패 {uploadReport.queue_failed}건이 대기 중입니다.
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* 수치 요약 */}
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg border border-[var(--border)] p-3">
+                  <div>대기 sync_queue: <span className="font-semibold">{uploadReport.queue_pending}</span></div>
+                  <div>실패 sync_queue: <span className={`font-semibold ${uploadReport.queue_failed > 0 ? "text-red-500" : ""}`}>{uploadReport.queue_failed}</span></div>
+                  <div>blocked: <span className={`font-semibold ${uploadReport.queue_blocked > 0 ? "text-amber-500" : ""}`}>{uploadReport.queue_blocked}</span></div>
+                  <div>remote_id 없는 회원: <span className={`font-semibold ${uploadReport.members_no_remote_id > 0 ? "text-amber-500" : ""}`}>{uploadReport.members_no_remote_id}</span></div>
+                  <div>remote_id 없는 회원권: <span className="font-semibold">{uploadReport.memberships_no_remote_id}</span></div>
+                  <div>remote_id 없는 출석: <span className="font-semibold">{uploadReport.attendance_no_remote_id}</span></div>
+                  <div>remote_id 없는 결제: <span className="font-semibold">{uploadReport.payments_no_remote_id}</span></div>
+                  <div>remote_id 없는 정지: <span className="font-semibold">{uploadReport.pause_logs_no_remote_id}</span></div>
+                  <div>상태 불일치: <span className={`font-semibold ${uploadReport.status_mismatch_count > 0 ? "text-red-500" : ""}`}>{uploadReport.status_mismatch_count}</span></div>
+                  <div>업로드 가능: <span className="font-semibold text-emerald-600">{uploadReport.uploadable_count}</span></div>
+                  <div>업로드 불가: <span className={`font-semibold ${uploadReport.blocked_upload_count > 0 ? "text-amber-500" : ""}`}>{uploadReport.blocked_upload_count}</span></div>
+                </div>
+                {/* 로컬 전용 회원 목록 */}
+                {uploadReport.local_only_members.length > 0 && (
+                  <div>
+                    <div className="mb-1 font-semibold text-[var(--text)]">로컬 전용 회원 ({uploadReport.local_only_members.length}명)</div>
+                    <div className="space-y-1">
+                      {uploadReport.local_only_members.map((m) => (
+                        <div key={m.local_id} className="rounded-lg border border-[var(--border)] px-3 py-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold">{m.name}</span>
+                            <span className={`rounded px-1.5 py-0.5 text-[10px] ${m.can_upload ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"}`}>
+                              {m.can_upload ? "업로드 가능" : "보류"}
+                            </span>
+                          </div>
+                          <div className="mt-0.5 text-[var(--muted)]">
+                            {m.center} · {m.member_type} · 회원번호: {m.member_no ?? "없음"} · local id: {m.local_id}
+                          </div>
+                          <div className="text-[var(--muted)]">
+                            sync_status: {m.sync_status} · 회원권: {m.has_membership ? "있음" : "없음"} · 출석: {m.attendance_count}건
+                          </div>
+                          {m.upload_block_reason && (
+                            <div className="text-amber-500">{m.upload_block_reason}</div>
+                          )}
+                          {m.last_error && (
+                            <div className="text-red-500">오류: {m.last_error}</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* 로컬 전용 회원권 목록 */}
+                {uploadReport.local_only_memberships.length > 0 && (
+                  <div>
+                    <div className="mb-1 font-semibold text-[var(--text)]">로컬 전용 회원권 ({uploadReport.local_only_memberships.length}건)</div>
+                    <div className="space-y-1">
+                      {uploadReport.local_only_memberships.map((ms) => (
+                        <div key={ms.local_id} className="rounded-lg border border-[var(--border)] px-3 py-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold">{ms.member_name}</span>
+                            <span className={`rounded px-1.5 py-0.5 text-[10px] ${ms.can_upload ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"}`}>
+                              {ms.can_upload ? "업로드 가능" : "보류"}
+                            </span>
+                          </div>
+                          <div className="text-[var(--muted)]">
+                            {ms.membership_type} · {ms.start_date} ~ {ms.end_date ?? "-"} · 잔여: {ms.remaining_count ?? "-"}/{ms.total_count ?? "-"}
+                          </div>
+                          {ms.upload_block_reason && (
+                            <div className="text-amber-500">{ms.upload_block_reason}</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* 로컬 전용 출석 목록 */}
+                {uploadReport.local_only_attendance.length > 0 && (
+                  <div>
+                    <div className="mb-1 font-semibold text-[var(--text)]">로컬 전용 출석 ({uploadReport.local_only_attendance.length}건)</div>
+                    <div className="space-y-1">
+                      {uploadReport.local_only_attendance.map((att) => (
+                        <div key={att.local_id} className="rounded-lg border border-[var(--border)] px-3 py-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold">{att.member_name}</span>
+                            <span className={`rounded px-1.5 py-0.5 text-[10px] ${att.can_upload ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"}`}>
+                              {att.can_upload ? "업로드 가능" : "보류"}
+                            </span>
+                          </div>
+                          <div className="text-[var(--muted)]">
+                            {att.checkin_at.slice(0, 10)} · {att.source ?? "staff"} · 차감: {att.deducted_count}회 · member_has_remote_id: {att.member_has_remote_id ? "있음" : "없음"}
+                          </div>
+                          {att.upload_block_reason && (
+                            <div className="text-amber-500">{att.upload_block_reason}</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── 출석-회원권 차감 불일치 진단 ── */}
+          <div className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--panel-strong)] px-4 py-4">
+            <div className="mb-3 flex items-center gap-2">
+              <AlertTriangle size={18} className="text-amber-500" />
+              <p className="text-sm font-semibold text-[var(--text)]">출석-회원권 차감 불일치 진단</p>
+            </div>
+            <p className="mb-3 text-xs text-[var(--muted)]">
+              회원 local ID를 입력하면 출석 기록 기준 예상 잔여 횟수와 현재 잔여 횟수를 비교합니다.
+            </p>
+            <div className="flex gap-2">
+              <input
+                className="input flex-1 text-sm"
+                type="number"
+                placeholder="회원 local ID"
+                value={mismatchMemberId}
+                onChange={(e) => setMismatchMemberId(e.target.value)}
+              />
+              <button
+                type="button"
+                className="btn btn-secondary text-sm"
+                disabled={mismatchLoading}
+                onClick={() => void handleMismatchDiagnose()}
+              >
+                {mismatchLoading ? "분석 중..." : "진단"}
+              </button>
+            </div>
+            {mismatchDiag && (
+              <div className="mt-3 space-y-2 text-xs">
+                <div className={`rounded-lg px-3 py-2 ${mismatchDiag.mismatch ? "bg-red-500/10 text-red-500" : "bg-emerald-500/10 text-emerald-600"}`}>
+                  {mismatchDiag.mismatch
+                    ? `불일치: 현재 잔여 ${mismatchDiag.current_remaining}회 ≠ 예상 ${mismatchDiag.expected_remaining}회 (차이: ${mismatchDiag.diff}회)`
+                    : `일치: 잔여 ${mismatchDiag.current_remaining}회 = 예상 ${mismatchDiag.expected_remaining}회`
+                  }
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg border border-[var(--border)] p-3">
+                  <div>회원: <span className="font-semibold">{mismatchDiag.member_name}</span></div>
+                  <div>local id: <span className="font-semibold">{mismatchDiag.member_id}</span></div>
+                  <div>회원권 종류: <span className="font-semibold">{mismatchDiag.membership_type ?? "없음"}</span></div>
+                  <div>총 횟수: <span className="font-semibold">{mismatchDiag.total_count ?? "-"}</span></div>
+                  <div>현재 잔여: <span className="font-semibold">{mismatchDiag.current_remaining ?? "-"}</span></div>
+                  <div>출석 차감 합계: <span className="font-semibold">{mismatchDiag.attendance_deducted_sum}</span></div>
+                  <div>예상 잔여: <span className="font-semibold">{mismatchDiag.expected_remaining ?? "-"}</span></div>
+                  <div>차이: <span className={`font-semibold ${mismatchDiag.diff !== 0 ? "text-red-500" : ""}`}>{mismatchDiag.diff}</span></div>
+                </div>
+                {mismatchDiag.mismatch && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary w-full text-sm"
+                    disabled={correctingRemaining}
+                    onClick={() => void handleCorrectRemaining()}
+                  >
+                    {correctingRemaining ? "보정 중..." : `이 회원 잔여 횟수 출석 기록 기준 보정 (${mismatchDiag.current_remaining} → ${mismatchDiag.expected_remaining})`}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--panel-strong)] px-4 py-3 text-xs text-[var(--muted)]">

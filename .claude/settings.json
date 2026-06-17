@@ -1,0 +1,52 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
+      "Bash(npm *)",
+      "Bash(npm.cmd *)",
+      "Bash(node *)",
+      "Bash(cargo *)",
+      "Bash(rustc *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git push)",
+      "Bash(git push origin*)",
+      "Bash(git fetch*)",
+      "Bash(git pull*)",
+      "Bash(git branch*)",
+      "Bash(git checkout*)",
+      "Bash(git show*)",
+      "Bash(git tag*)",
+      "Bash(gh *)",
+      "Bash(ls*)",
+      "Bash(cat*)",
+      "Bash(echo*)",
+      "Bash(mkdir*)",
+      "Bash(cp *)",
+      "Bash(mv *)"
+    ],
+    "ask": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git reset --hard*)",
+      "Bash(rm *)",
+      "Bash(Remove-Item*)",
+      "Bash(*DROP TABLE*)",
+      "Bash(*delete*supabase*)"
+    ],
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/*signing*key*)",
+      "Read(**/*.pem)",
+      "Read(**/*secret*)"
+    ]
+  }
+}

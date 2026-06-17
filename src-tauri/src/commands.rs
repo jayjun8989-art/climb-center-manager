@@ -1,14 +1,17 @@
 use crate::backup::{create_backup, get_backup_info, restore_backup};
 use crate::db::{
-    cancel_attendance, check_attendance_with_options, complete_member_push, count_active_members,
-    create_member, delete_member, enqueue_sync_item, ensure_local_schema, has_attendance_today,
-    has_attendance_on_date,
-    import_pull_snapshot, list_center_lockers, get_attendance, get_dashboard_stats,
-    cleanup_local_duplicates, find_duplicate_member_candidates, get_expiring_members, get_member_detail, get_pause_logs, get_payments, get_remote_id, list_members,
+    cancel_attendance, check_attendance_with_options, complete_member_push, correct_member_remaining_count,
+    count_active_members, create_member, delete_member, enqueue_sync_item, ensure_local_schema,
+    get_attendance_mismatch_diagnostic, get_upload_verification_report, has_attendance_today,
+    has_attendance_on_date, import_pull_snapshot, list_center_lockers, get_attendance, get_dashboard_stats,
+    cleanup_local_duplicates, find_duplicate_member_candidates, get_expiring_members, get_member_detail,
+    get_pause_logs, get_payments, get_remote_id, list_members,
     list_sync_queue, mark_sync_queue_error, pause_membership, purge_unsupported_sync_queue,
-    repair_member_sync_queue, remove_sync_queue_item, resume_membership, set_sync_state, update_member,
-    upsert_id_map, AppState, CenterMappingCorrection, CenterMappingMember, CenterMappingRepairResult,
-    DbError, PullImportResult, PullSnapshot, RepairSyncQueueResult, SyncQueueItem, SyncStatus,
+    repair_member_sync_queue, remove_sync_queue_item, repair_status_mismatch, resume_membership,
+    set_sync_state, update_member,
+    upsert_id_map, AppState, AttendanceMismatchDiagnostic, CenterMappingCorrection, CenterMappingMember,
+    CenterMappingRepairResult, DbError, PullImportResult, PullSnapshot, RepairSyncQueueResult,
+    SyncQueueItem, SyncStatus, UploadVerificationReport,
 };
 use crate::db::{list_members_with_remote_id, repair_center_mapping};
 use crate::models::{
@@ -578,4 +581,38 @@ pub fn get_raw_member_counts(state: State<'_, AppState>) -> Result<RawMemberCoun
             distinct_centers: centers.join(", "),
         })
     }).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_upload_verification_report_cmd(
+    state: State<'_, AppState>,
+) -> Result<UploadVerificationReport, String> {
+    get_upload_verification_report(&state).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_attendance_mismatch_diagnostic_cmd(
+    state: State<'_, AppState>,
+    member_id: i64,
+) -> Result<AttendanceMismatchDiagnostic, String> {
+    get_attendance_mismatch_diagnostic(&state, member_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn correct_member_remaining_count_cmd(
+    state: State<'_, AppState>,
+    member_id: i64,
+) -> Result<MutationResult<MemberListItem>, String> {
+    let member = correct_member_remaining_count(&state, member_id).map_err(|e| e.to_string())?;
+    Ok(MutationResult {
+        backup_warning: backup_best_effort(&state),
+        data: member,
+    })
+}
+
+#[tauri::command]
+pub fn repair_status_mismatch_cmd(
+    state: State<'_, AppState>,
+) -> Result<i64, String> {
+    repair_status_mismatch(&state).map_err(|e| e.to_string())
 }

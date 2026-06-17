@@ -5,11 +5,12 @@ import type { Center, SelfCheckinMember } from "../types";
 
 interface SelfCheckinPanelProps {
   onClose: () => void;
+  onCheckinSuccess?: () => void;
 }
 
 type Stage = "input" | "confirm" | "done";
 
-export function SelfCheckinPanel({ onClose }: SelfCheckinPanelProps) {
+export function SelfCheckinPanel({ onClose, onCheckinSuccess }: SelfCheckinPanelProps) {
   const [center, setCenter] = useState<Center>("ONCLE");
   const [memberNumber, setMemberNumber] = useState("");
   const [member, setMember] = useState<SelfCheckinMember | null>(null);
@@ -49,12 +50,20 @@ export function SelfCheckinPanel({ onClose }: SelfCheckinPanelProps) {
     setError("");
     setLoading(true);
     try {
-      await api.recordAttendance(
+      const result = await api.recordAttendance(
         { id: member.id, membership_id: member.membership_id },
         { editor: "self-checkin" },
       );
-      setSuccessMessage(`${member.name}님, 출석 처리되었습니다.`);
+      const updated = result.data;
+      const remainingBefore = member.remaining_count ?? 0;
+      const remainingAfter = updated.remaining_count ?? remainingBefore;
+      const didDecrement = updated.pass_type === "count" && remainingAfter < remainingBefore;
+      const countNote = didDecrement
+        ? ` · 잔여 ${remainingBefore}회 → ${remainingAfter}회`
+        : "";
+      setSuccessMessage(`${member.name}님, 출석 처리되었습니다.${countNote}`);
       setStage("done");
+      onCheckinSuccess?.();
     } catch (checkinError) {
       const message = checkinError instanceof Error ? checkinError.message : String(checkinError);
       setError(message.includes("이미 해당 날짜") ? "이미 오늘 출석 체크가 완료되었습니다." : message);

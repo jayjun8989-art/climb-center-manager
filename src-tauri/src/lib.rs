@@ -122,6 +122,10 @@ pub fn run() {
             commands::open_reports_archive_folder,
             commands::get_center_member_counts,
             commands::get_raw_member_counts,
+            commands::get_upload_verification_report_cmd,
+            commands::get_attendance_mismatch_diagnostic_cmd,
+            commands::correct_member_remaining_count_cmd,
+            commands::repair_status_mismatch_cmd,
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|error| {

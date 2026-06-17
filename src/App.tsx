@@ -612,7 +612,15 @@ export default function App() {
   }
 
   if (selfCheckinOpen) {
-    return <SelfCheckinPanel onClose={() => setSelfCheckinOpen(false)} />;
+    return (
+      <SelfCheckinPanel
+        onClose={() => setSelfCheckinOpen(false)}
+        onCheckinSuccess={() => {
+          refreshMembers().catch(() => undefined);
+          refreshDashboard().catch(() => undefined);
+        }}
+      />
+    );
   }
 
   if (requiresLogin && !auth.isAuthenticated) {
