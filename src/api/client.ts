@@ -26,7 +26,10 @@ import type {
   CenterMappingCorrection,
   CenterMappingRepairResult,
   UploadVerificationReport,
+  ServerMatchReport,
+  ServerCenterConsistency,
 } from "../types";
+import { uploadLocalMemberNow, matchServerMembersForCenter, getServerCenterConsistency } from "../sync/engine";
 import {
   defaultBackupInfo,
   defaultDashboardStats,
@@ -365,5 +368,33 @@ export const api = {
 
   repairStatusMismatch(): Promise<number> {
     return writeCommand("repair_status_mismatch_cmd", {}, () => 0);
+  },
+
+  requeueMemberForUpload(memberId: number): Promise<number> {
+    return writeCommand("requeue_member_for_upload_cmd", { member_id: memberId }, () => 0);
+  },
+
+  excludeMemberFromUpload(memberId: number): Promise<number> {
+    return writeCommand("exclude_member_from_upload_cmd", { member_id: memberId }, () => 0);
+  },
+
+  setMemberHiddenLocally(memberId: number): Promise<void> {
+    return writeCommand("set_member_hidden_locally_cmd", { member_id: memberId }, () => undefined as void);
+  },
+
+  uploadLocalMember(memberId: number): Promise<{ ok: boolean; message: string }> {
+    return uploadLocalMemberNow(memberId);
+  },
+
+  linkMemberRemoteId(localId: number, remoteId: string): Promise<void> {
+    return actionCommand("link_member_remote_id_cmd", { local_id: localId, remote_id: remoteId });
+  },
+
+  matchServerMembers(center: Center): Promise<ServerMatchReport> {
+    return matchServerMembersForCenter(center);
+  },
+
+  getServerCenterConsistency(center: Center): Promise<ServerCenterConsistency> {
+    return getServerCenterConsistency(center);
   },
 };

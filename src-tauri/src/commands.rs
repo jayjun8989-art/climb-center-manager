@@ -8,9 +8,11 @@ use crate::db::{
     get_pause_logs, get_payments, get_remote_id, list_members,
     list_sync_queue, mark_sync_queue_error, pause_membership, purge_unsupported_sync_queue,
     repair_member_sync_queue, remove_sync_queue_item, repair_status_mismatch, resume_membership,
-    set_sync_state, update_member,
+    set_sync_state, update_member, requeue_member_for_upload, exclude_member_from_upload, set_member_hidden_locally,
+    link_member_remote_id, get_local_members_for_matching, get_local_center_counts,
     upsert_id_map, AppState, AttendanceMismatchDiagnostic, CenterMappingCorrection, CenterMappingMember,
-    CenterMappingRepairResult, DbError, PullImportResult, PullSnapshot, RepairSyncQueueResult,
+    CenterMappingRepairResult, DbError, LocalMemberForMatch, LocalCenterCounts,
+    PullImportResult, PullSnapshot, RepairSyncQueueResult,
     SyncQueueItem, SyncStatus, UploadVerificationReport,
 };
 use crate::db::{list_members_with_remote_id, repair_center_mapping};
@@ -615,4 +617,53 @@ pub fn repair_status_mismatch_cmd(
     state: State<'_, AppState>,
 ) -> Result<i64, String> {
     repair_status_mismatch(&state).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn requeue_member_for_upload_cmd(
+    state: State<'_, AppState>,
+    member_id: i64,
+) -> Result<i64, String> {
+    requeue_member_for_upload(&state, member_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn exclude_member_from_upload_cmd(
+    state: State<'_, AppState>,
+    member_id: i64,
+) -> Result<i64, String> {
+    exclude_member_from_upload(&state, member_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_member_hidden_locally_cmd(
+    state: State<'_, AppState>,
+    member_id: i64,
+) -> Result<(), String> {
+    set_member_hidden_locally(&state, member_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn link_member_remote_id_cmd(
+    state: State<'_, AppState>,
+    local_id: i64,
+    remote_id: String,
+) -> Result<(), String> {
+    link_member_remote_id(&state, local_id, &remote_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_local_members_for_matching_cmd(
+    state: State<'_, AppState>,
+    center: String,
+) -> Result<Vec<LocalMemberForMatch>, String> {
+    get_local_members_for_matching(&state, &center).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_local_center_counts_cmd(
+    state: State<'_, AppState>,
+    center: String,
+) -> Result<LocalCenterCounts, String> {
+    get_local_center_counts(&state, &center).map_err(|e| e.to_string())
 }

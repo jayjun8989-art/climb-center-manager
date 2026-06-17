@@ -362,7 +362,7 @@ export async function checkOnline(): Promise<boolean> {
   }
 }
 
-async function pushMemberQueueItem(
+export async function pushMemberQueueItem(
   item: SyncQueueItem,
   syncContext: SyncErrorContext,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -541,6 +541,38 @@ async function pushAttendanceQueueItem(
   }
 }
 
+/** Upload a single local-only member directly to Supabase (creates/refreshes a queue item first). */
+export async function uploadLocalMemberNow(localId: number): Promise<{ ok: boolean; message: string }> {
+  if (!isTauriApp() || !isSupabaseConfigured()) {
+    return { ok: false, message: "데스크톱 앱 및 서버 연결이 필요합니다." };
+  }
+  const session = await getSession();
+  if (!session) return { ok: false, message: "로그인이 필요합니다." };
+
+  // Re-queue a fresh INSERT item for this member
+  const queueId = await safeInvoke<number>("requeue_member_for_upload_cmd", { member_id: localId });
+  if (!queueId) return { ok: false, message: "업로드 대기 항목 생성에 실패했습니다." };
+
+  const queue = await fetchLocalQueue(100);
+  const item = queue.find((q) => q.entity_type === "member" && q.entity_local_id === localId && !q.last_error);
+  if (!item) return { ok: false, message: "업로드 대기 항목을 찾을 수 없습니다." };
+
+  await resolveCenterIds().catch(() => {});
+
+  const context: SyncErrorContext = {
+    loginEmail: session.user.email ?? null,
+    roles: null,
+    rolesLoaded: true,
+    rolesError: null,
+  };
+
+  const result = await pushMemberQueueItem(item, context);
+  if (result.ok) return { ok: true, message: "업로드 완료" };
+  // On failure, mark the queue item as failed
+  await failQueueItem(item.id, result.error);
+  return { ok: false, message: result.error };
+}
+
 /** Push local sync_queue to Supabase (members only — no pull merge). */
 export async function pushSyncQueue(syncContext?: SyncErrorContext): Promise<SyncRunResult> {
   if (!isTauriApp()) {
@@ -709,6 +741,204 @@ async function countLocalMembersForCenters(centerCodes: Center[]): Promise<numbe
   if (centerCodes.includes("ONCLE")) total += counts.oncleMembers;
   if (centerCodes.includes("GRABIT")) total += counts.grabitMembers;
   return total;
+}
+
+// ── 서버 회원 매칭 ────────────────────────────────────────────────────────────
+
+import type {
+  LocalMemberForMatch,
+  LocalCenterCounts,
+  MemberMatchEntry,
+  ServerMatchReport,
+  ServerCenterConsistency,
+} from "../types";
+
+function normalizePhoneDigitsLocal(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  const d = phone.replace(/\D/g, "");
+  return d || null;
+}
+
+/**
+ * Fetch all server members for a center and match against local members without remote_id.
+ * Auto-links when a single unambiguous match is found (member_no or phone).
+ */
+export async function matchServerMembersForCenter(center: Center): Promise<ServerMatchReport> {
+  const supabase = getSupabaseClient();
+  if (!supabase) throw new Error("서버 연결을 확인해주세요.");
+  const session = await getSession();
+  if (!session) throw new Error("로그인이 필요합니다.");
+
+  const centerId = centerIdForCode(center);
+
+  // Fetch server members for this center
+  const { data: serverData, error: serverError } = await supabase
+    .from("members")
+    .select("id, name, phone, phone_normalized, member_no")
+    .eq("center_id", centerId)
+    .is("deleted_at", null);
+
+  if (serverError) {
+    throw new Error(`서버 회원 조회 실패: ${formatSyncError(serverError)}`);
+  }
+
+  const serverList: Array<{ id: string; name: string; phone: string | null; phone_normalized: string | null; member_no: number | null }> =
+    serverData ?? [];
+
+  // Get local members without remote_id for this center
+  const localMembers: LocalMemberForMatch[] =
+    (await safeInvoke<LocalMemberForMatch[]>("get_local_members_for_matching_cmd", { center })) ?? [];
+
+  const report: ServerMatchReport = {
+    center,
+    auto_linked: [],
+    needs_review: [],
+    no_match: [],
+    errors: [],
+    total_checked: localMembers.length,
+  };
+
+  for (const local of localMembers) {
+    const entry: MemberMatchEntry = {
+      local_id: local.local_id,
+      local_name: local.name,
+      local_member_no: local.member_no ?? null,
+      local_phone: local.phone ?? null,
+      local_attendance_count: local.attendance_count,
+      local_has_membership: local.has_membership,
+      match_type: "none",
+      candidates: [],
+      auto_linked: false,
+      remote_id: null,
+    };
+
+    // Priority 1: member_no exact match
+    if (local.member_no != null && local.member_no > 0) {
+      const byNo = serverList.filter((s) => s.member_no === local.member_no);
+      if (byNo.length === 1) {
+        entry.match_type = "member_no";
+        entry.candidates = byNo.map((s) => ({ id: s.id, name: s.name, phone: s.phone, member_no: s.member_no }));
+        try {
+          await safeInvoke("link_member_remote_id_cmd", { localId: local.local_id, remoteId: byNo[0].id });
+          entry.auto_linked = true;
+          entry.remote_id = byNo[0].id;
+          report.auto_linked.push(entry);
+        } catch (e) {
+          entry.error = e instanceof Error ? e.message : String(e);
+          report.errors.push(`${local.name}: ${entry.error}`);
+          report.needs_review.push(entry);
+        }
+        continue;
+      }
+      if (byNo.length > 1) {
+        entry.match_type = "ambiguous";
+        entry.candidates = byNo.map((s) => ({ id: s.id, name: s.name, phone: s.phone, member_no: s.member_no }));
+        report.needs_review.push(entry);
+        continue;
+      }
+    }
+
+    // Priority 2: phone normalized match
+    const localPhone = normalizePhoneDigitsLocal(local.phone);
+    if (localPhone) {
+      const byPhone = serverList.filter((s) => {
+        const sp = normalizePhoneDigitsLocal(s.phone) ?? s.phone_normalized;
+        return sp && sp === localPhone;
+      });
+      if (byPhone.length === 1) {
+        entry.match_type = "phone";
+        entry.candidates = byPhone.map((s) => ({ id: s.id, name: s.name, phone: s.phone, member_no: s.member_no }));
+        try {
+          await safeInvoke("link_member_remote_id_cmd", { localId: local.local_id, remoteId: byPhone[0].id });
+          entry.auto_linked = true;
+          entry.remote_id = byPhone[0].id;
+          report.auto_linked.push(entry);
+        } catch (e) {
+          entry.error = e instanceof Error ? e.message : String(e);
+          report.errors.push(`${local.name}: ${entry.error}`);
+          report.needs_review.push(entry);
+        }
+        continue;
+      }
+      if (byPhone.length > 1) {
+        entry.match_type = "ambiguous";
+        entry.candidates = byPhone.map((s) => ({ id: s.id, name: s.name, phone: s.phone, member_no: s.member_no }));
+        report.needs_review.push(entry);
+        continue;
+      }
+    }
+
+    // Priority 3: name match only (no auto-link, needs manual review)
+    const byName = serverList.filter((s) => s.name.trim() === local.name.trim());
+    if (byName.length > 0) {
+      entry.match_type = "name";
+      entry.candidates = byName.map((s) => ({ id: s.id, name: s.name, phone: s.phone, member_no: s.member_no }));
+      report.needs_review.push(entry);
+      continue;
+    }
+
+    report.no_match.push(entry);
+  }
+
+  return report;
+}
+
+/**
+ * Compare server vs local data counts for a center (PC consistency check).
+ */
+export async function getServerCenterConsistency(center: Center): Promise<ServerCenterConsistency> {
+  const supabase = getSupabaseClient();
+  if (!supabase) throw new Error("서버 연결을 확인해주세요.");
+
+  const centerId = centerIdForCode(center);
+
+  const [membersRes, activeMembersRes, membershipsRes, attendanceRes] = await Promise.all([
+    supabase.from("members").select("*", { count: "exact", head: true }).eq("center_id", centerId).is("deleted_at", null),
+    supabase.from("members").select("*", { count: "exact", head: true }).eq("center_id", centerId).eq("status", "active").is("deleted_at", null),
+    supabase.from("memberships").select("*", { count: "exact", head: true }).eq("center_id", centerId),
+    supabase.from("attendance_logs").select("*", { count: "exact", head: true }).eq("center_id", centerId).is("canceled_at", null),
+  ]);
+
+  const localCounts: LocalCenterCounts =
+    (await safeInvoke<LocalCenterCounts>("get_local_center_counts_cmd", { center })) ??
+    { members: 0, memberships: 0, attendance: 0, members_no_remote_id: 0 };
+
+  const syncStatus = await fetchLocalSyncStatus();
+
+  const serverMembers = membersRes.count ?? 0;
+  const localMembers = localCounts.members;
+
+  let verdict: "ok" | "warning" | "error" | "no_permission" = "ok";
+  let verdict_message = "정상: 이 PC는 서버 원장과 일치합니다.";
+
+  if (membersRes.error) {
+    verdict = "no_permission";
+    verdict_message = "권한 오류: 이 계정은 해당 센터에 접근할 수 없습니다.";
+  } else if (serverMembers > 0 && localMembers < Math.floor(serverMembers * 0.7)) {
+    verdict = "error";
+    verdict_message = `오류: 서버 원장 ${serverMembers}명 vs 로컬 ${localMembers}명 — 서버 기준 강제 불러오기를 실행하세요.`;
+  } else if (localCounts.members_no_remote_id > 0 || syncStatus.pending_count > 0) {
+    verdict = "warning";
+    verdict_message = `주의: 이 PC에만 있는 미동기화 데이터가 있습니다 (remote_id 없는 회원 ${localCounts.members_no_remote_id}명, 대기 ${syncStatus.pending_count}건).`;
+  }
+
+  return {
+    center,
+    server_members: serverMembers,
+    server_active_members: activeMembersRes.count ?? 0,
+    server_memberships: membershipsRes.count ?? 0,
+    server_attendance: attendanceRes.count ?? 0,
+    local_members: localMembers,
+    local_memberships: localCounts.memberships,
+    local_attendance: localCounts.attendance,
+    local_members_no_remote_id: localCounts.members_no_remote_id,
+    local_pending: syncStatus.pending_count,
+    local_failed: syncStatus.failed_count,
+    last_pull_at: syncStatus.last_pull_at ?? null,
+    last_push_at: syncStatus.last_push_at ?? null,
+    verdict,
+    verdict_message,
+  };
 }
 
 /** Pull members/memberships/attendance/lockers from Supabase into local SQLite cache. */

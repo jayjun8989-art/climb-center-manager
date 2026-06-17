@@ -1,6 +1,6 @@
 import { AlertTriangle, DatabaseBackup, Download, FolderOpen, KeyRound, RefreshCw, Settings, ShieldAlert, Upload, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { AttendanceMismatchDiagnostic, BackupInfo, Center, CenterMappingDiagnosticRow, DuplicateMemberCandidateGroup, LocalDuplicateCleanupSummary, ReportInfo, StorageInfo, SyncDiagnostics, UploadVerificationReport } from "../types";
+import type { AttendanceMismatchDiagnostic, BackupInfo, Center, CenterMappingDiagnosticRow, DuplicateMemberCandidateGroup, LocalDuplicateCleanupSummary, MemberMatchEntry, ReportInfo, ServerCenterConsistency, ServerMatchReport, StorageInfo, SyncDiagnostics, UploadVerificationReport } from "../types";
 import { fetchCenterMappingDiagnostics, buildCenterMappingCorrections } from "../sync/centerMappingDiagnostics";
 import type { SyncStatus } from "../sync/types";
 import { checkForUpdate, getAppVersion, installUpdate, runUpdateDiagnostic, UPDATER_ENDPOINT, type UpdateCheckOutcome, type UpdateDiagnosticResult } from "../lib/updater";
@@ -115,6 +115,15 @@ export function SettingsPanel({
   const [mismatchMemberId, setMismatchMemberId] = useState("");
   const [mismatchLoading, setMismatchLoading] = useState(false);
   const [correctingRemaining, setCorrectingRemaining] = useState(false);
+  const [uploadingMemberId, setUploadingMemberId] = useState<number | null>(null);
+  const [memberActionResults, setMemberActionResults] = useState<Record<number, { ok: boolean; message: string }>>({});
+
+  const [serverMatchReport, setServerMatchReport] = useState<ServerMatchReport | null>(null);
+  const [serverMatchLoading, setServerMatchLoading] = useState(false);
+  const [linkingMemberId, setLinkingMemberId] = useState<number | null>(null);
+
+  const [serverConsistency, setServerConsistency] = useState<ServerCenterConsistency | null>(null);
+  const [serverConsistencyLoading, setServerConsistencyLoading] = useState(false);
 
   const [forcePullBusy, setForcePullBusy] = useState(false);
   const [forcePullResult, setForcePullResult] = useState<{
@@ -456,6 +465,94 @@ export function SettingsPanel({
     }
   }
 
+  async function handleMatchServerMembers() {
+    if (!center) return;
+    setServerMatchLoading(true);
+    setServerMatchReport(null);
+    try {
+      const report = await api.matchServerMembers(center);
+      setServerMatchReport(report);
+    } catch (error) {
+      onNotify(error instanceof Error ? error.message : String(error));
+    } finally {
+      setServerMatchLoading(false);
+    }
+  }
+
+  async function handleLinkMember(entry: MemberMatchEntry, remoteId: string) {
+    setLinkingMemberId(entry.local_id);
+    try {
+      await api.linkMemberRemoteId(entry.local_id, remoteId);
+      onNotify(`"${entry.local_name}" 연결 완료 (remote_id: ${remoteId.slice(0, 8)}...)`);
+      await handleMatchServerMembers();
+    } catch (error) {
+      onNotify(error instanceof Error ? error.message : String(error));
+    } finally {
+      setLinkingMemberId(null);
+    }
+  }
+
+  async function handleCheckServerConsistency() {
+    if (!center) return;
+    setServerConsistencyLoading(true);
+    setServerConsistency(null);
+    try {
+      const result = await api.getServerCenterConsistency(center);
+      setServerConsistency(result);
+    } catch (error) {
+      onNotify(error instanceof Error ? error.message : String(error));
+    } finally {
+      setServerConsistencyLoading(false);
+    }
+  }
+
+  async function handleUploadMember(localId: number) {
+    setUploadingMemberId(localId);
+    try {
+      const result = await api.uploadLocalMember(localId);
+      setMemberActionResults((prev) => ({ ...prev, [localId]: result }));
+      if (result.ok) {
+        const report = await api.getUploadVerificationReport();
+        setUploadReport(report);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setMemberActionResults((prev) => ({ ...prev, [localId]: { ok: false, message } }));
+    } finally {
+      setUploadingMemberId(null);
+    }
+  }
+
+  async function handleExcludeMember(localId: number, name: string) {
+    const confirmed = window.confirm(
+      `"${name}" 회원을 업로드 제외로 표시합니다. 이 회원은 동기화 대상에서 빠집니다. 계속하시겠습니까?`
+    );
+    if (!confirmed) return;
+    try {
+      await api.excludeMemberFromUpload(localId);
+      setMemberActionResults((prev) => ({ ...prev, [localId]: { ok: true, message: "업로드 제외로 설정됨" } }));
+      const report = await api.getUploadVerificationReport();
+      setUploadReport(report);
+    } catch (error) {
+      onNotify(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function handleHideMember(localId: number, name: string) {
+    const confirmed = window.confirm(
+      `"${name}" 회원을 로컬에서 숨김 처리합니다. 회원 목록에서 보이지 않게 됩니다. 계속하시겠습니까?`
+    );
+    if (!confirmed) return;
+    try {
+      await api.setMemberHiddenLocally(localId);
+      onNotify(`"${name}" 회원이 숨김 처리되었습니다.`);
+      const report = await api.getUploadVerificationReport();
+      setUploadReport(report);
+    } catch (error) {
+      onNotify(error instanceof Error ? error.message : String(error));
+    }
+  }
+
   if (!open) return null;
 
   return (
@@ -751,28 +848,69 @@ export function SettingsPanel({
                   <div>
                     <div className="mb-1 font-semibold text-[var(--text)]">로컬 전용 회원 ({uploadReport.local_only_members.length}명)</div>
                     <div className="space-y-1">
-                      {uploadReport.local_only_members.map((m) => (
-                        <div key={m.local_id} className="rounded-lg border border-[var(--border)] px-3 py-2">
-                          <div className="flex items-center justify-between">
-                            <span className="font-semibold">{m.name}</span>
-                            <span className={`rounded px-1.5 py-0.5 text-[10px] ${m.can_upload ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"}`}>
-                              {m.can_upload ? "업로드 가능" : "보류"}
-                            </span>
+                      {uploadReport.local_only_members.map((m) => {
+                        const isTestCandidate = /^\d+$/.test(m.name.trim()) || /테스트|test/i.test(m.name) || m.sync_status === 'local_only';
+                        const actionResult = memberActionResults[m.local_id];
+                        const isUploading = uploadingMemberId === m.local_id;
+                        return (
+                          <div key={m.local_id} className="rounded-lg border border-[var(--border)] px-3 py-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-semibold">{m.name}</span>
+                                {isTestCandidate && (
+                                  <span className="rounded bg-slate-500/10 px-1 py-0.5 text-[10px] text-slate-500">테스트 후보</span>
+                                )}
+                              </div>
+                              <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${m.can_upload ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"}`}>
+                                {m.sync_status === 'local_only' ? "업로드 제외" : m.can_upload ? "업로드 가능" : "보류"}
+                              </span>
+                            </div>
+                            <div className="mt-0.5 text-[var(--muted)]">
+                              {m.center} · {m.member_type} · 회원번호: {m.member_no ?? "없음"} · local id: {m.local_id}
+                            </div>
+                            <div className="text-[var(--muted)]">
+                              sync_status: {m.sync_status} · 회원권: {m.has_membership ? "있음" : "없음"} · 출석: {m.attendance_count}건
+                            </div>
+                            {m.upload_block_reason && (
+                              <div className="text-amber-500">{m.upload_block_reason}</div>
+                            )}
+                            {m.last_error && (
+                              <div className="text-red-500">오류: {m.last_error}</div>
+                            )}
+                            {actionResult && (
+                              <div className={`mt-1 ${actionResult.ok ? "text-emerald-600" : "text-red-500"}`}>
+                                {actionResult.ok ? "✓ " : "✗ "}{actionResult.message}
+                              </div>
+                            )}
+                            {m.sync_status !== 'local_only' && (
+                              <div className="mt-1.5 flex flex-wrap gap-1">
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary !px-2 !py-1 text-[11px]"
+                                  disabled={isUploading}
+                                  onClick={() => void handleUploadMember(m.local_id)}
+                                >
+                                  {isUploading ? "업로드 중..." : "서버에 업로드"}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary !px-2 !py-1 text-[11px]"
+                                  onClick={() => void handleExcludeMember(m.local_id, m.name)}
+                                >
+                                  업로드 제외
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary !px-2 !py-1 text-[11px]"
+                                  onClick={() => void handleHideMember(m.local_id, m.name)}
+                                >
+                                  로컬 숨김
+                                </button>
+                              </div>
+                            )}
                           </div>
-                          <div className="mt-0.5 text-[var(--muted)]">
-                            {m.center} · {m.member_type} · 회원번호: {m.member_no ?? "없음"} · local id: {m.local_id}
-                          </div>
-                          <div className="text-[var(--muted)]">
-                            sync_status: {m.sync_status} · 회원권: {m.has_membership ? "있음" : "없음"} · 출석: {m.attendance_count}건
-                          </div>
-                          {m.upload_block_reason && (
-                            <div className="text-amber-500">{m.upload_block_reason}</div>
-                          )}
-                          {m.last_error && (
-                            <div className="text-red-500">오류: {m.last_error}</div>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -827,6 +965,173 @@ export function SettingsPanel({
               </div>
             )}
           </div>
+
+          {/* ── 서버 회원 매칭 검사 ── */}
+          {center && (
+            <div className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--panel-strong)] px-4 py-4">
+              <div className="mb-3 flex items-center gap-2">
+                <ShieldAlert size={18} className="text-sky-500" />
+                <p className="text-sm font-semibold text-[var(--text)]">서버 회원 매칭 검사</p>
+              </div>
+              <p className="mb-3 text-xs text-[var(--muted)]">
+                서버 ID 없는 로컬 회원을 Supabase 회원과 매칭합니다.
+                회원번호 → 연락처 순으로 자동 연결하고, 이름만 일치하는 경우 수동 확인 후 연결합니다.
+              </p>
+              <button
+                type="button"
+                className="btn btn-secondary text-sm"
+                disabled={serverMatchLoading}
+                onClick={() => void handleMatchServerMembers()}
+              >
+                <RefreshCw size={14} className={serverMatchLoading ? "animate-spin" : ""} />
+                {serverMatchLoading ? "매칭 중..." : "서버 회원 매칭 검사"}
+              </button>
+              {serverMatchReport && (
+                <div className="mt-3 space-y-2 text-xs">
+                  <div className="grid grid-cols-3 gap-2 rounded-lg border border-[var(--border)] p-3 text-center">
+                    <div>
+                      <div className="text-emerald-600 font-semibold text-base">{serverMatchReport.auto_linked.length}</div>
+                      <div className="text-[var(--muted)]">자동 연결</div>
+                    </div>
+                    <div>
+                      <div className={`font-semibold text-base ${serverMatchReport.needs_review.length > 0 ? "text-amber-500" : ""}`}>{serverMatchReport.needs_review.length}</div>
+                      <div className="text-[var(--muted)]">수동 확인 필요</div>
+                    </div>
+                    <div>
+                      <div className={`font-semibold text-base ${serverMatchReport.no_match.length > 0 ? "text-red-500" : ""}`}>{serverMatchReport.no_match.length}</div>
+                      <div className="text-[var(--muted)]">매칭 없음</div>
+                    </div>
+                  </div>
+
+                  {serverMatchReport.auto_linked.length > 0 && (
+                    <div>
+                      <div className="mb-1 font-semibold text-emerald-600">자동 연결 완료 ({serverMatchReport.auto_linked.length})</div>
+                      <div className="space-y-1">
+                        {serverMatchReport.auto_linked.map((e) => (
+                          <div key={e.local_id} className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-1.5">
+                            <span className="font-semibold">{e.local_name}</span>
+                            <span className="ml-2 text-[var(--muted)]">
+                              {e.match_type === 'member_no' ? '회원번호' : e.match_type === 'phone' ? '연락처' : '이름'} 일치
+                            </span>
+                            {e.remote_id && (
+                              <span className="ml-2 font-mono text-[10px] text-[var(--muted)]">{e.remote_id.slice(0, 8)}...</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {serverMatchReport.needs_review.length > 0 && (
+                    <div>
+                      <div className="mb-1 font-semibold text-amber-500">수동 확인 필요 ({serverMatchReport.needs_review.length})</div>
+                      <div className="space-y-2">
+                        {serverMatchReport.needs_review.map((e) => (
+                          <div key={e.local_id} className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-semibold">{e.local_name}</span>
+                              <span className="shrink-0 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-600">이름 일치 후보</span>
+                            </div>
+                            <div className="text-[var(--muted)]">회원번호: {e.local_member_no ?? "없음"} · 연락처: {e.local_phone ?? "없음"}</div>
+                            <div className="mt-1 space-y-1">
+                              {e.candidates.map((c) => (
+                                <div key={c.id} className="flex items-center justify-between gap-2 rounded bg-[var(--panel)] px-2 py-1">
+                                  <div>
+                                    <span className="font-semibold">{c.name}</span>
+                                    <span className="ml-2 text-[var(--muted)]">{c.phone ?? "연락처없음"} / 번호: {c.member_no ?? "없음"}</span>
+                                    <span className="ml-2 font-mono text-[10px] text-[var(--muted)]">{c.id.slice(0, 8)}...</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary !px-2 !py-1 text-[10px] shrink-0"
+                                    disabled={linkingMemberId === e.local_id}
+                                    onClick={() => void handleLinkMember(e, c.id)}
+                                  >
+                                    {linkingMemberId === e.local_id ? "연결 중..." : "이 회원으로 연결"}
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {serverMatchReport.no_match.length > 0 && (
+                    <div>
+                      <div className="mb-1 font-semibold text-[var(--text)]">서버 매칭 없음 ({serverMatchReport.no_match.length}) — 신규 업로드 필요</div>
+                      <div className="space-y-1">
+                        {serverMatchReport.no_match.map((e) => (
+                          <div key={e.local_id} className="rounded-lg border border-[var(--border)] px-3 py-1.5">
+                            <span className="font-semibold">{e.local_name}</span>
+                            <span className="ml-2 text-[var(--muted)]">번호: {e.local_member_no ?? "없음"} · 연락처: {e.local_phone ?? "없음"}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {serverMatchReport.errors.length > 0 && (
+                    <div className="rounded-lg bg-red-500/10 px-3 py-2 text-red-500">
+                      {serverMatchReport.errors.map((e, i) => <div key={i}>{e}</div>)}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── PC간 데이터 일치 검증 ── */}
+          {center && (
+            <div className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--panel-strong)] px-4 py-4">
+              <div className="mb-3 flex items-center gap-2">
+                <RefreshCw size={18} className="text-sky-500" />
+                <p className="text-sm font-semibold text-[var(--text)]">PC간 데이터 일치 검증</p>
+              </div>
+              <p className="mb-3 text-xs text-[var(--muted)]">
+                같은 계정으로 이 앱을 사용하는 모든 PC에서 동일한 데이터가 보여야 합니다.
+                서버의 회원 수와 이 PC의 로컬 데이터를 비교합니다.
+              </p>
+              <button
+                type="button"
+                className="btn btn-secondary text-sm"
+                disabled={serverConsistencyLoading}
+                onClick={() => void handleCheckServerConsistency()}
+              >
+                <RefreshCw size={14} className={serverConsistencyLoading ? "animate-spin" : ""} />
+                {serverConsistencyLoading ? "검증 중..." : "PC간 일치 검증"}
+              </button>
+              {serverConsistency && (
+                <div className="mt-3 space-y-2 text-xs">
+                  <div className={`rounded-lg px-3 py-2 font-semibold ${
+                    serverConsistency.verdict === 'ok' ? "bg-emerald-500/10 text-emerald-600" :
+                    serverConsistency.verdict === 'warning' ? "bg-amber-500/10 text-amber-600" :
+                    serverConsistency.verdict === 'error' ? "bg-red-500/10 text-red-500" :
+                    "bg-slate-500/10 text-slate-500"
+                  }`}>
+                    {serverConsistency.verdict_message}
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg border border-[var(--border)] p-3">
+                    <div className="col-span-2 font-semibold text-[var(--text)] mb-1">서버 (Supabase)</div>
+                    <div>전체 회원: <span className="font-semibold">{serverConsistency.server_members}</span></div>
+                    <div>활성 회원: <span className="font-semibold">{serverConsistency.server_active_members}</span></div>
+                    <div>회원권: <span className="font-semibold">{serverConsistency.server_memberships}</span></div>
+                    <div>출석: <span className="font-semibold">{serverConsistency.server_attendance}</span></div>
+                    <div className="col-span-2 font-semibold text-[var(--text)] mt-2 mb-1">이 PC (로컬)</div>
+                    <div>전체 회원: <span className="font-semibold">{serverConsistency.local_members}</span></div>
+                    <div>remote_id 없음: <span className={`font-semibold ${serverConsistency.local_members_no_remote_id > 0 ? "text-amber-500" : ""}`}>{serverConsistency.local_members_no_remote_id}</span></div>
+                    <div>회원권: <span className="font-semibold">{serverConsistency.local_memberships}</span></div>
+                    <div>출석: <span className="font-semibold">{serverConsistency.local_attendance}</span></div>
+                    <div>대기 중: <span className={`font-semibold ${serverConsistency.local_pending > 0 ? "text-amber-500" : ""}`}>{serverConsistency.local_pending}</span></div>
+                    <div>실패: <span className={`font-semibold ${serverConsistency.local_failed > 0 ? "text-red-500" : ""}`}>{serverConsistency.local_failed}</span></div>
+                    <div>마지막 서버→PC: <span className="font-semibold">{serverConsistency.last_pull_at ?? "없음"}</span></div>
+                    <div>마지막 PC→서버: <span className="font-semibold">{serverConsistency.last_push_at ?? "없음"}</span></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── 출석-회원권 차감 불일치 진단 ── */}
           <div className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--panel-strong)] px-4 py-4">

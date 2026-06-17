@@ -18,6 +18,7 @@ export function SelfCheckinPanel({ onClose, onCheckinSuccess }: SelfCheckinPanel
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [todayDuplicate, setTodayDuplicate] = useState(false);
 
   async function handleLookup(event: React.FormEvent) {
     event.preventDefault();
@@ -36,6 +37,8 @@ export function SelfCheckinPanel({ onClose, onCheckinSuccess }: SelfCheckinPanel
         setMember(null);
         return;
       }
+      const hasToday = await api.hasAttendanceToday({ id: found.id }).catch(() => false);
+      setTodayDuplicate(hasToday);
       setMember(found);
       setStage("confirm");
     } catch (lookupError) {
@@ -77,6 +80,7 @@ export function SelfCheckinPanel({ onClose, onCheckinSuccess }: SelfCheckinPanel
     setMember(null);
     setError("");
     setSuccessMessage("");
+    setTodayDuplicate(false);
     setStage("input");
   }
 
@@ -147,13 +151,18 @@ export function SelfCheckinPanel({ onClose, onCheckinSuccess }: SelfCheckinPanel
               </p>
               <p className="mt-1 text-sm text-[var(--muted)]">{member.remaining_text}</p>
             </div>
+            {todayDuplicate && (
+              <p className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-600">
+                ⚠ 오늘 이미 출석 처리된 회원입니다. 그래도 출석 처리하시겠습니까?
+              </p>
+            )}
             {error && (
               <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-500">
                 {error}
               </p>
             )}
             <button type="button" className="btn btn-primary w-full" onClick={handleCheckin} disabled={loading}>
-              {loading ? "처리 중..." : "본인 확인, 출석하기"}
+              {loading ? "처리 중..." : todayDuplicate ? "그래도 출석 처리" : "본인 확인, 출석하기"}
             </button>
             <button type="button" className="btn btn-secondary w-full" onClick={handleReset} disabled={loading}>
               다시 입력

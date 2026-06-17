@@ -26,8 +26,10 @@ pub use sync_local::{
     get_remote_id, get_sync_diagnostics, get_upload_verification_report, list_members_with_remote_id,
     list_sync_queue, mark_sync_queue_error, purge_unsupported_sync_queue, repair_center_mapping,
     repair_member_sync_queue, remove_sync_queue_item, repair_status_mismatch, set_sync_state,
-    upsert_id_map,
+    upsert_id_map, requeue_member_for_upload, exclude_member_from_upload, set_member_hidden_locally,
+    link_member_remote_id, get_local_members_for_matching, get_local_center_counts,
     CenterMappingCorrection, CenterMappingMember, CenterMappingRepairResult,
     RepairSyncQueueResult, SyncDiagnostics, SyncDiagnosticMember, SyncQueueItem, SyncStatus,
     UploadVerificationReport, UploadLocalMember, UploadLocalMembership, UploadLocalAttendance,
+    LocalMemberForMatch, LocalCenterCounts,
 };

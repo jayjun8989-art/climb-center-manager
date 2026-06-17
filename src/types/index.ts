@@ -436,6 +436,81 @@ export interface UploadVerificationReport {
   local_only_attendance: UploadLocalAttendance[];
 }
 
+// ── 서버 회원 매칭 ────────────────────────────────────────────────────────────
+
+export interface LocalMemberForMatch {
+  local_id: number;
+  name: string;
+  center: string;
+  member_no: number | null;
+  phone: string | null;
+  phone_normalized: string | null;
+  sync_status: string;
+  attendance_count: number;
+  has_membership: boolean;
+}
+
+export interface LocalCenterCounts {
+  members: number;
+  memberships: number;
+  attendance: number;
+  members_no_remote_id: number;
+}
+
+export interface ServerMemberCandidate {
+  id: string;
+  name: string;
+  phone: string | null;
+  member_no: number | null;
+}
+
+export type MemberMatchType = 'member_no' | 'phone' | 'name' | 'none' | 'ambiguous';
+
+export interface MemberMatchEntry {
+  local_id: number;
+  local_name: string;
+  local_member_no: number | null;
+  local_phone: string | null;
+  local_attendance_count: number;
+  local_has_membership: boolean;
+  match_type: MemberMatchType;
+  candidates: ServerMemberCandidate[];
+  auto_linked: boolean;
+  remote_id: string | null;
+  error?: string;
+}
+
+export interface ServerMatchReport {
+  center: string;
+  auto_linked: MemberMatchEntry[];
+  needs_review: MemberMatchEntry[];
+  no_match: MemberMatchEntry[];
+  errors: string[];
+  total_checked: number;
+}
+
+// ── PC간 일치 검증 ────────────────────────────────────────────────────────────
+
+export type ConsistencyVerdict = 'ok' | 'warning' | 'error' | 'no_permission';
+
+export interface ServerCenterConsistency {
+  center: string;
+  server_members: number;
+  server_active_members: number;
+  server_memberships: number;
+  server_attendance: number;
+  local_members: number;
+  local_memberships: number;
+  local_attendance: number;
+  local_members_no_remote_id: number;
+  local_pending: number;
+  local_failed: number;
+  last_pull_at: string | null;
+  last_push_at: string | null;
+  verdict: ConsistencyVerdict;
+  verdict_message: string;
+}
+
 export interface AttendanceMismatchDiagnostic {
   member_id: number;
   member_name: string;

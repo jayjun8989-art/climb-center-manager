@@ -1083,3 +1083,174 @@ pub fn repair_status_mismatch(state: &AppState) -> Result<i64, DbError> {
         Ok(count as i64)
     })
 }
+
+/// Link a local member to an existing server member (sets remote_id without uploading).
+/// Clears member queue items and unblocks related attendance/membership items.
+pub fn link_member_remote_id(state: &AppState, local_id: i64, remote_id: &str) -> Result<(), DbError> {
+    state.with_conn(|conn| {
+        let now = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        let tx = conn.transaction()?;
+
+        tx.execute(
+            "UPDATE members SET remote_id = ?1, sync_status = 'synced', updated_at = ?2
+             WHERE id = ?3",
+            rusqlite::params![remote_id, now, local_id],
+        )?;
+
+        tx.execute(
+            "INSERT INTO id_map (entity_type, local_id, remote_id) VALUES ('member', ?1, ?2)
+             ON CONFLICT(entity_type, local_id) DO UPDATE SET remote_id = excluded.remote_id",
+            rusqlite::params![local_id, remote_id],
+        )?;
+
+        // Remove queued member operations — this member is now linked to a server record
+        tx.execute(
+            "DELETE FROM sync_queue WHERE entity_type = 'member' AND entity_local_id = ?1",
+            [local_id],
+        )?;
+
+        // Unblock attendance queue items for this member so they can retry
+        tx.execute(
+            "UPDATE sync_queue SET last_error = NULL, retry_count = 0
+             WHERE entity_type = 'attendance'
+               AND last_error IS NOT NULL
+               AND json_extract(payload_json, '$.local_member_id') = ?1",
+            [local_id],
+        )?;
+
+        tx.commit()?;
+        Ok(())
+    })
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct LocalMemberForMatch {
+    pub local_id: i64,
+    pub name: String,
+    pub center: String,
+    pub member_no: Option<i64>,
+    pub phone: Option<String>,
+    pub phone_normalized: Option<String>,
+    pub sync_status: String,
+    pub attendance_count: i64,
+    pub has_membership: bool,
+}
+
+/// Returns local members without remote_id for a given center (for server matching).
+pub fn get_local_members_for_matching(state: &AppState, center: &str) -> Result<Vec<LocalMemberForMatch>, DbError> {
+    state.with_conn(|conn| {
+        let mut stmt = conn.prepare(
+            "SELECT m.id, m.name, m.center, m.member_no, m.phone,
+                    REPLACE(REPLACE(REPLACE(COALESCE(m.phone,''), '-', ''), ' ', ''), '+82', '0'),
+                    COALESCE(m.sync_status, 'pending'),
+                    (SELECT COUNT(*) FROM attendance_logs al WHERE al.member_id = m.id AND al.canceled_at IS NULL),
+                    (SELECT COUNT(*) FROM memberships ms WHERE ms.member_id = m.id) > 0
+             FROM members m
+             WHERE m.deleted_at IS NULL
+               AND (m.remote_id IS NULL OR m.remote_id = '')
+               AND UPPER(m.center) = UPPER(?1)
+             ORDER BY m.id DESC",
+        )?;
+        let rows = stmt.query_map([center], |row| {
+            let phone_normalized: String = row.get(5)?;
+            let has_ms: i64 = row.get(8)?;
+            Ok(LocalMemberForMatch {
+                local_id: row.get(0)?,
+                name: row.get(1)?,
+                center: row.get(2)?,
+                member_no: row.get(3)?,
+                phone: row.get(4)?,
+                phone_normalized: if phone_normalized.is_empty() { None } else { Some(phone_normalized) },
+                sync_status: row.get(6)?,
+                attendance_count: row.get(7)?,
+                has_membership: has_ms > 0,
+            })
+        })?.collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    })
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct LocalCenterCounts {
+    pub members: i64,
+    pub memberships: i64,
+    pub attendance: i64,
+    pub members_no_remote_id: i64,
+}
+
+/// Returns local DB counts for a given center (for PC consistency check).
+pub fn get_local_center_counts(state: &AppState, center: &str) -> Result<LocalCenterCounts, DbError> {
+    state.with_conn(|conn| {
+        let members: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM members WHERE deleted_at IS NULL AND UPPER(center) = UPPER(?1)",
+            [center], |row| row.get(0),
+        )?;
+        let memberships: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM memberships ms
+             JOIN members m ON m.id = ms.member_id
+             WHERE m.deleted_at IS NULL AND UPPER(m.center) = UPPER(?1)",
+            [center], |row| row.get(0),
+        )?;
+        let attendance: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM attendance_logs al
+             JOIN members m ON m.id = al.member_id
+             WHERE m.deleted_at IS NULL AND al.canceled_at IS NULL AND UPPER(m.center) = UPPER(?1)",
+            [center], |row| row.get(0),
+        )?;
+        let members_no_remote_id: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM members WHERE deleted_at IS NULL
+             AND UPPER(center) = UPPER(?1) AND (remote_id IS NULL OR remote_id = '')",
+            [center], |row| row.get(0),
+        )?;
+        Ok(LocalCenterCounts { members, memberships, attendance, members_no_remote_id })
+    })
+}
+
+/// Re-create a fresh 'insert' queue item for a local-only member so the next push will upload them.
+/// Removes any existing non-error member queue items for this member first to avoid duplicates.
+pub fn requeue_member_for_upload(state: &AppState, member_id: i64) -> Result<i64, DbError> {
+    let payload_json = build_member_sync_payload_json(state, member_id)?;
+    state.with_conn(|conn| {
+        conn.execute(
+            "DELETE FROM sync_queue WHERE entity_type = 'member' AND entity_local_id = ?1 AND last_error IS NULL",
+            [member_id],
+        )?;
+        conn.execute(
+            "UPDATE members SET sync_status = 'pending' WHERE id = ?1",
+            [member_id],
+        )?;
+        let now = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        conn.execute(
+            "INSERT INTO sync_queue (entity_type, entity_local_id, operation, payload_json, created_at)
+             VALUES ('member', ?1, 'insert', ?2, ?3)",
+            rusqlite::params![member_id, payload_json, now],
+        )?;
+        Ok(conn.last_insert_rowid())
+    })
+}
+
+/// Mark a member as local-only (excluded from sync): removes member queue items and sets sync_status = 'local_only'.
+pub fn exclude_member_from_upload(state: &AppState, member_id: i64) -> Result<i64, DbError> {
+    state.with_conn(|conn| {
+        let removed = conn.execute(
+            "DELETE FROM sync_queue WHERE entity_type = 'member' AND entity_local_id = ?1",
+            [member_id],
+        )?;
+        conn.execute(
+            "UPDATE members SET sync_status = 'local_only' WHERE id = ?1",
+            [member_id],
+        )?;
+        Ok(removed as i64)
+    })
+}
+
+/// Set hidden_locally = 1 for a member so they are hidden from the main list.
+pub fn set_member_hidden_locally(state: &AppState, member_id: i64) -> Result<(), DbError> {
+    state.with_conn(|conn| {
+        conn.execute(
+            "UPDATE members SET hidden_locally = 1 WHERE id = ?1",
+            [member_id],
+        )?;
+        Ok(())
+    })
+}
