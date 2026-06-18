@@ -257,7 +257,23 @@ fn normalize_phone(phone: &Option<String>) -> Option<String> {
 }
 
 fn phone_normalized(phone: &Option<String>) -> Option<String> {
-    normalize_phone(phone).map(|value| value.replace(|c: char| !c.is_ascii_digit(), ""))
+    normalize_phone(phone)
+        .map(|value| value.replace(|c: char| !c.is_ascii_digit(), ""))
+        .filter(|value| value.len() >= 7) // non-numeric / placeholder phones → None
+}
+
+fn is_test_data_member(name: &str, phone: &Option<String>) -> bool {
+    const TEST_NAMES: &[&str] = &["ddd", "dddd", "dfdfd", "주니어", "주니어 1"];
+    const TEST_PHONES: &[&str] = &["ddd", "ddff", "ㅎㅎㅎㅎ", "ㅈㅈㅈ"];
+    if TEST_NAMES.iter().any(|&n| n == name.trim()) {
+        return true;
+    }
+    if let Some(p) = phone {
+        if TEST_PHONES.iter().any(|&tp| tp == p.trim()) {
+            return true;
+        }
+    }
+    false
 }
 
 fn find_local_member_id(
@@ -266,6 +282,7 @@ fn find_local_member_id(
 ) -> Result<Option<i64>, DbError> {
     let remote_id = &row.remote_id;
 
+    // Priority 1: remote_id exact match
     if let Some(id) = conn
         .query_row(
             "SELECT id FROM members WHERE remote_id = ?1",
@@ -278,10 +295,7 @@ fn find_local_member_id(
         return Ok(Some(id));
     }
 
-    // Fallback: the id_map may already have this remote_id mapped to a local
-    // member row whose `members.remote_id` column wasn't backfilled (e.g. rows
-    // created before the remote_id column existed). Without this fallback,
-    // repeated pulls would insert a brand-new duplicate member row every time.
+    // Priority 2: id_map lookup (covers rows whose members.remote_id wasn't backfilled)
     if let Some(id) = conn
         .query_row(
             "SELECT local_id FROM id_map WHERE entity_type = 'member' AND remote_id = ?1",
@@ -294,43 +308,61 @@ fn find_local_member_id(
         return Ok(Some(id));
     }
 
-    // Fallback: center + phone (normalized) — covers members that were never
-    // synced before (no remote_id, no id_map entry) but already exist locally.
-    if let Some(phone_norm) = phone_normalized(&row.phone) {
-        if let Some(id) = conn
+    // Priority 3: center + member_no — only when unique (prevents test-data collapse)
+    if let Some(member_no) = row.member_no {
+        let count: i64 = conn
             .query_row(
-                "SELECT id FROM members
-                 WHERE center = ?1 AND phone_normalized = ?2 AND deleted_at IS NULL
-                 ORDER BY updated_at DESC, id DESC LIMIT 1",
+                "SELECT COUNT(*) FROM members
+                 WHERE center = ?1 AND member_no = ?2 AND deleted_at IS NULL",
+                params![row.center, member_no],
+                |r| r.get(0),
+            )
+            .map_err(DbError::from)?;
+        if count == 1 {
+            if let Some(id) = conn
+                .query_row(
+                    "SELECT id FROM members
+                     WHERE center = ?1 AND member_no = ?2 AND deleted_at IS NULL",
+                    params![row.center, member_no],
+                    |r| r.get(0),
+                )
+                .optional()
+                .map_err(DbError::from)?
+            {
+                return Ok(Some(id));
+            }
+        }
+    }
+
+    // Priority 4: center + phone_normalized — only when ≥7 digits AND unique match.
+    // phone_normalized() already filters out non-numeric / short strings,
+    // preventing empty-string collapse when multiple members lack a real phone.
+    if let Some(phone_norm) = phone_normalized(&row.phone) {
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM members
+                 WHERE center = ?1 AND phone_normalized = ?2 AND deleted_at IS NULL",
                 params![row.center, phone_norm],
                 |r| r.get(0),
             )
-            .optional()
-            .map_err(DbError::from)?
-        {
-            return Ok(Some(id));
+            .map_err(DbError::from)?;
+        if count == 1 {
+            if let Some(id) = conn
+                .query_row(
+                    "SELECT id FROM members
+                     WHERE center = ?1 AND phone_normalized = ?2 AND deleted_at IS NULL",
+                    params![row.center, phone_norm],
+                    |r| r.get(0),
+                )
+                .optional()
+                .map_err(DbError::from)?
+            {
+                return Ok(Some(id));
+            }
         }
     }
 
-    // Fallback: center + name + member_type when phone is absent on both sides.
-    if row.phone.as_deref().map(str::trim).unwrap_or("").is_empty() {
-        let member_type = normalize_local_member_type(&row.member_type);
-        if let Some(id) = conn
-            .query_row(
-                "SELECT id FROM members
-                 WHERE center = ?1 AND name = ?2 AND member_type = ?3
-                   AND IFNULL(phone, '') = '' AND deleted_at IS NULL
-                 ORDER BY updated_at DESC, id DESC LIMIT 1",
-                params![row.center, row.name.trim(), member_type],
-                |r| r.get(0),
-            )
-            .optional()
-            .map_err(DbError::from)?
-        {
-            return Ok(Some(id));
-        }
-    }
-
+    // Priority 5: INSERT — no name-only fallback (too loose, causes collapse)
     Ok(None)
 }
 
@@ -412,6 +444,12 @@ fn upsert_member(
              ON CONFLICT(entity_type, local_id) DO UPDATE SET remote_id = excluded.remote_id",
             params![local_id, row.remote_id],
         )?;
+        if is_test_data_member(row.name.trim(), &row.phone) {
+            conn.execute(
+                "UPDATE members SET hidden_locally = 1 WHERE id = ?1",
+                [local_id],
+            )?;
+        }
         return Ok((local_id, false));
     }
 
@@ -444,6 +482,12 @@ fn upsert_member(
          ON CONFLICT(entity_type, local_id) DO UPDATE SET remote_id = excluded.remote_id",
         params![local_id, row.remote_id],
     )?;
+    if is_test_data_member(row.name.trim(), &row.phone) {
+        conn.execute(
+            "UPDATE members SET hidden_locally = 1 WHERE id = ?1",
+            [local_id],
+        )?;
+    }
     Ok((local_id, true))
 }
 

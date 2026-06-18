@@ -1,11 +1,11 @@
 {
-    "version": "1.0.46",
-    "pub_date": "2026-06-17T00:00:00Z",
-    "notes": "v1.0.46: pull UPDATE 경로 remote_id 저장 버그 수정, backfill 함수 추가, 자동 pull 개선, KST 시간 표시 수정",
+    "version": "1.0.49",
+    "pub_date": "2026-06-18T00:00:00Z",
+    "notes": "v1.0.49: phone_normalized 빈 문자열 버그 수정 — 비수치 전화번호 회원이 단일 row로 collapse되던 문제 해결, 강제 pull 후 서버 1716명 → 로컬 1716명 정상 저장",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVoyVnlJN1hsc2J2MEVhQjBGck9XeDlpNXd0TUx4OXhmWUtQSEl5MllsZlhIcG9OOHJVaWZ5RlpUdit5cXJobnRualBEd0NrU0pYd3N5SVYreHNIZmdNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxNjg4OTc4CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC40Nl94NjQtc2V0dXAuZXhlCi9Ga1Y0NlpKSXZmeEtsN3U1WEI2VURySDBGVUxoRUtyM0hHMXN4QklwN0s5SEFCVythbHU4aHlaMmhDRlhnWXIyQ29oN1RXMzcxa0o0T3R3WFZNL1JRPT0K",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.46/ClimbCenterManager_1.0.46_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWVVZFA0L1lobjh1Y0ZqYitWNnlYczBtcCtjOTVoU0dSekRqYUcyZTU3MkFVbHQ3QUFzNUxXMndmbnJjay9Qd0pIWmVzR3krRkoxYk5rNTh0SktLTXdnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxNzc2MzkzCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC40OV94NjQtc2V0dXAuZXhlCk9CS1lxMDBSdjBjZXFtVktwMHZLOGJaSXp5Ny9KM2JWaDdIVHhIT2NIYXVLd2k0ZVJHV0xONnhPSEgzUDExU015ZWltUXMwU1BoRnBTRjZqLzR6eEJBPT0K",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.49/ClimbCenterManager_1.0.49_x64-setup.exe"
         }
     }
 }
