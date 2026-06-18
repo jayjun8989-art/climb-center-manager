@@ -9,6 +9,7 @@ mod locker;
 mod pull_import;
 mod status;
 mod sync_local;
+pub mod diagnostic;
 
 pub use attendance_ext::{
     cancel_attendance, check_attendance_with_options, has_attendance_today, has_attendance_on_date,
@@ -18,6 +19,7 @@ pub use attendance_ext::{
 pub use ensure_schema::ensure_local_schema;
 pub use locker::list_center_lockers;
 pub use ops::*;
+pub use diagnostic::{run_diagnostic, DiagnosticReport};
 pub use pull_import::{
     backfill_member_remote_ids_from_id_map, count_active_members, import_pull_snapshot,
     PullImportResult, PullSnapshot,

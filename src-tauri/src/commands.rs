@@ -15,6 +15,7 @@ use crate::db::{
     CenterMappingRepairResult, DbError, LocalMemberForMatch, LocalCenterCounts,
     PullImportResult, PullSnapshot, RepairSyncQueueResult,
     SyncQueueItem, SyncStatus, UploadVerificationReport,
+    run_diagnostic, DiagnosticReport,
 };
 use crate::db::{list_members_with_remote_id, repair_center_mapping};
 use crate::models::{
@@ -674,4 +675,11 @@ pub fn get_local_center_counts_cmd(
     center: String,
 ) -> Result<LocalCenterCounts, String> {
     get_local_center_counts(&state, &center).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn membership_attendance_queue_diag_cmd(
+    state: State<'_, AppState>,
+) -> Result<DiagnosticReport, String> {
+    run_diagnostic(&state).map_err(|e| e.to_string())
 }

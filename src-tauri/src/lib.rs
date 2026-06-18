@@ -133,6 +133,7 @@ pub fn run() {
             commands::link_member_remote_id_cmd,
             commands::get_local_members_for_matching_cmd,
             commands::get_local_center_counts_cmd,
+            commands::membership_attendance_queue_diag_cmd,
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|error| {

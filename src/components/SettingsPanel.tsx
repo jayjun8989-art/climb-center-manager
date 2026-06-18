@@ -9,6 +9,52 @@ import type { Update } from "@tauri-apps/plugin-updater";
 import { api } from "../api/client";
 import { repairSyncQueue, runSyncVerificationReport, type SyncVerificationReport } from "../sync/engine";
 import { getSupabaseClient } from "../lib/supabase/client";
+import { invoke } from "@tauri-apps/api/core";
+
+// ---------------------------------------------------------------------------
+// Diagnostic report types (v1.0.54)
+// ---------------------------------------------------------------------------
+
+interface DiagItem {
+  localId: number;
+  isTestData: boolean;
+  classification: string;
+  classificationReason: string;
+}
+interface DiagMembershipItem extends DiagItem {
+  membershipType: string;
+  memberName: string;
+  memberCenter: string;
+  memberRemoteId: string | null;
+}
+interface DiagAttendanceItem extends DiagItem {
+  checkinAt: string;
+  memberName: string;
+  memberCenter: string;
+  memberRemoteId: string | null;
+  membershipRemoteId: string | null;
+}
+interface DiagSyncQueueItem extends DiagItem {
+  entityType: string;
+  operation: string;
+  entityLocalId: number;
+  retryCount: number;
+  lastError: string | null;
+  memberName: string | null;
+  memberRemoteId: string | null;
+}
+interface DiagSection<T> {
+  total: number;
+  summary: Record<string, number>;
+  items: T[];
+}
+interface DiagnosticReport {
+  generatedAt: string;
+  membershipsNoRemoteId: DiagSection<DiagMembershipItem>;
+  attendanceNoRemoteId: DiagSection<DiagAttendanceItem>;
+  syncQueue: DiagSection<DiagSyncQueueItem>;
+  diagFilePath: string | null;
+}
 
 interface SettingsPanelProps {
   open: boolean;
@@ -139,6 +185,8 @@ export function SettingsPanel({
   const [serverConsistencyLoading, setServerConsistencyLoading] = useState(false);
 
   const [forcePullBusy, setForcePullBusy] = useState(false);
+  const [diagBusy, setDiagBusy] = useState(false);
+  const [diagReport, setDiagReport] = useState<DiagnosticReport | null>(null);
   const [forcePullResult, setForcePullResult] = useState<{
     serverCount: number;
     fetchedCount: number;
@@ -401,6 +449,19 @@ export function SettingsPanel({
       onNotify(error instanceof Error ? error.message : String(error));
     } finally {
       setVerifyBusyId(null);
+    }
+  }
+
+  async function handleMembershipAttendanceDiag() {
+    setDiagBusy(true);
+    setDiagReport(null);
+    try {
+      const report = await invoke<DiagnosticReport>("membership_attendance_queue_diag_cmd");
+      setDiagReport(report);
+    } catch (error) {
+      onNotify(`진단 실패: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setDiagBusy(false);
     }
   }
 
@@ -1536,6 +1597,92 @@ export function SettingsPanel({
                   </div>
                 );
               })()}
+
+              {/* ── 회원권·출석·큐 진단 버튼 ── */}
+              <div className="mt-3">
+                <button
+                  className="btn btn-secondary w-full"
+                  disabled={diagBusy}
+                  onClick={() => void handleMembershipAttendanceDiag()}
+                >
+                  <RefreshCw size={16} className={diagBusy ? "animate-spin" : ""} />
+                  {diagBusy ? "진단 중..." : "회원권·출석·큐 진단 리포트"}
+                </button>
+              </div>
+              {diagReport && (
+                <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 text-[11px] space-y-2">
+                  <div className="font-semibold text-[var(--text)]">회원권·출석·큐 진단 결과 <span className="text-[var(--muted)] font-normal">({diagReport.generatedAt})</span></div>
+
+                  {/* 회원권 */}
+                  <details open>
+                    <summary className="cursor-pointer font-semibold text-[var(--text)]">
+                      회원권 (remote_id 없음): {diagReport.membershipsNoRemoteId.total}건
+                    </summary>
+                    <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[var(--muted)]">
+                      {Object.entries(diagReport.membershipsNoRemoteId.summary).map(([k, v]) => (
+                        <div key={k}><span className={k === "SAFE_UPLOAD_CANDIDATE" ? "text-emerald-500" : k.startsWith("BLOCK") ? "text-red-500" : "text-amber-400"}>{k}</span>: <span className="font-semibold text-[var(--text)]">{v}</span></div>
+                      ))}
+                    </div>
+                    {diagReport.membershipsNoRemoteId.items.length > 0 && (
+                      <div className="mt-1 max-h-40 overflow-y-auto rounded border border-[var(--border)] bg-[var(--bg)] p-2 font-mono text-[10px] space-y-0.5">
+                        {diagReport.membershipsNoRemoteId.items.map((m) => (
+                          <div key={m.localId} className={m.classification === "SAFE_UPLOAD_CANDIDATE" ? "text-emerald-500" : m.classification.startsWith("BLOCK") ? "text-red-400" : "text-amber-400"}>
+                            [{m.memberCenter}] {m.memberName} — {m.membershipType} | {m.classification}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </details>
+
+                  {/* 출석 */}
+                  <details open>
+                    <summary className="cursor-pointer font-semibold text-[var(--text)]">
+                      출석 (remote_id 없음): {diagReport.attendanceNoRemoteId.total}건
+                    </summary>
+                    <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[var(--muted)]">
+                      {Object.entries(diagReport.attendanceNoRemoteId.summary).map(([k, v]) => (
+                        <div key={k}><span className={k === "SAFE_UPLOAD_CANDIDATE" ? "text-emerald-500" : k.startsWith("BLOCK") ? "text-red-500" : "text-amber-400"}>{k}</span>: <span className="font-semibold text-[var(--text)]">{v}</span></div>
+                      ))}
+                    </div>
+                    {diagReport.attendanceNoRemoteId.items.length > 0 && (
+                      <div className="mt-1 max-h-40 overflow-y-auto rounded border border-[var(--border)] bg-[var(--bg)] p-2 font-mono text-[10px] space-y-0.5">
+                        {diagReport.attendanceNoRemoteId.items.map((a) => (
+                          <div key={a.localId} className={a.classification === "SAFE_UPLOAD_CANDIDATE" ? "text-emerald-500" : a.classification.startsWith("BLOCK") ? "text-red-400" : "text-amber-400"}>
+                            [{a.memberCenter}] {a.memberName} — {a.checkinAt.slice(0, 10)} | {a.classification}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </details>
+
+                  {/* 큐 */}
+                  <details open>
+                    <summary className="cursor-pointer font-semibold text-[var(--text)]">
+                      sync_queue: {diagReport.syncQueue.total}건
+                    </summary>
+                    <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[var(--muted)]">
+                      {Object.entries(diagReport.syncQueue.summary).map(([k, v]) => (
+                        <div key={k}><span className={k === "ALREADY_RESOLVED" ? "text-emerald-500" : k.startsWith("BLOCK") ? "text-red-500" : k.includes("CANDIDATE") ? "text-sky-400" : "text-amber-400"}>{k}</span>: <span className="font-semibold text-[var(--text)]">{v}</span></div>
+                      ))}
+                    </div>
+                    {diagReport.syncQueue.items.length > 0 && (
+                      <div className="mt-1 max-h-40 overflow-y-auto rounded border border-[var(--border)] bg-[var(--bg)] p-2 font-mono text-[10px] space-y-0.5">
+                        {diagReport.syncQueue.items.map((q) => (
+                          <div key={q.localId} className={q.classification === "ALREADY_RESOLVED" ? "text-emerald-500" : q.classification.startsWith("BLOCK") ? "text-red-400" : q.classification.includes("CANDIDATE") ? "text-sky-400" : "text-amber-400"}>
+                            [{q.entityType}#{q.entityLocalId}] {q.memberName ?? "?"} | {q.classification}{q.lastError ? ` — ${q.lastError.slice(0, 60)}` : ""}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </details>
+
+                  {diagReport.diagFilePath && (
+                    <div className="text-[9px] text-[var(--muted)] font-mono break-all">
+                      저장 위치: {diagReport.diagFilePath}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {verifyReport && (
                 <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 text-[11px]">
