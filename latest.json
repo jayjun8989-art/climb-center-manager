@@ -1,11 +1,11 @@
 {
-    "version": "1.0.49",
+    "version": "1.0.50",
     "pub_date": "2026-06-18T00:00:00Z",
-    "notes": "v1.0.49: phone_normalized 빈 문자열 버그 수정 — 비수치 전화번호 회원이 단일 row로 collapse되던 문제 해결, 강제 pull 후 서버 1716명 → 로컬 1716명 정상 저장",
+    "notes": "v1.0.50: within-pull cross-matching 차단 + missing remote_id 진단",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWVVZFA0L1lobjh1Y0ZqYitWNnlYczBtcCtjOTVoU0dSekRqYUcyZTU3MkFVbHQ3QUFzNUxXMndmbnJjay9Qd0pIWmVzR3krRkoxYk5rNTh0SktLTXdnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxNzc2MzkzCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC40OV94NjQtc2V0dXAuZXhlCk9CS1lxMDBSdjBjZXFtVktwMHZLOGJaSXp5Ny9KM2JWaDdIVHhIT2NIYXVLd2k0ZVJHV0xONnhPSEgzUDExU015ZWltUXMwU1BoRnBTRjZqLzR6eEJBPT0K",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.49/ClimbCenterManager_1.0.49_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVF6VVowVzJJY3V4YXRxSy9ORWZ3bVJJOFpWdWt0Y0lKUXhseWRkRHk5WFF4eTVqb2F0aUJieXJKYlkxd20zbnl6MnZyTGVVcGZlZWFpSEJNUzMyTmdZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxNzg0NjE0CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC41MF94NjQtc2V0dXAuZXhlCmRCZklacStrK1J0dWRGM3IwcWFZdnpHRU1qaldWcDFpVTdWT2QwcUdxSUFWb1MraFBZVUdoQ3k4ZU1SSmtJWnRTamFCclNxdm9rSHhxSWdRTHo4bUR3PT0K",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.50/ClimbCenterManager_1.0.50_x64-setup.exe"
         }
     }
 }

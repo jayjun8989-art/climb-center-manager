@@ -1011,14 +1011,16 @@ export default function App() {
           } catch {
             // ignore
           }
+          const missingCount = result.missingRemoteIdCount ?? 0;
+          const missingSample = result.missingRemoteIdSample ?? [];
           // Verdict message
           let verdict: string;
           if (serverCount > 0 && localDbCount === 0) {
             verdict = `서버 데이터를 처리했지만 로컬 DB 저장 수가 0명입니다. import 저장 로직을 확인해야 합니다.`;
-          } else if (localDbCount === serverCount) {
+          } else if (missingCount === 0) {
             verdict = `서버 원장이 이 PC에 정상 반영되었습니다.`;
-          } else if (localDbCount > 0 && localDbCount < serverCount) {
-            verdict = `서버 데이터를 처리했지만 로컬 DB 저장 수(${localDbCount}명)가 서버 원장(${serverCount}명)과 다릅니다. import 저장 로직을 확인하세요.`;
+          } else if (missingCount > 0) {
+            verdict = `서버 ${serverCount}명 중 ${missingCount}명의 remote_id가 로컬에 없습니다. (로컬 저장: ${localDbCount}명)`;
           } else {
             verdict = `화면 표시 수는 현재 필터/활성 회원 기준입니다.`;
           }
@@ -1028,7 +1030,7 @@ export default function App() {
           if (result.errors && result.errors.length > 0) {
             console.warn("[App] 강제 불러오기 오류:", result.errors);
           }
-          return { serverCount, fetchedCount, localDbCount, localDisplayCount, noRemoteIdCount, displayCount, message, verdict };
+          return { serverCount, fetchedCount, localDbCount, localDisplayCount, noRemoteIdCount, displayCount, message, verdict, missingCount, missingSample };
         }}
         onPushToSupabase={
           permissions.canSyncPush

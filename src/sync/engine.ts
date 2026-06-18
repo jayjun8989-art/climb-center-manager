@@ -1238,6 +1238,12 @@ export async function pullFromSupabase(options?: {
     failedMembers?: number;
     failedMemberships?: number;
     firstError?: string | null;
+    serverTotal?: number;
+    localTotalAfter?: number;
+    localWithRemoteId?: number;
+    missingRemoteIdCount?: number;
+    missingRemoteIdSample?: import("./types").PullMissingMemberSample[];
+    conflictCount?: number;
   };
 
   try {
@@ -1334,6 +1340,12 @@ export async function pullFromSupabase(options?: {
     message,
     pullDiagnostics,
     fetchedTotal: membersRows.length,
+    serverTotal: importResult.serverTotal,
+    localTotalAfter: importResult.localTotalAfter,
+    localWithRemoteId: importResult.localWithRemoteId,
+    missingRemoteIdCount: importResult.missingRemoteIdCount,
+    missingRemoteIdSample: importResult.missingRemoteIdSample,
+    conflictCount: importResult.conflictCount,
   };
 }
 

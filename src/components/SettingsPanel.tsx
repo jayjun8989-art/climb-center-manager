@@ -49,6 +49,8 @@ interface SettingsPanelProps {
     displayCount: number;
     message: string;
     verdict: string;
+    missingCount?: number;
+    missingSample?: Array<{ remoteId: string; name: string; memberNo: number | null; phone: string | null; phoneNormalizedVal: string | null; center: string; isTestData: boolean }>;
   }>;
   onPushToSupabase?: () => void;
   allowedCenterIds?: string[];
@@ -146,6 +148,8 @@ export function SettingsPanel({
     message: string;
     verdict: string;
     warning?: string;
+    missingCount?: number;
+    missingSample?: Array<{ remoteId: string; name: string; memberNo: number | null; phone: string | null; phoneNormalizedVal: string | null; center: string; isTestData: boolean }>;
   } | null>(null);
 
   useEffect(() => {
@@ -405,7 +409,10 @@ export function SettingsPanel({
     try {
       const result = await onForcePullFromSupabase();
       let warning: string | undefined;
-      if (result.serverCount > 0 && result.localDbCount < result.serverCount * 0.9) {
+      const missing = result.missingCount ?? 0;
+      if (missing > 0) {
+        warning = `서버 ${result.serverCount}명 중 ${missing}명의 remote_id가 로컬에 없음 — 재시도 권장`;
+      } else if (result.serverCount > 0 && result.localDbCount < result.serverCount * 0.9) {
         warning = `서버 원장 ${result.serverCount}명 중 로컬 DB에 ${result.localDbCount}명만 저장됨 — upsert 오류 가능성`;
       }
       setForcePullResult({ ...result, warning });
@@ -1495,7 +1502,8 @@ export function SettingsPanel({
                       <div>서버에서 받은 회원: <span className="font-semibold text-[var(--text)]">{forcePullResult.fetchedCount}명</span></div>
                       <div>로컬 DB 저장 회원: <span className={`font-semibold ${isFailed ? "text-red-600" : forcePullResult.localDbCount === forcePullResult.serverCount ? "text-emerald-600" : "text-amber-500"}`}>{forcePullResult.localDbCount}명</span></div>
                       <div>화면 표시 회원: <span className="font-semibold text-[var(--text)]">{forcePullResult.displayCount}명</span></div>
-                      <div className="col-span-2">remote_id 없는 회원: <span className={`font-semibold ${forcePullResult.noRemoteIdCount > 0 ? "text-amber-500" : "text-emerald-600"}`}>{forcePullResult.noRemoteIdCount}명</span></div>
+                      <div>remote_id 없는 회원: <span className={`font-semibold ${forcePullResult.noRemoteIdCount > 0 ? "text-amber-500" : "text-emerald-600"}`}>{forcePullResult.noRemoteIdCount}명</span></div>
+                      <div>missing remote_id: <span className={`font-semibold ${(forcePullResult.missingCount ?? 0) > 0 ? "text-red-500" : "text-emerald-600"}`}>{forcePullResult.missingCount ?? 0}명</span></div>
                     </div>
                     <div className={`mt-2 font-semibold ${isFailed ? "text-red-600" : isOk ? "text-emerald-600" : "text-amber-500"}`}>
                       {forcePullResult.verdict}
@@ -1504,6 +1512,18 @@ export function SettingsPanel({
                       <div className="mt-1 text-amber-500">{forcePullResult.warning}</div>
                     )}
                     <div className="mt-1 text-[var(--muted)]">{forcePullResult.message}</div>
+                    {(forcePullResult.missingSample ?? []).length > 0 && (
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-amber-500 font-semibold">missing 샘플 ({forcePullResult.missingSample!.length}건)</summary>
+                        <div className="mt-1 max-h-48 overflow-y-auto rounded border border-[var(--border)] bg-[var(--bg)] p-2 font-mono text-[10px] space-y-0.5">
+                          {forcePullResult.missingSample!.map((m) => (
+                            <div key={m.remoteId} className={m.isTestData ? "text-amber-400" : "text-[var(--muted)]"}>
+                              [{m.center}] {m.name} | no={m.memberNo ?? "-"} | phone={m.phone ?? "-"} | norm={m.phoneNormalizedVal ?? "-"}{m.isTestData ? " ⚠테스트" : ""}
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
                   </div>
                 );
               })()}

@@ -35,6 +35,16 @@ export interface PullCenterDiagnostics {
   mappingFail: number;
 }
 
+export interface PullMissingMemberSample {
+  remoteId: string;
+  name: string;
+  memberNo: number | null;
+  phone: string | null;
+  phoneNormalizedVal: string | null;
+  center: string;
+  isTestData: boolean;
+}
+
 export interface PullRunResult {
   importedMembers: number;
   importedMemberships: number;
@@ -48,4 +58,11 @@ export interface PullRunResult {
   pullDiagnostics?: Record<string, PullCenterDiagnostics>;
   /** Total rows fetched from server across all pages (may differ from COUNT if RLS limits results) */
   fetchedTotal?: number;
+  // Diagnostics from import
+  serverTotal?: number;
+  localTotalAfter?: number;
+  localWithRemoteId?: number;
+  missingRemoteIdCount?: number;
+  missingRemoteIdSample?: PullMissingMemberSample[];
+  conflictCount?: number;
 }

@@ -145,6 +145,18 @@ fn has_remote_id(value: &str) -> bool {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct PullMissingMemberSample {
+    pub remote_id: String,
+    pub name: String,
+    pub member_no: Option<i64>,
+    pub phone: Option<String>,
+    pub phone_normalized_val: Option<String>,
+    pub center: String,
+    pub is_test_data: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PullImportResult {
     pub imported_members: i64,
     pub imported_memberships: i64,
@@ -155,6 +167,13 @@ pub struct PullImportResult {
     pub failed_members: i64,
     pub failed_memberships: i64,
     pub first_error: Option<String>,
+    // Diagnostics — populated after commit
+    pub server_total: i64,
+    pub local_total_after: i64,
+    pub local_with_remote_id: i64,
+    pub missing_remote_id_count: i64,
+    pub missing_remote_id_sample: Vec<PullMissingMemberSample>,
+    pub conflict_count: i64,
 }
 
 /// Backfill members.remote_id from id_map for rows where remote_id is NULL.
@@ -308,12 +327,14 @@ fn find_local_member_id(
         return Ok(Some(id));
     }
 
-    // Priority 3: center + member_no — only when unique (prevents test-data collapse)
+    // Priority 3: center + member_no — only when unique AND only pre-existing local rows
+    // (remote_id IS NULL check prevents matching rows already inserted in this same pull)
     if let Some(member_no) = row.member_no {
         let count: i64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM members
-                 WHERE center = ?1 AND member_no = ?2 AND deleted_at IS NULL",
+                 WHERE center = ?1 AND member_no = ?2 AND deleted_at IS NULL
+                   AND (remote_id IS NULL OR remote_id = '')",
                 params![row.center, member_no],
                 |r| r.get(0),
             )
@@ -322,7 +343,8 @@ fn find_local_member_id(
             if let Some(id) = conn
                 .query_row(
                     "SELECT id FROM members
-                     WHERE center = ?1 AND member_no = ?2 AND deleted_at IS NULL",
+                     WHERE center = ?1 AND member_no = ?2 AND deleted_at IS NULL
+                       AND (remote_id IS NULL OR remote_id = '')",
                     params![row.center, member_no],
                     |r| r.get(0),
                 )
@@ -334,14 +356,15 @@ fn find_local_member_id(
         }
     }
 
-    // Priority 4: center + phone_normalized — only when ≥7 digits AND unique match.
-    // phone_normalized() already filters out non-numeric / short strings,
-    // preventing empty-string collapse when multiple members lack a real phone.
+    // Priority 4: center + phone_normalized — only when ≥7 digits AND unique AND pre-existing.
+    // phone_normalized() already filters out non-numeric / short strings.
+    // remote_id IS NULL check prevents within-pull collapse (same phone → same row).
     if let Some(phone_norm) = phone_normalized(&row.phone) {
         let count: i64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM members
-                 WHERE center = ?1 AND phone_normalized = ?2 AND deleted_at IS NULL",
+                 WHERE center = ?1 AND phone_normalized = ?2 AND deleted_at IS NULL
+                   AND (remote_id IS NULL OR remote_id = '')",
                 params![row.center, phone_norm],
                 |r| r.get(0),
             )
@@ -350,7 +373,8 @@ fn find_local_member_id(
             if let Some(id) = conn
                 .query_row(
                     "SELECT id FROM members
-                     WHERE center = ?1 AND phone_normalized = ?2 AND deleted_at IS NULL",
+                     WHERE center = ?1 AND phone_normalized = ?2 AND deleted_at IS NULL
+                       AND (remote_id IS NULL OR remote_id = '')",
                     params![row.center, phone_norm],
                     |r| r.get(0),
                 )
@@ -382,7 +406,7 @@ fn find_local_membership_id(
 fn upsert_member(
     conn: &rusqlite::Connection,
     row: &PullMemberRow,
-) -> Result<(i64, bool), DbError> {
+) -> Result<(i64, bool, bool), DbError> { // (local_id, inserted, had_conflict)
     let member_type = normalize_local_member_type(&row.member_type);
     let phone = normalize_phone(&row.phone);
     let phone_norm = phone_normalized(&row.phone);
@@ -450,7 +474,7 @@ fn upsert_member(
                 [local_id],
             )?;
         }
-        return Ok((local_id, false));
+        return Ok((local_id, false, has_conflict));
     }
 
     conn.execute(
@@ -488,7 +512,7 @@ fn upsert_member(
             [local_id],
         )?;
     }
-    Ok((local_id, true))
+    Ok((local_id, true, false))
 }
 
 fn upsert_membership(
@@ -567,7 +591,13 @@ pub fn import_pull_snapshot(state: &AppState, snapshot: PullSnapshot) -> Result<
     let mut skipped = 0_i64;
     let mut failed_members = 0_i64;
     let mut failed_memberships = 0_i64;
+    let mut conflict_count = 0_i64;
     let mut first_error: Option<String> = None;
+    let mut local_total_after = 0_i64;
+    let mut local_with_remote_id = 0_i64;
+    let mut local_remote_id_set: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    let server_total = snapshot.members.len() as i64;
 
     state.with_conn(|conn| {
         // ensure_local_schema adds phone_normalized and other missing columns
@@ -589,12 +619,15 @@ pub fn import_pull_snapshot(state: &AppState, snapshot: PullSnapshot) -> Result<
                 continue;
             }
             match upsert_member(&tx, row) {
-                Ok((local_id, inserted)) => {
+                Ok((local_id, inserted, had_conflict)) => {
                     member_ids.insert(row.remote_id.clone(), local_id);
                     if inserted {
                         imported_members += 1;
                     } else {
                         updated_members += 1;
+                    }
+                    if had_conflict {
+                        conflict_count += 1;
                     }
                 }
                 Err(error) => {
@@ -612,8 +645,8 @@ pub fn import_pull_snapshot(state: &AppState, snapshot: PullSnapshot) -> Result<
         }
 
         eprintln!(
-            "[pull_import] members: imported={} updated={} failed={} skipped={}",
-            imported_members, updated_members, failed_members, skipped
+            "[pull_import] members: imported={} updated={} failed={} skipped={} conflicts={}",
+            imported_members, updated_members, failed_members, skipped, conflict_count
         );
 
         for row in &snapshot.memberships {
@@ -759,6 +792,25 @@ pub fn import_pull_snapshot(state: &AppState, snapshot: PullSnapshot) -> Result<
 
         tx.commit()?;
         refresh_all_statuses(conn)?;
+
+        // Post-commit diagnostics (run after commit so counts reflect committed state)
+        local_total_after = conn.query_row(
+            "SELECT COUNT(*) FROM members WHERE deleted_at IS NULL",
+            [], |r| r.get(0),
+        ).unwrap_or(0);
+        local_with_remote_id = conn.query_row(
+            "SELECT COUNT(*) FROM members WHERE deleted_at IS NULL AND remote_id IS NOT NULL AND remote_id != ''",
+            [], |r| r.get(0),
+        ).unwrap_or(0);
+
+        if let Ok(mut stmt) = conn.prepare(
+            "SELECT remote_id FROM members WHERE deleted_at IS NULL AND remote_id IS NOT NULL AND remote_id != ''"
+        ) {
+            if let Ok(iter) = stmt.query_map([], |r| r.get::<_, String>(0)) {
+                iter.filter_map(|r| r.ok()).for_each(|id| { local_remote_id_set.insert(id); });
+            }
+        }
+
         Ok(())
     })?;
 
@@ -768,6 +820,29 @@ pub fn import_pull_snapshot(state: &AppState, snapshot: PullSnapshot) -> Result<
         .unwrap_or_else(|e| { eprintln!("[pull_import] backfill failed: {}", e); (0, 0) });
 
     eprintln!("[pull_import] post-pull backfill: {}", backfilled);
+
+    // Compute missing remote_ids (server rows not found in local DB)
+    let missing_rows: Vec<&PullMemberRow> = snapshot.members.iter()
+        .filter(|m| !local_remote_id_set.contains(&m.remote_id))
+        .collect();
+    let missing_remote_id_count = missing_rows.len() as i64;
+    let missing_remote_id_sample: Vec<PullMissingMemberSample> = missing_rows.iter()
+        .take(50)
+        .map(|m| PullMissingMemberSample {
+            remote_id: m.remote_id.clone(),
+            name: m.name.clone(),
+            member_no: m.member_no,
+            phone: m.phone.clone(),
+            phone_normalized_val: phone_normalized(&m.phone),
+            center: m.center.clone(),
+            is_test_data: is_test_data_member(m.name.trim(), &m.phone),
+        })
+        .collect();
+
+    eprintln!(
+        "[pull_import] diagnostics: server={} local_after={} local_with_remote_id={} missing={} conflicts={}",
+        server_total, local_total_after, local_with_remote_id, missing_remote_id_count, conflict_count
+    );
 
     Ok(PullImportResult {
         imported_members,
@@ -779,5 +854,11 @@ pub fn import_pull_snapshot(state: &AppState, snapshot: PullSnapshot) -> Result<
         failed_members,
         failed_memberships,
         first_error,
+        server_total,
+        local_total_after,
+        local_with_remote_id,
+        missing_remote_id_count,
+        missing_remote_id_sample,
+        conflict_count,
     })
 }
