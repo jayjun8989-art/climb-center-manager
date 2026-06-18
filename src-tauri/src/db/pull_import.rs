@@ -298,8 +298,8 @@ fn phone_normalized(phone: &Option<String>) -> Option<String> {
 }
 
 fn is_test_data_member(name: &str, phone: &Option<String>) -> bool {
-    const TEST_NAMES: &[&str] = &["ddd", "dddd", "dfdfd", "주니어", "주니어 1"];
-    const TEST_PHONES: &[&str] = &["ddd", "ddff", "ㅎㅎㅎㅎ", "ㅈㅈㅈ"];
+    const TEST_NAMES: &[&str] = &["ddd", "dddd", "dfdfd", "주니어", "주니어 1", "온클"];
+    const TEST_PHONES: &[&str] = &["ddd", "ddff", "ㅎㅎㅎㅎ", "ㅈㅈㅈ", "939ㅇ"];
     if TEST_NAMES.iter().any(|&n| n == name.trim()) {
         return true;
     }
@@ -461,6 +461,7 @@ fn upsert_member(
                 member_no = COALESCE(member_no, ?13),
                 updated_at = ?11, sync_status = 'synced', remote_updated_at = ?11,
                 hidden_locally = 0, is_local_duplicate = 0,
+                deleted_at = NULL,
                 remote_id = CASE WHEN (remote_id IS NULL OR remote_id = '') THEN ?14 ELSE remote_id END
              WHERE id = ?12",
             params![
