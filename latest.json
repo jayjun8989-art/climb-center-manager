@@ -1,11 +1,11 @@
 {
-    "version": "1.0.51",
+    "version": "1.0.52",
     "pub_date": "2026-06-18T00:00:00Z",
-    "notes": "v1.0.51: 서버 status 미지원 값 정규화 (trial/left/quit → inactive) + missing 원인 진단",
+    "notes": "v1.0.52: missing 6명 진단 전용 — conflict reason 표시 + AppData JSON 저장",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVI0S0FlUllFYkdSQnlwdHQyMUYyTnlwVStEcU94ZVpTcVdBbGdWUjd6T0VlZE9VdGo0L3ArcjBOM3ZOeWNnaXBield3clR2aHY1emZ5djc4eUJic3djPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxNzg2ODE5CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC41MV94NjQtc2V0dXAuZXhlCjNkWE1yM3oweHlhQzY0L2xpQzRiYlQ5K2RiNENvTEFmRkk2SXlHWjQvK2luRnBZbmNSYkdMZUhQUHJRQmtQNDVuTWVVc0psQjBtMERBeGwzaDJ4QkRnPT0K",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.51/ClimbCenterManager_1.0.51_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVk2cDFhaXFxSkVYaEh6TVpwSGZ1cU14cVFDSjhXSGV6RW5iZ3d1ZzBtWW5uTjFRME9ZWmdSNm9HT1R1cDRrRHFWMlB4YmlwTk9KN2ZsbHlGclI0WGdRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxNzg4MjcyCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC41Ml94NjQtc2V0dXAuZXhlCmE2Tk9mOHBZVEtiaVRJSXJRTk9CNFFGalphUFVWR3Naai95aUNoUDZ0NXNRTnhxY0lVRWdQU0UyTjlBaE5YN3Rtb2hzZktxVTkwOW9ydTBGVEhQMkJ3PT0K",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.52/ClimbCenterManager_1.0.52_x64-setup.exe"
         }
     }
 }

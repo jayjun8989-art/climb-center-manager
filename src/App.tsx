@@ -1013,6 +1013,7 @@ export default function App() {
           }
           const missingCount = result.missingRemoteIdCount ?? 0;
           const missingSample = result.missingRemoteIdSample ?? [];
+          const diagFilePath = result.diagFilePath;
           // Verdict message
           let verdict: string;
           if (serverCount > 0 && localDbCount === 0) {
@@ -1030,7 +1031,7 @@ export default function App() {
           if (result.errors && result.errors.length > 0) {
             console.warn("[App] 강제 불러오기 오류:", result.errors);
           }
-          return { serverCount, fetchedCount, localDbCount, localDisplayCount, noRemoteIdCount, displayCount, message, verdict, missingCount, missingSample };
+          return { serverCount, fetchedCount, localDbCount, localDisplayCount, noRemoteIdCount, displayCount, message, verdict, missingCount, missingSample, diagFilePath };
         }}
         onPushToSupabase={
           permissions.canSyncPush

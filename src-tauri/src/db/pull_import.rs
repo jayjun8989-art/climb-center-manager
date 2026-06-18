@@ -176,6 +176,7 @@ pub struct PullImportResult {
     pub missing_remote_id_count: i64,
     pub missing_remote_id_sample: Vec<PullMissingMemberSample>,
     pub conflict_count: i64,
+    pub diag_file_path: Option<String>,
 }
 
 /// Backfill members.remote_id from id_map for rows where remote_id is NULL.
@@ -421,7 +422,7 @@ fn find_local_membership_id(
 fn upsert_member(
     conn: &rusqlite::Connection,
     row: &PullMemberRow,
-) -> Result<(i64, bool, bool), DbError> { // (local_id, inserted, had_conflict)
+) -> Result<(i64, bool, bool, Option<String>), DbError> { // (local_id, inserted, had_conflict, conflict_existing_remote_id)
     let member_type = normalize_local_member_type(&row.member_type);
     let status = normalize_member_status(&row.status);
     let phone = normalize_phone(&row.phone);
@@ -490,7 +491,8 @@ fn upsert_member(
                 [local_id],
             )?;
         }
-        return Ok((local_id, false, has_conflict));
+        let conflict_remote_id = if has_conflict { existing_remote_id.clone() } else { None };
+        return Ok((local_id, false, has_conflict, conflict_remote_id));
     }
 
     conn.execute(
@@ -528,7 +530,7 @@ fn upsert_member(
             [local_id],
         )?;
     }
-    Ok((local_id, true, false))
+    Ok((local_id, true, false, None))
 }
 
 fn upsert_membership(
@@ -636,7 +638,7 @@ pub fn import_pull_snapshot(state: &AppState, snapshot: PullSnapshot) -> Result<
                 continue;
             }
             match upsert_member(&tx, row) {
-                Ok((local_id, inserted, had_conflict)) => {
+                Ok((local_id, inserted, had_conflict, conflict_existing)) => {
                     member_ids.insert(row.remote_id.clone(), local_id);
                     if inserted {
                         imported_members += 1;
@@ -645,6 +647,14 @@ pub fn import_pull_snapshot(state: &AppState, snapshot: PullSnapshot) -> Result<
                     }
                     if had_conflict {
                         conflict_count += 1;
+                        // Record conflict so it appears as fail_reason in missing sample
+                        failure_map.entry(row.remote_id.clone()).or_insert_with(|| {
+                            format!(
+                                "CONFLICT: local_id={} already bound to remote_id={} — incoming remote_id not written to members",
+                                local_id,
+                                conflict_existing.as_deref().unwrap_or("?")
+                            )
+                        });
                     }
                 }
                 Err(error) => {
@@ -874,6 +884,16 @@ pub fn import_pull_snapshot(state: &AppState, snapshot: PullSnapshot) -> Result<
         server_total, local_total_after, local_with_remote_id, missing_remote_id_count, conflict_count
     );
 
+    // Save diagnostic JSON to AppData for inspection when UI is insufficient
+    let diag_file_path = save_diag_json(
+        state,
+        server_total,
+        local_total_after,
+        local_with_remote_id,
+        missing_remote_id_count,
+        &missing_remote_id_sample,
+    );
+
     Ok(PullImportResult {
         imported_members,
         imported_memberships,
@@ -890,5 +910,51 @@ pub fn import_pull_snapshot(state: &AppState, snapshot: PullSnapshot) -> Result<
         missing_remote_id_count,
         missing_remote_id_sample,
         conflict_count,
+        diag_file_path,
     })
+}
+
+fn save_diag_json(
+    state: &AppState,
+    server_total: i64,
+    local_total: i64,
+    local_with_remote_id: i64,
+    missing_count: i64,
+    missing_members: &[PullMissingMemberSample],
+) -> Option<String> {
+    let app_data_dir = state.db_path.parent()?;
+    let path = app_data_dir.join("last_pull_missing_members.json");
+
+    let payload = serde_json::json!({
+        "serverTotal": server_total,
+        "localTotal": local_total,
+        "localWithRemoteId": local_with_remote_id,
+        "missingRemoteIdCount": missing_count,
+        "missingMembers": missing_members
+            .iter()
+            .map(|m| serde_json::json!({
+                "remoteId": m.remote_id,
+                "name": m.name,
+                "memberNo": m.member_no,
+                "phone": m.phone,
+                "phoneNormalizedVal": m.phone_normalized_val,
+                "center": m.center,
+                "status": m.status,
+                "isTestData": m.is_test_data,
+                "failReason": m.fail_reason,
+            }))
+            .collect::<Vec<_>>()
+    });
+
+    match std::fs::write(&path, serde_json::to_string_pretty(&payload).unwrap_or_default()) {
+        Ok(_) => {
+            let p = path.to_string_lossy().to_string();
+            eprintln!("[pull_import] diag JSON saved: {}", p);
+            Some(p)
+        }
+        Err(e) => {
+            eprintln!("[pull_import] diag JSON save failed: {}", e);
+            None
+        }
+    }
 }

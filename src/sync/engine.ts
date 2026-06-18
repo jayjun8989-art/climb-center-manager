@@ -1244,6 +1244,7 @@ export async function pullFromSupabase(options?: {
     missingRemoteIdCount?: number;
     missingRemoteIdSample?: import("./types").PullMissingMemberSample[];
     conflictCount?: number;
+    diagFilePath?: string;
   };
 
   try {
@@ -1346,6 +1347,7 @@ export async function pullFromSupabase(options?: {
     missingRemoteIdCount: importResult.missingRemoteIdCount,
     missingRemoteIdSample: importResult.missingRemoteIdSample,
     conflictCount: importResult.conflictCount,
+    diagFilePath: importResult.diagFilePath,
   };
 }
 

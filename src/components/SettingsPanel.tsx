@@ -51,6 +51,7 @@ interface SettingsPanelProps {
     verdict: string;
     missingCount?: number;
     missingSample?: Array<{ remoteId: string; name: string; memberNo: number | null; phone: string | null; phoneNormalizedVal: string | null; center: string; status: string; isTestData: boolean; failReason: string | null }>;
+    diagFilePath?: string;
   }>;
   onPushToSupabase?: () => void;
   allowedCenterIds?: string[];
@@ -150,6 +151,7 @@ export function SettingsPanel({
     warning?: string;
     missingCount?: number;
     missingSample?: Array<{ remoteId: string; name: string; memberNo: number | null; phone: string | null; phoneNormalizedVal: string | null; center: string; status: string; isTestData: boolean; failReason: string | null }>;
+    diagFilePath?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -1513,16 +1515,23 @@ export function SettingsPanel({
                     )}
                     <div className="mt-1 text-[var(--muted)]">{forcePullResult.message}</div>
                     {(forcePullResult.missingSample ?? []).length > 0 && (
-                      <details className="mt-2">
+                      <details className="mt-2" open>
                         <summary className="cursor-pointer text-amber-500 font-semibold">missing 샘플 ({forcePullResult.missingSample!.length}건)</summary>
-                        <div className="mt-1 max-h-48 overflow-y-auto rounded border border-[var(--border)] bg-[var(--bg)] p-2 font-mono text-[10px] space-y-0.5">
+                        <div className="mt-1 max-h-64 overflow-y-auto rounded border border-[var(--border)] bg-[var(--bg)] p-2 font-mono text-[10px] space-y-1">
                           {forcePullResult.missingSample!.map((m) => (
-                            <div key={m.remoteId} className={m.isTestData ? "text-amber-400" : "text-[var(--muted)]"}>
-                              [{m.center}] {m.name} | no={m.memberNo ?? "-"} | phone={m.phone ?? "-"} | norm={m.phoneNormalizedVal ?? "-"} | status={m.status}{m.isTestData ? " ⚠테스트" : ""}{m.failReason ? ` | 원인: ${m.failReason}` : ""}
+                            <div key={m.remoteId} className={m.isTestData ? "text-amber-400" : "text-red-400"}>
+                              <div>[{m.center}] <strong>{m.name}</strong> | no={m.memberNo ?? "-"} | phone={m.phone ?? "-"} | norm={m.phoneNormalizedVal ?? "-"} | status={m.status}{m.isTestData ? " ⚠테스트" : ""}</div>
+                              <div className="pl-2 text-[9px] text-[var(--muted)]">remote_id: {m.remoteId}</div>
+                              {m.failReason && <div className="pl-2 text-[9px] text-red-500">원인: {m.failReason}</div>}
                             </div>
                           ))}
                         </div>
                       </details>
+                    )}
+                    {forcePullResult.diagFilePath && (
+                      <div className="mt-1 text-[9px] text-[var(--muted)] font-mono break-all">
+                        진단 파일: {forcePullResult.diagFilePath}
+                      </div>
                     )}
                   </div>
                 );

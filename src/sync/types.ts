@@ -67,4 +67,5 @@ export interface PullRunResult {
   missingRemoteIdCount?: number;
   missingRemoteIdSample?: PullMissingMemberSample[];
   conflictCount?: number;
+  diagFilePath?: string;
 }
