@@ -1,11 +1,11 @@
 {
-    "version": "1.0.50",
+    "version": "1.0.51",
     "pub_date": "2026-06-18T00:00:00Z",
-    "notes": "v1.0.50: within-pull cross-matching 차단 + missing remote_id 진단",
+    "notes": "v1.0.51: 서버 status 미지원 값 정규화 (trial/left/quit → inactive) + missing 원인 진단",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVF6VVowVzJJY3V4YXRxSy9ORWZ3bVJJOFpWdWt0Y0lKUXhseWRkRHk5WFF4eTVqb2F0aUJieXJKYlkxd20zbnl6MnZyTGVVcGZlZWFpSEJNUzMyTmdZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxNzg0NjE0CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC41MF94NjQtc2V0dXAuZXhlCmRCZklacStrK1J0dWRGM3IwcWFZdnpHRU1qaldWcDFpVTdWT2QwcUdxSUFWb1MraFBZVUdoQ3k4ZU1SSmtJWnRTamFCclNxdm9rSHhxSWdRTHo4bUR3PT0K",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.50/ClimbCenterManager_1.0.50_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVI0S0FlUllFYkdSQnlwdHQyMUYyTnlwVStEcU94ZVpTcVdBbGdWUjd6T0VlZE9VdGo0L3ArcjBOM3ZOeWNnaXBield3clR2aHY1emZ5djc4eUJic3djPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxNzg2ODE5CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC41MV94NjQtc2V0dXAuZXhlCjNkWE1yM3oweHlhQzY0L2xpQzRiYlQ5K2RiNENvTEFmRkk2SXlHWjQvK2luRnBZbmNSYkdMZUhQUHJRQmtQNDVuTWVVc0psQjBtMERBeGwzaDJ4QkRnPT0K",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.51/ClimbCenterManager_1.0.51_x64-setup.exe"
         }
     }
 }

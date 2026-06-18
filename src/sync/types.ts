@@ -42,7 +42,9 @@ export interface PullMissingMemberSample {
   phone: string | null;
   phoneNormalizedVal: string | null;
   center: string;
+  status: string;
   isTestData: boolean;
+  failReason: string | null;
 }
 
 export interface PullRunResult {

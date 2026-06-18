@@ -50,7 +50,7 @@ interface SettingsPanelProps {
     message: string;
     verdict: string;
     missingCount?: number;
-    missingSample?: Array<{ remoteId: string; name: string; memberNo: number | null; phone: string | null; phoneNormalizedVal: string | null; center: string; isTestData: boolean }>;
+    missingSample?: Array<{ remoteId: string; name: string; memberNo: number | null; phone: string | null; phoneNormalizedVal: string | null; center: string; status: string; isTestData: boolean; failReason: string | null }>;
   }>;
   onPushToSupabase?: () => void;
   allowedCenterIds?: string[];
@@ -149,7 +149,7 @@ export function SettingsPanel({
     verdict: string;
     warning?: string;
     missingCount?: number;
-    missingSample?: Array<{ remoteId: string; name: string; memberNo: number | null; phone: string | null; phoneNormalizedVal: string | null; center: string; isTestData: boolean }>;
+    missingSample?: Array<{ remoteId: string; name: string; memberNo: number | null; phone: string | null; phoneNormalizedVal: string | null; center: string; status: string; isTestData: boolean; failReason: string | null }>;
   } | null>(null);
 
   useEffect(() => {
@@ -1518,7 +1518,7 @@ export function SettingsPanel({
                         <div className="mt-1 max-h-48 overflow-y-auto rounded border border-[var(--border)] bg-[var(--bg)] p-2 font-mono text-[10px] space-y-0.5">
                           {forcePullResult.missingSample!.map((m) => (
                             <div key={m.remoteId} className={m.isTestData ? "text-amber-400" : "text-[var(--muted)]"}>
-                              [{m.center}] {m.name} | no={m.memberNo ?? "-"} | phone={m.phone ?? "-"} | norm={m.phoneNormalizedVal ?? "-"}{m.isTestData ? " ⚠테스트" : ""}
+                              [{m.center}] {m.name} | no={m.memberNo ?? "-"} | phone={m.phone ?? "-"} | norm={m.phoneNormalizedVal ?? "-"} | status={m.status}{m.isTestData ? " ⚠테스트" : ""}{m.failReason ? ` | 원인: ${m.failReason}` : ""}
                             </div>
                           ))}
                         </div>

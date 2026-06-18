@@ -185,6 +185,19 @@ function mapRemoteMemberType(value: string): string {
   }
 }
 
+/** Map server status → local allowed values: active | paused | expired | inactive */
+function mapRemoteMemberStatus(value: string | null | undefined): string {
+  switch (value) {
+    case "active":
+    case "paused":
+    case "expired":
+    case "inactive":
+      return value;
+    default:
+      return "inactive"; // trial, left, quit, null → inactive
+  }
+}
+
 function mapRemoteMembershipType(row: SupabaseMembershipRow): string {
   switch (row.membership_type) {
     case "monthly":
@@ -236,7 +249,7 @@ export function buildPullSnapshot(input: {
       parentName: row.parent_name,
       parentPhone: row.parent_phone,
       memo: row.memo,
-      status: row.status,
+      status: mapRemoteMemberStatus(row.status),
       createdAt: toLocalDateTime(row.created_at),
       updatedAt: toLocalDateTime(row.updated_at),
       memberNo: toIntOrNull(row.member_no),

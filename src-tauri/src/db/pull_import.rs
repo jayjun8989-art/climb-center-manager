@@ -152,7 +152,9 @@ pub struct PullMissingMemberSample {
     pub phone: Option<String>,
     pub phone_normalized_val: Option<String>,
     pub center: String,
+    pub status: String,
     pub is_test_data: bool,
+    pub fail_reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -226,10 +228,14 @@ pub fn backfill_member_remote_ids_from_id_map(state: &AppState) -> Result<(i64, 
                 params![remote_id, local_id],
             )?;
 
-            // Remove any pending member insert/update queue items now that remote_id is set
+            // Mark pending member insert/update queue items as resolved (remote_id now set).
+            // Use UPDATE not DELETE so records are preserved for audit.
             tx.execute(
-                "DELETE FROM sync_queue WHERE entity_type = 'member' AND entity_local_id = ?1
-                 AND operation IN ('insert', 'update')",
+                "UPDATE sync_queue SET last_error = 'RESOLVED: remote_id 복구됨 — 재시도 불필요',
+                    retry_count = 0
+                 WHERE entity_type = 'member' AND entity_local_id = ?1
+                   AND operation IN ('insert', 'update')
+                   AND (last_error IS NULL OR last_error NOT LIKE 'RESOLVED:%')",
                 [local_id],
             )?;
 
@@ -255,6 +261,15 @@ pub fn backfill_member_remote_ids_from_id_map(state: &AppState) -> Result<(i64, 
         );
         Ok((backfilled, conflicts))
     })
+}
+
+/// Normalise member status from server to a value accepted by the local CHECK constraint.
+/// Server may send values like "trial", "left", "quit" that are not in the allowed list.
+fn normalize_member_status(status: &str) -> &str {
+    match status {
+        "active" | "paused" | "expired" | "inactive" => status,
+        _ => "inactive",
+    }
 }
 
 pub fn count_active_members(state: &AppState) -> Result<i64, DbError> {
@@ -408,6 +423,7 @@ fn upsert_member(
     row: &PullMemberRow,
 ) -> Result<(i64, bool, bool), DbError> { // (local_id, inserted, had_conflict)
     let member_type = normalize_local_member_type(&row.member_type);
+    let status = normalize_member_status(&row.status);
     let phone = normalize_phone(&row.phone);
     let phone_norm = phone_normalized(&row.phone);
 
@@ -456,7 +472,7 @@ fn upsert_member(
                 row.parent_phone,
                 row.memo,
                 row.address,
-                row.status,
+                status,
                 row.updated_at,
                 local_id,
                 row.member_no,
@@ -494,7 +510,7 @@ fn upsert_member(
             row.memo,
             row.address,
             row.member_no,
-            row.status,
+            status,
             row.created_at,
             row.updated_at,
             row.remote_id,
@@ -596,6 +612,7 @@ pub fn import_pull_snapshot(state: &AppState, snapshot: PullSnapshot) -> Result<
     let mut local_total_after = 0_i64;
     let mut local_with_remote_id = 0_i64;
     let mut local_remote_id_set: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut failure_map: std::collections::HashMap<String, String> = std::collections::HashMap::new();
 
     let server_total = snapshot.members.len() as i64;
 
@@ -631,11 +648,13 @@ pub fn import_pull_snapshot(state: &AppState, snapshot: PullSnapshot) -> Result<
                     }
                 }
                 Err(error) => {
+                    let err_str = error.to_string();
                     let msg = format!(
-                        "members 저장 실패 (remote_id={} name={} center={}): {}",
-                        row.remote_id, row.name, row.center, error
+                        "members 저장 실패 (remote_id={} name={} center={} status={}): {}",
+                        row.remote_id, row.name, row.center, row.status, err_str
                     );
                     eprintln!("[pull_import] {}", msg);
+                    failure_map.insert(row.remote_id.clone(), err_str);
                     if first_error.is_none() {
                         first_error = Some(msg);
                     }
@@ -835,9 +854,20 @@ pub fn import_pull_snapshot(state: &AppState, snapshot: PullSnapshot) -> Result<
             phone: m.phone.clone(),
             phone_normalized_val: phone_normalized(&m.phone),
             center: m.center.clone(),
+            status: m.status.clone(),
             is_test_data: is_test_data_member(m.name.trim(), &m.phone),
+            fail_reason: failure_map.get(&m.remote_id).cloned(),
         })
         .collect();
+
+    // Log each missing member for server-side debugging
+    for s in &missing_remote_id_sample {
+        eprintln!(
+            "[pull_import] missing: remote_id={} name={} center={} status={} phone={:?} norm={:?} test={} fail={:?}",
+            s.remote_id, s.name, s.center, s.status,
+            s.phone, s.phone_normalized_val, s.is_test_data, s.fail_reason
+        );
+    }
 
     eprintln!(
         "[pull_import] diagnostics: server={} local_after={} local_with_remote_id={} missing={} conflicts={}",
