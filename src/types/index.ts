@@ -452,9 +452,13 @@ export interface LocalMemberForMatch {
 
 export interface LocalCenterCounts {
   members: number;
+  members_display: number;
   memberships: number;
   attendance: number;
   members_no_remote_id: number;
+  memberships_no_remote_id: number;
+  attendance_no_remote_id: number;
+  blocked: number;
 }
 
 export interface ServerMemberCandidate {
@@ -500,9 +504,13 @@ export interface ServerCenterConsistency {
   server_memberships: number;
   server_attendance: number;
   local_members: number;
+  local_display_members: number;
   local_memberships: number;
   local_attendance: number;
   local_members_no_remote_id: number;
+  local_memberships_no_remote_id: number;
+  local_attendance_no_remote_id: number;
+  local_blocked: number;
   local_pending: number;
   local_failed: number;
   last_pull_at: string | null;

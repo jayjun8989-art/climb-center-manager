@@ -972,22 +972,26 @@ export async function getServerCenterConsistency(center: Center): Promise<Server
 
   const localCounts: LocalCenterCounts =
     (await safeInvoke<LocalCenterCounts>("get_local_center_counts_cmd", { center })) ??
-    { members: 0, memberships: 0, attendance: 0, members_no_remote_id: 0 };
+    { members: 0, members_display: 0, memberships: 0, attendance: 0, members_no_remote_id: 0, memberships_no_remote_id: 0, attendance_no_remote_id: 0, blocked: 0 };
 
   const syncStatus = await fetchLocalSyncStatus();
 
   const serverMembers = membersRes.count ?? 0;
   const localMembers = localCounts.members;
+  const localDisplay = localCounts.members_display;
 
   let verdict: "ok" | "warning" | "error" | "no_permission" = "ok";
-  let verdict_message = "정상: 이 PC는 서버 원장과 일치합니다.";
+  let verdict_message = "정상: 이 PC 원장은 서버와 일치합니다.";
 
   if (membersRes.error) {
     verdict = "no_permission";
     verdict_message = "권한 오류: 이 계정은 해당 센터에 접근할 수 없습니다.";
   } else if (serverMembers > 0 && localMembers < Math.floor(serverMembers * 0.7)) {
     verdict = "error";
-    verdict_message = `오류: 서버 원장 ${serverMembers}명 vs 로컬 ${localMembers}명 — 서버 기준 강제 불러오기를 실행하세요.`;
+    verdict_message = `원장 수 불일치: 서버 ${serverMembers}명 vs 로컬 DB ${localMembers}명 — 서버 기준 강제 불러오기를 실행하세요.`;
+  } else if (localMembers === serverMembers && localDisplay < localMembers) {
+    verdict = "warning";
+    verdict_message = `원장 동기화 정상. 화면 표시(${localDisplay}명)는 필터/hidden 기준이므로 원장 불일치 아닙니다.`;
   } else if (localCounts.members_no_remote_id > 0 || syncStatus.pending_count > 0) {
     verdict = "warning";
     verdict_message = `주의: 이 PC에만 있는 미동기화 데이터가 있습니다 (remote_id 없는 회원 ${localCounts.members_no_remote_id}명, 대기 ${syncStatus.pending_count}건).`;
@@ -1000,9 +1004,13 @@ export async function getServerCenterConsistency(center: Center): Promise<Server
     server_memberships: membershipsRes.count ?? 0,
     server_attendance: attendanceRes.count ?? 0,
     local_members: localMembers,
+    local_display_members: localDisplay,
     local_memberships: localCounts.memberships,
     local_attendance: localCounts.attendance,
     local_members_no_remote_id: localCounts.members_no_remote_id,
+    local_memberships_no_remote_id: localCounts.memberships_no_remote_id,
+    local_attendance_no_remote_id: localCounts.attendance_no_remote_id,
+    local_blocked: localCounts.blocked,
     local_pending: syncStatus.pending_count,
     local_failed: syncStatus.failed_count,
     last_pull_at: syncStatus.last_pull_at ?? null,

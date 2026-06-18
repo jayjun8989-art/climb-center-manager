@@ -1173,18 +1173,30 @@ pub fn get_local_members_for_matching(state: &AppState, center: &str) -> Result<
 #[derive(Debug, Clone, Serialize)]
 pub struct LocalCenterCounts {
     pub members: i64,
+    pub members_display: i64,
     pub memberships: i64,
     pub attendance: i64,
     pub members_no_remote_id: i64,
+    pub memberships_no_remote_id: i64,
+    pub attendance_no_remote_id: i64,
+    pub blocked: i64,
 }
 
 /// Returns local DB counts for a given center (for PC consistency check).
 pub fn get_local_center_counts(state: &AppState, center: &str) -> Result<LocalCenterCounts, DbError> {
     state.with_conn(|conn| {
+        // A/B: total non-deleted members for this center
         let members: i64 = conn.query_row(
             "SELECT COUNT(*) FROM members WHERE deleted_at IS NULL AND UPPER(center) = UPPER(?1)",
             [center], |row| row.get(0),
         )?;
+        // C: display-filtered members (not hidden, not local duplicate)
+        let members_display: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM members WHERE deleted_at IS NULL AND UPPER(center) = UPPER(?1)
+             AND COALESCE(hidden_locally, 0) = 0 AND COALESCE(is_local_duplicate, 0) = 0",
+            [center], |row| row.get(0),
+        )?;
+        // G: all memberships linked to center members
         let memberships: i64 = conn.query_row(
             "SELECT COUNT(*) FROM memberships ms
              JOIN members m ON m.id = ms.member_id
@@ -1197,12 +1209,41 @@ pub fn get_local_center_counts(state: &AppState, center: &str) -> Result<LocalCe
              WHERE m.deleted_at IS NULL AND al.canceled_at IS NULL AND UPPER(m.center) = UPPER(?1)",
             [center], |row| row.get(0),
         )?;
+        // D: members without remote_id
         let members_no_remote_id: i64 = conn.query_row(
             "SELECT COUNT(*) FROM members WHERE deleted_at IS NULL
              AND UPPER(center) = UPPER(?1) AND (remote_id IS NULL OR remote_id = '')",
             [center], |row| row.get(0),
         )?;
-        Ok(LocalCenterCounts { members, memberships, attendance, members_no_remote_id })
+        // H: memberships without remote_id
+        let memberships_no_remote_id: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM memberships ms
+             JOIN members m ON m.id = ms.member_id
+             WHERE m.deleted_at IS NULL AND UPPER(m.center) = UPPER(?1) AND ms.remote_id IS NULL",
+            [center], |row| row.get(0),
+        )?;
+        // I: attendance_logs without remote_id
+        let attendance_no_remote_id: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM attendance_logs al
+             JOIN members m ON m.id = al.member_id
+             WHERE m.deleted_at IS NULL AND UPPER(m.center) = UPPER(?1) AND al.remote_id IS NULL",
+            [center], |row| row.get(0),
+        )?;
+        // blocked: sync_queue items with last_error set
+        let blocked: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL",
+            [], |row| row.get(0),
+        )?;
+        Ok(LocalCenterCounts {
+            members,
+            members_display,
+            memberships,
+            attendance,
+            members_no_remote_id,
+            memberships_no_remote_id,
+            attendance_no_remote_id,
+            blocked,
+        })
     })
 }
 

@@ -40,7 +40,16 @@ interface SettingsPanelProps {
   syncStatus?: SyncStatus | null;
   syncBusy?: boolean;
   onPullFromSupabase?: () => void;
-  onForcePullFromSupabase?: () => Promise<{ serverCount: number; localCount: number; displayCount: number; message: string }>;
+  onForcePullFromSupabase?: () => Promise<{
+    serverCount: number;
+    fetchedCount: number;
+    localDbCount: number;
+    localDisplayCount: number;
+    noRemoteIdCount: number;
+    displayCount: number;
+    message: string;
+    verdict: string;
+  }>;
   onPushToSupabase?: () => void;
   allowedCenterIds?: string[];
 }
@@ -129,9 +138,13 @@ export function SettingsPanel({
   const [forcePullBusy, setForcePullBusy] = useState(false);
   const [forcePullResult, setForcePullResult] = useState<{
     serverCount: number;
-    localCount: number;
+    fetchedCount: number;
+    localDbCount: number;
+    localDisplayCount: number;
+    noRemoteIdCount: number;
     displayCount: number;
     message: string;
+    verdict: string;
     warning?: string;
   } | null>(null);
 
@@ -392,8 +405,8 @@ export function SettingsPanel({
     try {
       const result = await onForcePullFromSupabase();
       let warning: string | undefined;
-      if (result.serverCount > 0 && result.localCount < result.serverCount * 0.9) {
-        warning = `서버 회원 ${result.serverCount}명 중 ${result.localCount}명만 반영됨 — upsert 오류 가능성`;
+      if (result.serverCount > 0 && result.localDbCount < result.serverCount * 0.9) {
+        warning = `서버 원장 ${result.serverCount}명 중 로컬 DB에 ${result.localDbCount}명만 저장됨 — upsert 오류 가능성`;
       }
       setForcePullResult({ ...result, warning });
       onNotify(result.message);
@@ -1113,21 +1126,39 @@ export function SettingsPanel({
                   }`}>
                     {serverConsistency.verdict_message}
                   </div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg border border-[var(--border)] p-3">
-                    <div className="col-span-2 font-semibold text-[var(--text)] mb-1">서버 (Supabase)</div>
-                    <div>전체 회원: <span className="font-semibold">{serverConsistency.server_members}</span></div>
-                    <div>활성 회원: <span className="font-semibold">{serverConsistency.server_active_members}</span></div>
-                    <div>회원권: <span className="font-semibold">{serverConsistency.server_memberships}</span></div>
-                    <div>출석: <span className="font-semibold">{serverConsistency.server_attendance}</span></div>
-                    <div className="col-span-2 font-semibold text-[var(--text)] mt-2 mb-1">이 PC (로컬)</div>
-                    <div>전체 회원: <span className="font-semibold">{serverConsistency.local_members}</span></div>
-                    <div>remote_id 없음: <span className={`font-semibold ${serverConsistency.local_members_no_remote_id > 0 ? "text-amber-500" : ""}`}>{serverConsistency.local_members_no_remote_id}</span></div>
-                    <div>회원권: <span className="font-semibold">{serverConsistency.local_memberships}</span></div>
-                    <div>출석: <span className="font-semibold">{serverConsistency.local_attendance}</span></div>
-                    <div>대기 중: <span className={`font-semibold ${serverConsistency.local_pending > 0 ? "text-amber-500" : ""}`}>{serverConsistency.local_pending}</span></div>
-                    <div>실패: <span className={`font-semibold ${serverConsistency.local_failed > 0 ? "text-red-500" : ""}`}>{serverConsistency.local_failed}</span></div>
-                    <div>마지막 서버→PC: <span className="font-semibold">{formatDateTimeSeoul(serverConsistency.last_pull_at) || "없음"}</span></div>
-                    <div>마지막 PC→서버: <span className="font-semibold">{formatDateTimeSeoul(serverConsistency.last_push_at) || "없음"}</span></div>
+                  <div className="space-y-2 rounded-lg border border-[var(--border)] p-3 text-[11px]">
+                    <div className="font-semibold text-[var(--text)]">서버 (Supabase) · deleted_at IS NULL 기준</div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                      <div>전체 원장: <span className="font-semibold">{serverConsistency.server_members}</span></div>
+                      <div>회원권 전체: <span className="font-semibold">{serverConsistency.server_memberships}</span></div>
+                      <div>출석: <span className="font-semibold">{serverConsistency.server_attendance}</span></div>
+                    </div>
+                    <div className="border-t border-[var(--border)] pt-2 font-semibold text-[var(--text)]">이 PC (로컬 DB)</div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                      <div>로컬 DB 원장 전체: <span className={`font-semibold ${serverConsistency.local_members !== serverConsistency.server_members ? "text-amber-500" : "text-emerald-600"}`}>{serverConsistency.local_members}</span></div>
+                      <div>화면 표시 회원: <span className="font-semibold text-[var(--muted)]">{serverConsistency.local_display_members}</span></div>
+                      <div>remote_id 있는 회원: <span className="font-semibold">{serverConsistency.local_members - serverConsistency.local_members_no_remote_id}</span></div>
+                      <div>remote_id 없는 회원: <span className={`font-semibold ${serverConsistency.local_members_no_remote_id > 0 ? "text-amber-500" : ""}`}>{serverConsistency.local_members_no_remote_id}</span></div>
+                      <div>회원권 전체: <span className="font-semibold">{serverConsistency.local_memberships}</span></div>
+                      <div>remote_id 없는 회원권: <span className={`font-semibold ${serverConsistency.local_memberships_no_remote_id > 0 ? "text-amber-500" : ""}`}>{serverConsistency.local_memberships_no_remote_id}</span></div>
+                      <div>출석: <span className="font-semibold">{serverConsistency.local_attendance}</span></div>
+                      <div>remote_id 없는 출석: <span className={`font-semibold ${serverConsistency.local_attendance_no_remote_id > 0 ? "text-amber-500" : ""}`}>{serverConsistency.local_attendance_no_remote_id}</span></div>
+                      <div>대기 중: <span className={`font-semibold ${serverConsistency.local_pending > 0 ? "text-amber-500" : ""}`}>{serverConsistency.local_pending}</span></div>
+                      <div>실패: <span className={`font-semibold ${serverConsistency.local_failed > 0 ? "text-red-500" : ""}`}>{serverConsistency.local_failed}</span></div>
+                      <div>blocked: <span className={`font-semibold ${serverConsistency.local_blocked > 0 ? "text-amber-500" : ""}`}>{serverConsistency.local_blocked}</span></div>
+                      <div>마지막 서버→PC: <span className="font-semibold">{formatDateTimeSeoul(serverConsistency.last_pull_at) || "없음"}</span></div>
+                      <div>마지막 PC→서버: <span className="font-semibold">{formatDateTimeSeoul(serverConsistency.last_push_at) || "없음"}</span></div>
+                    </div>
+                    {serverConsistency.local_memberships_no_remote_id > 0 && (
+                      <div className="rounded-lg bg-amber-500/10 px-2 py-1.5 text-amber-600">
+                        remote_id 없는 회원권 {serverConsistency.local_memberships_no_remote_id}건: 해당 회원이 서버와 연결(remote_id)되어 있으면 다음 동기화에서 자동 업로드됩니다. 회원 remote_id가 없으면 먼저 "서버 회원 매칭 검사"를 실행하세요.
+                      </div>
+                    )}
+                    {serverConsistency.local_attendance_no_remote_id > 0 && (
+                      <div className="rounded-lg bg-amber-500/10 px-2 py-1.5 text-amber-600">
+                        remote_id 없는 출석 {serverConsistency.local_attendance_no_remote_id}건: 회원 remote_id 연결 후 동기화하면 업로드됩니다.
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1294,7 +1325,19 @@ export function SettingsPanel({
               <button
                 className="btn btn-primary"
                 disabled={!syncConfigured || !syncOnline || syncBusy}
-                onClick={onPushToSupabase}
+                onClick={() => {
+                  const risks: string[] = [];
+                  if ((diagnostics?.members_without_remote_id ?? 0) > 0) risks.push(`remote_id 없는 회원 ${diagnostics!.members_without_remote_id}명`);
+                  if ((diagnostics?.queue_failed ?? 0) > 0) risks.push(`실패 항목 ${diagnostics!.queue_failed}건`);
+                  if ((diagnostics?.queue_blocked ?? 0) > 0) risks.push(`blocked ${diagnostics!.queue_blocked}건`);
+                  if (risks.length > 0) {
+                    const ok = window.confirm(
+                      `[주의] 현재 동기화 위험 요소가 있습니다:\n${risks.join("\n")}\n\n서버에 중복/테스트 데이터가 생성될 위험이 있습니다.\n먼저 업로드 검증 리포트에서 문제를 해결한 후 동기화하세요.\n\n그래도 계속하시겠습니까?`
+                    );
+                    if (!ok) return;
+                  }
+                  onPushToSupabase();
+                }}
               >
                 <Upload size={18} />
                 Supabase로 동기화
@@ -1386,16 +1429,33 @@ export function SettingsPanel({
                   </button>
                 )}
                 {onPushToSupabase && (
-                  <button className="btn btn-secondary" disabled={syncBusy} onClick={onPushToSupabase}>
+                  <button
+                    className="btn btn-secondary"
+                    disabled={syncBusy}
+                    onClick={() => {
+                      const risks: string[] = [];
+                      if ((diagnostics?.members_without_remote_id ?? 0) > 0) risks.push(`remote_id 없는 회원 ${diagnostics!.members_without_remote_id}명`);
+                      if ((diagnostics?.queue_failed ?? 0) > 0) risks.push(`실패 항목 ${diagnostics!.queue_failed}건`);
+                      if ((diagnostics?.queue_blocked ?? 0) > 0) risks.push(`blocked ${diagnostics!.queue_blocked}건`);
+                      if (risks.length > 0) {
+                        const ok = window.confirm(
+                          `[주의] 현재 동기화 위험 요소가 있습니다:\n${risks.join("\n")}\n\n서버에 중복/테스트 데이터가 생성될 위험이 있습니다.\n먼저 업로드 검증 리포트를 확인하고 문제를 해결한 후 동기화하세요.\n\n그래도 계속하시겠습니까?`
+                        );
+                        if (!ok) return;
+                      }
+                      onPushToSupabase();
+                    }}
+                  >
                     Supabase로 동기화
                   </button>
                 )}
                 <button
-                  className="btn btn-primary sm:col-span-2"
-                  disabled={retryBusy || syncBusy}
+                  className="btn btn-secondary sm:col-span-2"
+                  disabled={retryBusy || syncBusy || (diagnostics?.queue_failed ?? 0) > 0}
+                  title={(diagnostics?.queue_failed ?? 0) > 0 ? `실패 항목 ${diagnostics?.queue_failed}건이 있습니다. 업로드 검증 리포트에서 원인을 확인하고 수동으로 처리하세요. (테스트 데이터로 차단된 항목은 재시도 불가)` : undefined}
                   onClick={() => void handleRetryFailed()}
                 >
-                  {retryBusy ? "재시도 중..." : "실패 항목 다시 시도"}
+                  {retryBusy ? "재시도 중..." : `실패 항목 다시 시도${(diagnostics?.queue_failed ?? 0) > 0 ? ` (${diagnostics!.queue_failed}건 — 직접 확인 필요)` : ""}`}
                 </button>
                 <button
                   className="btn btn-secondary sm:col-span-2"
@@ -1417,25 +1477,33 @@ export function SettingsPanel({
                 )}
               </div>
               {forcePullResult && (() => {
-                const isFailed = forcePullResult.serverCount > 0 && forcePullResult.localCount === 0;
-                const isWarning = !isFailed && (forcePullResult.warning || (forcePullResult.serverCount > 0 && forcePullResult.localCount < forcePullResult.serverCount * 0.95));
+                const isFailed = forcePullResult.serverCount > 0 && forcePullResult.localDbCount === 0;
+                const isWarning = !isFailed && !!forcePullResult.warning;
+                const isOk = !isFailed && !isWarning;
                 const borderClass = isFailed
-                  ? "border-red-500/40 bg-red-500/10 text-red-600"
+                  ? "border-red-500/40 bg-red-500/10"
                   : isWarning
-                  ? "border-amber-500/40 bg-amber-500/10 text-amber-600"
-                  : "border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]";
+                  ? "border-amber-500/40 bg-amber-500/10"
+                  : "border-emerald-500/30 bg-emerald-500/5";
                 return (
                   <div className={`mt-3 rounded-xl border p-3 text-[11px] ${borderClass}`}>
-                    <div className={`font-semibold ${isFailed ? "text-red-600" : "text-[var(--text)]"}`}>
+                    <div className={`mb-2 font-semibold ${isFailed ? "text-red-600" : isOk ? "text-emerald-600" : "text-amber-600"}`}>
                       {isFailed ? "강제 불러오기 실패" : "강제 불러오기 결과"}
                     </div>
-                    <div>서버 회원: <span className="font-semibold text-[var(--text)]">{forcePullResult.serverCount}명</span></div>
-                    <div>로컬 반영: <span className={`font-semibold ${isFailed ? "text-red-600" : "text-[var(--text)]"}`}>{forcePullResult.localCount}명</span></div>
-                    <div>화면 표시: <span className="font-semibold text-[var(--text)]">{forcePullResult.displayCount}명</span></div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[var(--muted)]">
+                      <div>서버 원장: <span className="font-semibold text-[var(--text)]">{forcePullResult.serverCount}명</span></div>
+                      <div>서버에서 받은 회원: <span className="font-semibold text-[var(--text)]">{forcePullResult.fetchedCount}명</span></div>
+                      <div>로컬 DB 저장 회원: <span className={`font-semibold ${isFailed ? "text-red-600" : forcePullResult.localDbCount === forcePullResult.serverCount ? "text-emerald-600" : "text-amber-500"}`}>{forcePullResult.localDbCount}명</span></div>
+                      <div>화면 표시 회원: <span className="font-semibold text-[var(--text)]">{forcePullResult.displayCount}명</span></div>
+                      <div className="col-span-2">remote_id 없는 회원: <span className={`font-semibold ${forcePullResult.noRemoteIdCount > 0 ? "text-amber-500" : "text-emerald-600"}`}>{forcePullResult.noRemoteIdCount}명</span></div>
+                    </div>
+                    <div className={`mt-2 font-semibold ${isFailed ? "text-red-600" : isOk ? "text-emerald-600" : "text-amber-500"}`}>
+                      {forcePullResult.verdict}
+                    </div>
                     {forcePullResult.warning && (
-                      <div className="mt-1 font-semibold">{forcePullResult.warning}</div>
+                      <div className="mt-1 text-amber-500">{forcePullResult.warning}</div>
                     )}
-                    <div className="mt-1">{forcePullResult.message}</div>
+                    <div className="mt-1 text-[var(--muted)]">{forcePullResult.message}</div>
                   </div>
                 );
               })()}

@@ -993,31 +993,42 @@ export default function App() {
           ) {
             window.dispatchEvent(new CustomEvent("climb-sync-pull-complete"));
           }
-          // Total server count from diagnostics
+          // Total server count from diagnostics (rows actually fetched via pagination)
           const serverCount = result.pullDiagnostics
             ? Object.values(result.pullDiagnostics).reduce((s, d) => s + d.serverCount, 0)
             : 0;
-          const localCount = result.importedMembers + result.updatedMembers;
-          // Query display count from local DB
-          let displayCount = localCount;
+          const fetchedCount = result.fetchedTotal ?? serverCount;
+          // Actual local SQLite count (real DB state, not import counters)
+          const localDbCounts = await api.getLocalCenterCounts(center);
+          const localDbCount = localDbCounts?.members ?? (result.importedMembers + result.updatedMembers);
+          const localDisplayCount = localDbCounts?.members_display ?? localDbCount;
+          const noRemoteIdCount = localDbCounts?.members_no_remote_id ?? 0;
+          // Display count via list query
+          let displayCount = localDisplayCount;
           try {
             const memberResult = await api.getMembers({ center, search: "", memberGroup: "all", statusFilter: "all", page: 1, pageSize: 1 });
             displayCount = memberResult.total;
           } catch {
             // ignore
           }
-          // Use engine's message when it detected a failure (0 local from non-zero server)
-          let message: string;
-          if (serverCount > 0 && localCount === 0) {
-            // engine.ts sets result.message to the detailed failure reason
-            message = result.message ?? `강제 불러오기 실패: 서버 회원 ${serverCount}명을 조회했지만 로컬 DB에 0명만 반영되었습니다.`;
+          // Verdict message
+          let verdict: string;
+          if (serverCount > 0 && localDbCount === 0) {
+            verdict = `서버 데이터를 처리했지만 로컬 DB 저장 수가 0명입니다. import 저장 로직을 확인해야 합니다.`;
+          } else if (localDbCount === serverCount) {
+            verdict = `서버 원장이 이 PC에 정상 반영되었습니다.`;
+          } else if (localDbCount > 0 && localDbCount < serverCount) {
+            verdict = `서버 데이터를 처리했지만 로컬 DB 저장 수(${localDbCount}명)가 서버 원장(${serverCount}명)과 다릅니다. import 저장 로직을 확인하세요.`;
           } else {
-            message = `강제 불러오기 완료: 서버 ${center} 회원 ${serverCount}명 확인 → 로컬 ${localCount}명 반영 → 화면 표시 ${displayCount}명`;
+            verdict = `화면 표시 수는 현재 필터/활성 회원 기준입니다.`;
           }
+          const message = result.errors && result.errors.length > 0
+            ? (result.message ?? `오류 발생: ${result.errors[0]}`)
+            : (result.message ?? `강제 불러오기 완료`);
           if (result.errors && result.errors.length > 0) {
             console.warn("[App] 강제 불러오기 오류:", result.errors);
           }
-          return { serverCount, localCount, displayCount, message };
+          return { serverCount, fetchedCount, localDbCount, localDisplayCount, noRemoteIdCount, displayCount, message, verdict };
         }}
         onPushToSupabase={
           permissions.canSyncPush

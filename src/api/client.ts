@@ -28,6 +28,7 @@ import type {
   UploadVerificationReport,
   ServerMatchReport,
   ServerCenterConsistency,
+  LocalCenterCounts,
 } from "../types";
 import { uploadLocalMemberNow, matchServerMembersForCenter, getServerCenterConsistency } from "../sync/engine";
 import {
@@ -400,5 +401,9 @@ export const api = {
 
   backfillMemberRemoteIds(): Promise<[number, number]> {
     return invokeCommand<[number, number]>("backfill_member_remote_ids_cmd");
+  },
+
+  getLocalCenterCounts(center: Center): Promise<LocalCenterCounts | null> {
+    return invokeCommand<LocalCenterCounts>("get_local_center_counts_cmd", { center }).catch(() => null);
   },
 };
