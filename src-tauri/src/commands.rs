@@ -16,6 +16,10 @@ use crate::db::{
     PullImportResult, PullSnapshot, RepairSyncQueueResult,
     SyncQueueItem, SyncStatus, UploadVerificationReport,
     run_diagnostic, DiagnosticReport,
+    safe_sync_dry_run, resolve_member_queue_items, backfill_membership_remote_id,
+    backfill_attendance_remote_id, get_attendance_candidates, save_safe_sync_report,
+    SafeSyncDryRun, SafeSyncMembershipCandidate, SafeSyncAttendanceCandidate,
+    ResolveMemberQueueResult,
 };
 use crate::db::{list_members_with_remote_id, repair_center_mapping};
 use crate::models::{
@@ -682,4 +686,52 @@ pub fn membership_attendance_queue_diag_cmd(
     state: State<'_, AppState>,
 ) -> Result<DiagnosticReport, String> {
     run_diagnostic(&state).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn safe_sync_dry_run_cmd(
+    state: State<'_, AppState>,
+) -> Result<SafeSyncDryRun, String> {
+    safe_sync_dry_run(&state).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn resolve_member_queue_cmd(
+    state: State<'_, AppState>,
+    queue_ids: Vec<i64>,
+) -> Result<ResolveMemberQueueResult, String> {
+    resolve_member_queue_items(&state, &queue_ids).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn backfill_membership_remote_id_cmd(
+    state: State<'_, AppState>,
+    local_id: i64,
+    remote_id: String,
+) -> Result<(), String> {
+    backfill_membership_remote_id(&state, local_id, &remote_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn backfill_attendance_remote_id_cmd(
+    state: State<'_, AppState>,
+    local_id: i64,
+    remote_id: String,
+) -> Result<(), String> {
+    backfill_attendance_remote_id(&state, local_id, &remote_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_attendance_candidates_cmd(
+    state: State<'_, AppState>,
+) -> Result<Vec<SafeSyncAttendanceCandidate>, String> {
+    get_attendance_candidates(&state).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_safe_sync_report_cmd(
+    state: State<'_, AppState>,
+    json: String,
+) -> Result<String, String> {
+    save_safe_sync_report(&state, &json).map_err(|e| e.to_string())
 }

@@ -10,6 +10,7 @@ mod pull_import;
 mod status;
 mod sync_local;
 pub mod diagnostic;
+pub mod safe_sync;
 
 pub use attendance_ext::{
     cancel_attendance, check_attendance_with_options, has_attendance_today, has_attendance_on_date,
@@ -20,6 +21,12 @@ pub use ensure_schema::ensure_local_schema;
 pub use locker::list_center_lockers;
 pub use ops::*;
 pub use diagnostic::{run_diagnostic, DiagnosticReport};
+pub use safe_sync::{
+    safe_sync_dry_run, resolve_member_queue_items, backfill_membership_remote_id,
+    backfill_attendance_remote_id, get_attendance_candidates, save_safe_sync_report,
+    SafeSyncDryRun, SafeSyncMembershipCandidate, SafeSyncAttendanceCandidate,
+    SafeSyncMemberQueueItem, ResolveMemberQueueResult,
+};
 pub use pull_import::{
     backfill_member_remote_ids_from_id_map, count_active_members, import_pull_snapshot,
     PullImportResult, PullSnapshot,

@@ -94,7 +94,8 @@ pub struct DiagSyncQueueItem {
     pub member_remote_id: Option<String>,
     pub membership_remote_id: Option<String>,
     pub is_test_data: bool,
-    /// "RESOLVABLE_MEMBER_QUEUE" | "MEMBERSHIP_UPLOAD_CANDIDATE" | "ATTENDANCE_UPLOAD_CANDIDATE"
+    /// "RESOLVABLE_MEMBER_QUEUE" | "DUPLICATE_OR_SERVER_EXISTS"
+    /// | "MEMBERSHIP_UPLOAD_CANDIDATE" | "ATTENDANCE_UPLOAD_CANDIDATE"
     /// | "BLOCK_TEST_DATA" | "ALREADY_RESOLVED" | "MANUAL_REVIEW"
     pub classification: String,
     pub classification_reason: String,
@@ -365,20 +366,13 @@ fn diagnose_sync_queue(state: &AppState) -> Result<DiagSection<DiagSyncQueueItem
         let mut items: Vec<DiagSyncQueueItem> = Vec::new();
 
         for (id, entity_type, operation, entity_local_id, retry_count, last_error, created_at) in raw {
-            // Resolve member info depending on entity_type
-            let (member_name, member_remote_id, membership_remote_id) =
+            let (member_name, member_remote_id, membership_remote_id, member_phone) =
                 resolve_queue_member_info(conn, &entity_type, entity_local_id)?;
 
             let is_test = is_test_data(
                 member_name.as_deref().unwrap_or(""),
-                &member_name.as_ref().map(|_| {
-                    // We only have name here; phone check will rely on name pattern
-                    String::new()
-                }),
-            ) || last_error
-                .as_deref()
-                .map(|e| e.contains("테스트") || e.contains("차단"))
-                .unwrap_or(false);
+                &member_phone,
+            );
 
             let (classification, classification_reason) = classify_queue_item(
                 &entity_type,
@@ -420,56 +414,64 @@ fn resolve_queue_member_info(
     conn: &rusqlite::Connection,
     entity_type: &str,
     entity_local_id: i64,
-) -> Result<(Option<String>, Option<String>, Option<String>), DbError> {
+) -> Result<(Option<String>, Option<String>, Option<String>, Option<String>), DbError> {
     match entity_type {
         "member" => {
-            let row: Option<(String, Option<String>)> = conn
-                .query_row(
-                    "SELECT name, remote_id FROM members WHERE id = ?1",
-                    [entity_local_id],
-                    |r| Ok((r.get(0)?, r.get(1)?)),
-                )
-                .optional()
-                .map_err(DbError::from)?;
-            Ok(row
-                .map(|(n, rid)| (Some(n), rid, None))
-                .unwrap_or((None, None, None)))
-        }
-        "membership" => {
             let row: Option<(String, Option<String>, Option<String>)> = conn
                 .query_row(
-                    "SELECT m.name, m.remote_id, ms.remote_id
-                     FROM memberships ms
-                     JOIN members m ON m.id = ms.member_id
-                     WHERE ms.id = ?1",
+                    "SELECT name, remote_id, phone FROM members WHERE id = ?1",
                     [entity_local_id],
                     |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
                 )
                 .optional()
                 .map_err(DbError::from)?;
             Ok(row
-                .map(|(n, mrid, msrid)| (Some(n), mrid, msrid))
-                .unwrap_or((None, None, None)))
+                .map(|(n, rid, ph)| (Some(n), rid, None, ph))
+                .unwrap_or((None, None, None, None)))
+        }
+        "membership" => {
+            let row: Option<(String, Option<String>, Option<String>, Option<String>)> = conn
+                .query_row(
+                    "SELECT m.name, m.remote_id, ms.remote_id, m.phone
+                     FROM memberships ms
+                     JOIN members m ON m.id = ms.member_id
+                     WHERE ms.id = ?1",
+                    [entity_local_id],
+                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+                )
+                .optional()
+                .map_err(DbError::from)?;
+            Ok(row
+                .map(|(n, mrid, msrid, ph)| (Some(n), mrid, msrid, ph))
+                .unwrap_or((None, None, None, None)))
         }
         "attendance" => {
-            let row: Option<(String, Option<String>, Option<String>)> = conn
+            let row: Option<(String, Option<String>, Option<String>, Option<String>)> = conn
                 .query_row(
-                    "SELECT m.name, m.remote_id, ms.remote_id
+                    "SELECT m.name, m.remote_id, ms.remote_id, m.phone
                      FROM attendance_logs al
                      JOIN members m ON m.id = al.member_id
                      LEFT JOIN memberships ms ON ms.id = al.membership_id
                      WHERE al.id = ?1",
                     [entity_local_id],
-                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
                 )
                 .optional()
                 .map_err(DbError::from)?;
             Ok(row
-                .map(|(n, mrid, msrid)| (Some(n), mrid, msrid))
-                .unwrap_or((None, None, None)))
+                .map(|(n, mrid, msrid, ph)| (Some(n), mrid, msrid, ph))
+                .unwrap_or((None, None, None, None)))
         }
-        _ => Ok((None, None, None)),
+        _ => Ok((None, None, None, None)),
     }
+}
+
+fn is_duplicate_or_server_exists_error(err: &str) -> bool {
+    err.contains("서버에 동일 연락처 후보")
+        || err.contains("서버 존재")
+        || err.contains("동일 후보")
+        || err.contains("중복")
+        || err.contains("등록 차단")
 }
 
 fn classify_queue_item(
@@ -488,12 +490,47 @@ fn classify_queue_item(
             "이미 해결됨 — 재시도 불필요".to_string(),
         );
     }
-    if is_test || err.contains("테스트") || err.contains("차단") {
+
+    if is_test {
         return (
             "BLOCK_TEST_DATA".to_string(),
-            "테스트/의심 데이터 관련 큐 — 업로드 차단".to_string(),
+            "테스트/의심 데이터 — 업로드 차단".to_string(),
         );
     }
+
+    if entity_type == "member" && is_duplicate_or_server_exists_error(err) {
+        if has_remote_id(member_remote_id) {
+            return (
+                "RESOLVABLE_MEMBER_QUEUE".to_string(),
+                "서버 중복/존재 차단이었으나 remote_id 이미 있음 — resolved 처리 후보".to_string(),
+            );
+        } else {
+            return (
+                "DUPLICATE_OR_SERVER_EXISTS".to_string(),
+                format!("서버에 동일 후보 존재로 차단됨 — last_error: {}", &err[..err.len().min(80)]),
+            );
+        }
+    }
+
+    if !is_test && (err.contains("테스트") || err.contains("차단")) {
+        if entity_type == "member" && has_remote_id(member_remote_id) {
+            return (
+                "RESOLVABLE_MEMBER_QUEUE".to_string(),
+                "차단 에러 있으나 remote_id 이미 있음 — resolved 처리 후보".to_string(),
+            );
+        }
+        if is_duplicate_or_server_exists_error(err) {
+            return (
+                "DUPLICATE_OR_SERVER_EXISTS".to_string(),
+                format!("서버 존재/중복으로 차단됨 — last_error: {}", &err[..err.len().min(80)]),
+            );
+        }
+        return (
+            "BLOCK_TEST_DATA".to_string(),
+            "테스트/차단 관련 큐 — 업로드 차단".to_string(),
+        );
+    }
+
     match entity_type {
         "member" => {
             if has_remote_id(member_remote_id) {

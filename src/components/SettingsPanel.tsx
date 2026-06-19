@@ -10,6 +10,7 @@ import { api } from "../api/client";
 import { repairSyncQueue, runSyncVerificationReport, type SyncVerificationReport } from "../sync/engine";
 import { getSupabaseClient } from "../lib/supabase/client";
 import { invoke } from "@tauri-apps/api/core";
+import { safeSyncDryRun, executeSafeSync, type SafeSyncDryRun, type SafeSyncResult } from "../sync/safeSync";
 
 // ---------------------------------------------------------------------------
 // Diagnostic report types (v1.0.54)
@@ -187,6 +188,11 @@ export function SettingsPanel({
   const [forcePullBusy, setForcePullBusy] = useState(false);
   const [diagBusy, setDiagBusy] = useState(false);
   const [diagReport, setDiagReport] = useState<DiagnosticReport | null>(null);
+  const [safeSyncBusy, setSafeSyncBusy] = useState(false);
+  const [safeSyncDryRunResult, setSafeSyncDryRunResult] = useState<SafeSyncDryRun | null>(null);
+  const [safeSyncConfirmOpen, setSafeSyncConfirmOpen] = useState(false);
+  const [safeSyncResult, setSafeSyncResult] = useState<SafeSyncResult | null>(null);
+  const [safeSyncProgress, setSafeSyncProgress] = useState("");
   const [forcePullResult, setForcePullResult] = useState<{
     serverCount: number;
     fetchedCount: number;
@@ -462,6 +468,40 @@ export function SettingsPanel({
       onNotify(`진단 실패: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setDiagBusy(false);
+    }
+  }
+
+  async function handleSafeSyncDryRun() {
+    setSafeSyncBusy(true);
+    setSafeSyncDryRunResult(null);
+    setSafeSyncResult(null);
+    setSafeSyncProgress("");
+    try {
+      const dr = await safeSyncDryRun();
+      setSafeSyncDryRunResult(dr);
+      setSafeSyncConfirmOpen(true);
+    } catch (error) {
+      onNotify(`dry-run 실패: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setSafeSyncBusy(false);
+    }
+  }
+
+  async function handleSafeSyncExecute() {
+    if (!safeSyncDryRunResult) return;
+    setSafeSyncConfirmOpen(false);
+    setSafeSyncBusy(true);
+    setSafeSyncProgress("시작 중...");
+    try {
+      const result = await executeSafeSync(safeSyncDryRunResult, setSafeSyncProgress);
+      setSafeSyncResult(result);
+      setSafeSyncProgress("");
+      onNotify(`처리 완료 — 회원권 insert:${result.actions.membershipInserted} backfill:${result.actions.membershipBackfilled}, 출석 insert:${result.actions.attendanceInserted} backfill:${result.actions.attendanceBackfilled}`);
+    } catch (error) {
+      onNotify(`처리 실패: ${error instanceof Error ? error.message : String(error)}`);
+      setSafeSyncProgress("");
+    } finally {
+      setSafeSyncBusy(false);
     }
   }
 
@@ -1679,6 +1719,115 @@ export function SettingsPanel({
                   {diagReport.diagFilePath && (
                     <div className="text-[9px] text-[var(--muted)] font-mono break-all">
                       저장 위치: {diagReport.diagFilePath}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── 검증된 회원권·출석 처리 버튼 ── */}
+              <div className="mt-3">
+                <button
+                  className="btn btn-secondary w-full"
+                  disabled={safeSyncBusy || !syncOnline}
+                  onClick={() => void handleSafeSyncDryRun()}
+                >
+                  <Upload size={16} className={safeSyncBusy ? "animate-spin" : ""} />
+                  {safeSyncBusy ? (safeSyncProgress || "처리 중...") : "검증된 회원권·출석 처리 실행"}
+                </button>
+                {!syncOnline && (
+                  <div className="mt-1 text-[10px] text-amber-500">Supabase 연결 필요</div>
+                )}
+              </div>
+
+              {/* Dry-run confirm dialog */}
+              {safeSyncConfirmOpen && safeSyncDryRunResult && (
+                <div className="mt-3 rounded-xl border-2 border-amber-500 bg-[var(--panel)] p-3 text-[11px] space-y-2">
+                  <div className="font-semibold text-amber-400">검증된 회원권·출석 처리 — dry-run 요약</div>
+                  <div className="space-y-0.5 text-[var(--muted)]">
+                    <div>member queue 정리 후보: <span className="font-semibold text-[var(--text)]">{safeSyncDryRunResult.memberQueueResolve.length}건</span></div>
+                    <div>회원권 업로드/매칭 후보: <span className="font-semibold text-emerald-500">{safeSyncDryRunResult.membershipCandidates.length}건</span></div>
+                    <div>회원권 테스트 차단: <span className="font-semibold text-red-400">{safeSyncDryRunResult.membershipBlockedTest}건</span></div>
+                    <div>출석 업로드/매칭 후보: <span className="font-semibold text-sky-400">최대 {safeSyncDryRunResult.attendanceCandidatesMax}건</span></div>
+                    <div>출석 테스트 차단: <span className="font-semibold text-red-400">{safeSyncDryRunResult.attendanceBlockedTest}건</span></div>
+                    {safeSyncDryRunResult.manualReview > 0 && (
+                      <div>수동 확인: <span className="font-semibold text-amber-400">{safeSyncDryRunResult.manualReview}건</span></div>
+                    )}
+                  </div>
+                  <div className="text-[10px] text-amber-400 mt-2">
+                    이 작업은 테스트 데이터를 업로드하지 않고, 검증된 회원권/출석만 처리합니다. 계속할까요?
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <button className="btn btn-secondary flex-1" onClick={() => setSafeSyncConfirmOpen(false)}>
+                      취소
+                    </button>
+                    <button className="btn btn-secondary flex-1 !border-emerald-500 !text-emerald-500" onClick={() => void handleSafeSyncExecute()}>
+                      확인 — 실행
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Safe sync result */}
+              {safeSyncResult && (
+                <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 text-[11px] space-y-2">
+                  <div className="font-semibold text-emerald-500">검증된 회원권·출석 처리 결과</div>
+                  <div className="grid grid-cols-3 gap-x-2 text-[10px]">
+                    <div className="font-semibold text-[var(--muted)]">항목</div>
+                    <div className="font-semibold text-[var(--muted)]">처리 전</div>
+                    <div className="font-semibold text-[var(--muted)]">처리 후</div>
+                    <div>회원권 no remote_id</div>
+                    <div>{safeSyncResult.before.membershipsNoRemoteId}</div>
+                    <div className="font-semibold">{safeSyncResult.after.membershipsNoRemoteId}</div>
+                    <div>출석 no remote_id</div>
+                    <div>{safeSyncResult.before.attendanceNoRemoteId}</div>
+                    <div className="font-semibold">{safeSyncResult.after.attendanceNoRemoteId}</div>
+                    <div>member queue pending</div>
+                    <div>{safeSyncResult.before.syncQueuePending}</div>
+                    <div className="font-semibold">{safeSyncResult.after.syncQueuePending}</div>
+                  </div>
+                  <div className="space-y-0.5 text-[var(--muted)]">
+                    <div>member queue resolved: <span className="text-emerald-500 font-semibold">{safeSyncResult.actions.memberQueueResolved}</span></div>
+                    <div>회원권 insert: <span className="text-emerald-500 font-semibold">{safeSyncResult.actions.membershipInserted}</span> / backfill: <span className="text-sky-400 font-semibold">{safeSyncResult.actions.membershipBackfilled}</span> / 테스트 차단: <span className="text-red-400 font-semibold">{safeSyncResult.actions.membershipBlockedTest}</span></div>
+                    <div>출석 insert: <span className="text-emerald-500 font-semibold">{safeSyncResult.actions.attendanceInserted}</span> / backfill: <span className="text-sky-400 font-semibold">{safeSyncResult.actions.attendanceBackfilled}</span> / 테스트 차단: <span className="text-red-400 font-semibold">{safeSyncResult.actions.attendanceBlockedTest}</span></div>
+                    {safeSyncResult.actions.manualReview > 0 && (
+                      <div>수동 확인: <span className="text-amber-400 font-semibold">{safeSyncResult.actions.manualReview}</span></div>
+                    )}
+                  </div>
+                  {safeSyncResult.actions.errors.length > 0 && (
+                    <details>
+                      <summary className="cursor-pointer text-red-400">오류 {safeSyncResult.actions.errors.length}건</summary>
+                      <div className="mt-1 max-h-32 overflow-y-auto rounded border border-[var(--border)] bg-[var(--bg)] p-2 font-mono text-[9px] text-red-400 space-y-0.5">
+                        {safeSyncResult.actions.errors.map((e, i) => <div key={i}>{e}</div>)}
+                      </div>
+                    </details>
+                  )}
+                  {safeSyncResult.actions.membershipDetails.length > 0 && (
+                    <details>
+                      <summary className="cursor-pointer text-[var(--muted)]">회원권 상세 {safeSyncResult.actions.membershipDetails.length}건</summary>
+                      <div className="mt-1 max-h-32 overflow-y-auto rounded border border-[var(--border)] bg-[var(--bg)] p-2 font-mono text-[9px] space-y-0.5">
+                        {safeSyncResult.actions.membershipDetails.map((d, i) => (
+                          <div key={i} className={d.action === "inserted" ? "text-emerald-500" : d.action === "backfilled" ? "text-sky-400" : "text-red-400"}>
+                            [ms#{d.localId}] {d.name} — {d.action}{d.serverIdUsed ? ` (${d.serverIdUsed.slice(0, 8)})` : ""}{d.error ? ` — ${d.error}` : ""}
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                  {safeSyncResult.actions.attendanceDetails.length > 0 && (
+                    <details>
+                      <summary className="cursor-pointer text-[var(--muted)]">출석 상세 {safeSyncResult.actions.attendanceDetails.length}건</summary>
+                      <div className="mt-1 max-h-32 overflow-y-auto rounded border border-[var(--border)] bg-[var(--bg)] p-2 font-mono text-[9px] space-y-0.5">
+                        {safeSyncResult.actions.attendanceDetails.map((d, i) => (
+                          <div key={i} className={d.action === "inserted" ? "text-emerald-500" : d.action === "backfilled" ? "text-sky-400" : "text-red-400"}>
+                            [att#{d.localId}] {d.name} — {d.action}{d.serverIdUsed ? ` (${d.serverIdUsed.slice(0, 8)})` : ""}{d.error ? ` — ${d.error}` : ""}
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                  {safeSyncResult.reportFilePath && (
+                    <div className="text-[9px] text-[var(--muted)] font-mono break-all">
+                      리포트 저장: {safeSyncResult.reportFilePath}
                     </div>
                   )}
                 </div>

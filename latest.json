@@ -1,11 +1,11 @@
 {
-    "version": "1.0.54",
-    "pub_date": "2026-06-18T00:00:00Z",
-    "notes": "v1.0.54: 회원권·출석·큐 진단 리포트 — remote_id 없는 항목 분류 및 JSON 저장 (read-only)",
+    "version": "1.0.55",
+    "pub_date": "2026-06-19T00:00:00Z",
+    "notes": "v1.0.55: 검증된 회원권·출석 safe sync — dry-run 확인 후 처리, sync_queue 분류 개선",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVVIMXlHUjNrL3lXOWdHU1A1NTZSUTdpV2MrOWc1V2diTmsrS3hiR0NidWJiWDlGMGZPc1hpN0Z4KzFQUytoVVA2SW5tYVNCOEFTYkRLZy95TTZ6emdNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxNzkwOTAzCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC41NF94NjQtc2V0dXAuZXhlCjlzc1ZUV25wMEdwYmo1WVpxNElMM1U0VkJocExJTEEyL3VoMjZhUmVHUEl6azIyc3E4Zm90aVJNUTM1dEs4ZVBxU0JMYzRsR09FbEdJNGYxdHVBdUFBPT0K",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.54/ClimbCenterManager_1.0.54_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUldTMUFQNTlJaUFWdVdTYWtyR2FuWC8yK3g4bENhN3Y2TzVDSzNKVVY3ejc4ZDdTWEJ3UjFsZHFQY1FJZGUyNm1LYnRqTHdORjFBaHNIZnVEdWMzVkJFRWZpd1FlTXNMK1FnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxODYzMDA1CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC41NV94NjQtc2V0dXAuZXhlCk9paldhSUNpOXRnSzc0MGtDY040ZVFreDBSYXgvSDZaSjNIZEZhRGp6cHRhSjdMTHJiTVljNmkyb0VGUWJrQXdBVDdNdmNYTDhhOExQU3FqQndYRkFnPT0K",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.55/ClimbCenterManager_1.0.55_x64-setup.exe"
         }
     }
 }

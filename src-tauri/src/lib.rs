@@ -134,6 +134,12 @@ pub fn run() {
             commands::get_local_members_for_matching_cmd,
             commands::get_local_center_counts_cmd,
             commands::membership_attendance_queue_diag_cmd,
+            commands::safe_sync_dry_run_cmd,
+            commands::resolve_member_queue_cmd,
+            commands::backfill_membership_remote_id_cmd,
+            commands::backfill_attendance_remote_id_cmd,
+            commands::get_attendance_candidates_cmd,
+            commands::save_safe_sync_report_cmd,
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|error| {
