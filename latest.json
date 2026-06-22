@@ -4,7 +4,7 @@
     "notes": "v1.0.56: UI filter hotfix — 1개월 미등록 필터 수정, 주니어 분류 개선",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUldTMUFQNTlJaUFWdWRiQVBWNVlpc1pLS1kwSkZwS21KbDRHN1EvM0o4dmtRa2lTSnpzWkNiRUQzYmkxbmdhbVJVUVJkMlZwTmFLSnlhMEhJTXRzdU5jUGpUK0FCc2x3MkFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyMTIyMjkxCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC41Nl94NjQtc2V0dXAuZXhlCjgyR2VzV3Z1V3lxemlGUXAvaHJYQTFPMWZjYk1wSTIwZmRiUVF2T0REamVSMjNWY1huM3VORjIremkyZjRjaE5hTE5XUDNrOG41b083a2tZeHVrRENRPT0K",
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWRiQVBWNVlpc1pLS1kwSkZwS21KbDRHN1EvM0o4dmtRa2lTSnpzWkNiRUQzYmkxbmdhbVJVUVJkMlZwTmFLSnlhMEhJTXRzdU5jUGpUK0FCc2x3MkFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyMTIyMjkxCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC41Nl94NjQtc2V0dXAuZXhlCjgyR2VzV3Z1V3lxemlGUXAvaHJYQTFPMWZjYk1wSTIwZmRiUVF2T0REamVSMjNWY1huM3VORjIremkyZjRjaE5hTE5XUDNrOG41b083a2tZeHVrRENRPT0K",
             "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.56/ClimbCenterManager_1.0.56_x64-setup.exe"
         }
     }
