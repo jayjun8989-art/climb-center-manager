@@ -362,8 +362,11 @@ fn map_list_item(row: &Row<'_>, today: NaiveDate) -> Result<MemberListItem, rusq
         .map(|end| (today - end).num_days() as i32)
         .filter(|days| *days >= 0);
 
-    let is_inactive_30_days = latest_membership_end_date.is_none()
-        || days_since_expired.map(|days| days >= 30).unwrap_or(true);
+    let is_inactive_30_days = if latest_membership_end_date.is_none() {
+        true
+    } else {
+        days_since_expired.map(|days| days >= 30).unwrap_or(false)
+    };
 
     Ok(MemberListItem {
         id: row.get(0)?,

@@ -71,11 +71,7 @@ export function normalizeMemberType(
   const value = String(memberType ?? "").trim().toLowerCase();
   if (value === "trial") return "trial";
   if (value === "junior") return "junior";
-  // 'regular' (Supabase 직접 저장값): 회원권 종류와 무관하게 항상 regular
-  if (value === "regular") return "regular";
 
-  // 'general' (Supabase 'regular'를 로컬 매핑한 값), null, 빈 문자열, 기타 미지값:
-  // SQL normalized_member_type_sql()과 동일하게 최신 회원권 종류로 판별
   const latestType = String(latestMembershipType ?? membershipType ?? "").toLowerCase();
   if (latestType === "junior" || latestType === "8times" || latestType === "16times") {
     return "junior";
@@ -99,10 +95,11 @@ export function memberMatchesGroupFilter(
       if (member.status === "paused") return false;
       if (member.is_inactive_30_days != null) return member.is_inactive_30_days;
       if (!member.latest_membership_end_date) return true;
-      return (
-        new Date(member.latest_membership_end_date).getTime() <=
-        Date.now() - 30 * 24 * 60 * 60 * 1000
-      );
+      {
+        const endTime = new Date(member.latest_membership_end_date).getTime();
+        if (endTime >= Date.now()) return false;
+        return endTime <= Date.now() - 30 * 24 * 60 * 60 * 1000;
+      }
     default:
       return true;
   }

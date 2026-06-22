@@ -4,7 +4,16 @@ pub fn normalized_member_type_sql() -> &'static str {
     r#"CASE
         WHEN m.member_type = 'trial' THEN 'trial'
         WHEN m.member_type = 'junior' THEN 'junior'
-        WHEN m.member_type = 'regular' THEN 'regular'
+        WHEN m.member_type = 'regular' THEN
+            CASE
+                WHEN COALESCE(
+                    (SELECT lm.membership_type FROM memberships lm
+                     WHERE lm.member_id = m.id
+                     ORDER BY lm.end_date DESC, lm.id DESC LIMIT 1),
+                    ms.membership_type
+                ) IN ('junior', '8times', '16times') THEN 'junior'
+                ELSE 'regular'
+            END
         WHEN m.member_type = 'general' OR m.member_type IS NULL OR TRIM(m.member_type) = '' THEN
             CASE
                 WHEN COALESCE(
@@ -120,6 +129,7 @@ pub fn count_inactive_30_members_sql(today: &str) -> String {
            AND (
              {latest_end} IS NULL
              OR {latest_end} < date('{today}', '-30 days')
-           )"
+           )
+           AND COALESCE(m.hidden_locally, 0) = 0 AND COALESCE(m.is_local_duplicate, 0) = 0"
     )
 }
