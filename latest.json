@@ -1,11 +1,11 @@
 {
-    "version": "1.0.57",
-    "pub_date": "2026-06-24T09:00:00Z",
-    "notes": "v1.0.57: final queue cleanup and test data hide",
+    "version": "1.0.58",
+    "pub_date": "2026-06-24T10:00:00Z",
+    "notes": "v1.0.58: diagnostic count cleanup for resolved queue",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWY1b1hRZTBsRDBBY2RTcm1tazhONklYT0wvV1UyRm95cnBvdmZoVkZ3WVlFVHVSN3dHSEZJdE92MDJERmRycFo3YVd2NStjN0xrb2p6dlRtS1BvYXdjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyMjkyNTY0CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC41N194NjQtc2V0dXAuZXhlCm5ZWWVZc3BnUlRBbzZJc1BKcm0rMUZmMGc0MjBXYmx2UlVMRXczNGZDdnVqOUM5VndpTlRFRTNmRHY1SjhUSEsxNG52Y3JyaURZU043dzhqaEI0NERnPT0K",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.57/ClimbCenterManager_1.0.57_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVRrQzFsR3BNNVIwV1Q1NUs3aS9YQXRlL0Ivd3lBWXA2dmw0Z1dGR1hLQlNGNnl5OVlOK1BGQWxkMTRxMGx1WnRna3M0SmlzaXI4RDVuSGU2THpLSVFVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyMjkzMzc0CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC41OF94NjQtc2V0dXAuZXhlCmNhTCtPam8rcDVLbTU0ZUhabE9XVnVTbmV2UXRqVEpNUFQ5dWRJeTFLUzJ0UHUwdnJZeUV4VTdDMGFNbXB6SjVvWnNNaDRxTyt3MDE0MGVyYWR0VkFBPT0K",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.58/ClimbCenterManager_1.0.58_x64-setup.exe"
         }
     }
 }

@@ -366,13 +366,13 @@ pub struct SyncStatus {
 pub fn fetch_sync_status(state: &AppState) -> Result<SyncStatus, DbError> {
     state.with_conn(|conn| {
         let pending_count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM sync_queue",
+            "SELECT COUNT(*) FROM sync_queue WHERE NOT (last_error IS NOT NULL AND last_error LIKE 'RESOLVED:%')",
             [],
             |row| row.get(0),
         )?;
 
         let failed_count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL",
+            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL AND NOT (last_error LIKE 'RESOLVED:%')",
             [],
             |row| row.get(0),
         )?;
@@ -890,16 +890,17 @@ pub fn get_upload_verification_report(state: &AppState) -> Result<UploadVerifica
             [], |row| row.get(0),
         )?;
         let queue_failed: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL AND retry_count < 5",
+            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL AND NOT (last_error LIKE 'RESOLVED:%') AND retry_count < 5",
             [], |row| row.get(0),
         )?;
         let queue_blocked: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL AND retry_count >= 5",
+            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL AND NOT (last_error LIKE 'RESOLVED:%') AND retry_count >= 5",
             [], |row| row.get(0),
         )?;
         let members_no_remote_id: i64 = conn.query_row(
             "SELECT COUNT(*) FROM members WHERE deleted_at IS NULL
-             AND (remote_id IS NULL OR remote_id = '')",
+             AND (remote_id IS NULL OR remote_id = '')
+             AND COALESCE(hidden_locally, 0) = 0",
             [], |row| row.get(0),
         )?;
         let memberships_no_remote_id: i64 = conn.query_row(
@@ -947,6 +948,7 @@ pub fn get_upload_verification_report(state: &AppState) -> Result<UploadVerifica
              LEFT JOIN sync_queue sq
                ON sq.entity_type = 'member' AND sq.entity_local_id = m.id
              WHERE m.deleted_at IS NULL AND (m.remote_id IS NULL OR m.remote_id = '')
+               AND COALESCE(m.hidden_locally, 0) = 0
              GROUP BY m.id
              ORDER BY m.id DESC
              LIMIT 50",

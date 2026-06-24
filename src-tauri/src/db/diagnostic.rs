@@ -369,6 +369,19 @@ fn diagnose_sync_queue(state: &AppState) -> Result<DiagSection<DiagSyncQueueItem
             let (member_name, member_remote_id, membership_remote_id, member_phone) =
                 resolve_queue_member_info(conn, &entity_type, entity_local_id)?;
 
+            let entity_remote_id: Option<String> = match entity_type.as_str() {
+                "member" => {
+                    conn.query_row("SELECT remote_id FROM members WHERE id = ?1", [entity_local_id], |r| r.get(0)).optional().ok().flatten()
+                }
+                "attendance" => {
+                    conn.query_row("SELECT remote_id FROM attendance_logs WHERE id = ?1", [entity_local_id], |r| r.get(0)).optional().ok().flatten()
+                }
+                "membership" => {
+                    conn.query_row("SELECT remote_id FROM memberships WHERE id = ?1", [entity_local_id], |r| r.get(0)).optional().ok().flatten()
+                }
+                _ => None,
+            };
+
             let is_test = is_test_data(
                 member_name.as_deref().unwrap_or(""),
                 &member_phone,
@@ -380,6 +393,7 @@ fn diagnose_sync_queue(state: &AppState) -> Result<DiagSection<DiagSyncQueueItem
                 &last_error,
                 &member_remote_id,
                 &membership_remote_id,
+                &entity_remote_id,
                 is_test,
             );
 
@@ -480,6 +494,7 @@ fn classify_queue_item(
     last_error: &Option<String>,
     member_remote_id: &Option<String>,
     membership_remote_id: &Option<String>,
+    entity_remote_id: &Option<String>,
     is_test: bool,
 ) -> (String, String) {
     let err = last_error.as_deref().unwrap_or("");
@@ -488,6 +503,13 @@ fn classify_queue_item(
         return (
             "ALREADY_RESOLVED".to_string(),
             "이미 해결됨 — 재시도 불필요".to_string(),
+        );
+    }
+
+    if has_remote_id(entity_remote_id) {
+        return (
+            "ALREADY_RESOLVED".to_string(),
+            format!("엔티티에 remote_id 있음 — 이미 처리됨 ({})", entity_remote_id.as_deref().unwrap_or("")),
         );
     }
 
