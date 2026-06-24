@@ -366,7 +366,13 @@ pub struct SyncStatus {
 pub fn fetch_sync_status(state: &AppState) -> Result<SyncStatus, DbError> {
     state.with_conn(|conn| {
         let pending_count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM sync_queue WHERE NOT (last_error IS NOT NULL AND last_error LIKE 'RESOLVED:%')",
+            "SELECT COUNT(*) FROM sync_queue sq
+             WHERE sq.last_error IS NULL
+               AND NOT (
+                 (sq.entity_type = 'member' AND EXISTS (SELECT 1 FROM members m WHERE m.id = sq.entity_local_id AND m.remote_id IS NOT NULL AND m.remote_id != ''))
+                 OR (sq.entity_type = 'attendance' AND EXISTS (SELECT 1 FROM attendance_logs al WHERE al.id = sq.entity_local_id AND al.remote_id IS NOT NULL AND al.remote_id != ''))
+                 OR (sq.entity_type = 'membership' AND EXISTS (SELECT 1 FROM memberships ms WHERE ms.id = sq.entity_local_id AND ms.remote_id IS NOT NULL AND ms.remote_id != ''))
+               )",
             [],
             |row| row.get(0),
         )?;
@@ -580,7 +586,13 @@ pub struct SyncDiagnostics {
 pub fn get_sync_diagnostics(state: &AppState) -> Result<SyncDiagnostics, DbError> {
     state.with_conn(|conn| {
         let queue_pending: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NULL",
+            "SELECT COUNT(*) FROM sync_queue sq
+             WHERE sq.last_error IS NULL
+               AND NOT (
+                 (sq.entity_type = 'member' AND EXISTS (SELECT 1 FROM members m WHERE m.id = sq.entity_local_id AND m.remote_id IS NOT NULL AND m.remote_id != ''))
+                 OR (sq.entity_type = 'attendance' AND EXISTS (SELECT 1 FROM attendance_logs al WHERE al.id = sq.entity_local_id AND al.remote_id IS NOT NULL AND al.remote_id != ''))
+                 OR (sq.entity_type = 'membership' AND EXISTS (SELECT 1 FROM memberships ms WHERE ms.id = sq.entity_local_id AND ms.remote_id IS NOT NULL AND ms.remote_id != ''))
+               )",
             [],
             |row| row.get(0),
         )?;
@@ -651,9 +663,10 @@ pub fn get_sync_diagnostics(state: &AppState) -> Result<SyncDiagnostics, DbError
              FROM members m
              LEFT JOIN sync_queue sq ON sq.entity_type = 'member' AND sq.entity_local_id = m.id
              WHERE m.deleted_at IS NULL
+               AND COALESCE(m.hidden_locally, 0) = 0
                AND (
                  (m.remote_id IS NULL OR m.remote_id = '')
-                 OR sq.last_error IS NOT NULL
+                 OR (sq.last_error IS NOT NULL AND sq.last_error NOT LIKE 'RESOLVED:%')
                )
              GROUP BY m.id
              ORDER BY m.id DESC
@@ -886,7 +899,13 @@ pub struct UploadVerificationReport {
 pub fn get_upload_verification_report(state: &AppState) -> Result<UploadVerificationReport, DbError> {
     state.with_conn(|conn| {
         let queue_pending: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NULL",
+            "SELECT COUNT(*) FROM sync_queue sq
+             WHERE sq.last_error IS NULL
+               AND NOT (
+                 (sq.entity_type = 'member' AND EXISTS (SELECT 1 FROM members m WHERE m.id = sq.entity_local_id AND m.remote_id IS NOT NULL AND m.remote_id != ''))
+                 OR (sq.entity_type = 'attendance' AND EXISTS (SELECT 1 FROM attendance_logs al WHERE al.id = sq.entity_local_id AND al.remote_id IS NOT NULL AND al.remote_id != ''))
+                 OR (sq.entity_type = 'membership' AND EXISTS (SELECT 1 FROM memberships ms WHERE ms.id = sq.entity_local_id AND ms.remote_id IS NOT NULL AND ms.remote_id != ''))
+               )",
             [], |row| row.get(0),
         )?;
         let queue_failed: i64 = conn.query_row(
