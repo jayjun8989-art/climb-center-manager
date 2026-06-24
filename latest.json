@@ -1,11 +1,11 @@
 {
-    "version": "1.0.60",
-    "pub_date": "2026-06-24T12:00:00Z",
-    "notes": "v1.0.60: final pending queue cleanup",
+    "version": "1.0.61",
+    "pub_date": "2026-06-24T12:30:00Z",
+    "notes": "v1.0.61: resolved-error display cleanup",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVNVSnQ1cmxMbmR1OG9xSmMxbGFNd3ZLN0NxZVpHYUZ1SWpKZGJTdW9FMmlaY3Q4ZU92SW52bUM5dzNybW1SZ1hVSGYxYXhhMWtFYzVWN3llZWhxL3dFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyMjk1NjIxCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC42MF94NjQtc2V0dXAuZXhlCkNPU21JVzJxSGFrYllPWVhUSitFem9DQ05BU3FRY1p5UWhXRitJQ3R2OVB1NTY2SHFpQ2I5dEFHUmE0cWlnU0RiQlArbjVMRzQyTC85M215Yk5wL0F3PT0K",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.60/ClimbCenterManager_1.0.60_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVViVC8xcGo4aUo4NThNYTV1Nzd2WXJ0VXJWUTN6RVBvK0hZR2N6cGN1Mmd1T2RqS0VvMG9ub0hKd0NHcUVLbExUSzVFZHFNTC9SS2JIemhZcnZ6VGdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyMjk2Mjg3CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC42MV94NjQtc2V0dXAuZXhlCjZlNjdoWGR3Qlc1RGdVRkFvdnh4WXAwRzZsS0RiRXZHWFpya1NmSlN1TExTTEoyMlY1S01lTlk5aWpQOGY4MG9xQ1l0NGxjT1RidVNFS2NVTWlPT0F3PT0K",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.61/ClimbCenterManager_1.0.61_x64-setup.exe"
         }
     }
 }
