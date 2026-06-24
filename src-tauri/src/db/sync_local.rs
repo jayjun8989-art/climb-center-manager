@@ -585,12 +585,12 @@ pub fn get_sync_diagnostics(state: &AppState) -> Result<SyncDiagnostics, DbError
             |row| row.get(0),
         )?;
         let queue_failed: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL AND retry_count < 5",
+            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL AND NOT (last_error LIKE 'RESOLVED:%') AND retry_count < 5",
             [],
             |row| row.get(0),
         )?;
         let queue_blocked: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL AND retry_count >= 5",
+            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL AND NOT (last_error LIKE 'RESOLVED:%') AND retry_count >= 5",
             [],
             |row| row.get(0),
         )?;
@@ -1231,9 +1231,8 @@ pub fn get_local_center_counts(state: &AppState, center: &str) -> Result<LocalCe
              WHERE m.deleted_at IS NULL AND UPPER(m.center) = UPPER(?1) AND al.remote_id IS NULL",
             [center], |row| row.get(0),
         )?;
-        // blocked: sync_queue items with last_error set
         let blocked: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL",
+            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL AND NOT (last_error LIKE 'RESOLVED:%')",
             [], |row| row.get(0),
         )?;
         Ok(LocalCenterCounts {
