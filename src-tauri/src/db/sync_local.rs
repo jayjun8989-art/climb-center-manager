@@ -378,7 +378,13 @@ pub fn fetch_sync_status(state: &AppState) -> Result<SyncStatus, DbError> {
         )?;
 
         let failed_count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL AND NOT (last_error LIKE 'RESOLVED:%')",
+            "SELECT COUNT(*) FROM sync_queue sq
+             WHERE sq.last_error IS NOT NULL AND NOT (sq.last_error LIKE 'RESOLVED:%')
+               AND NOT (
+                 (sq.entity_type = 'member' AND EXISTS (SELECT 1 FROM members m WHERE m.id = sq.entity_local_id AND m.remote_id IS NOT NULL AND m.remote_id != ''))
+                 OR (sq.entity_type = 'attendance' AND EXISTS (SELECT 1 FROM attendance_logs al WHERE al.id = sq.entity_local_id AND al.remote_id IS NOT NULL AND al.remote_id != ''))
+                 OR (sq.entity_type = 'membership' AND EXISTS (SELECT 1 FROM memberships ms WHERE ms.id = sq.entity_local_id AND ms.remote_id IS NOT NULL AND ms.remote_id != ''))
+               )",
             [],
             |row| row.get(0),
         )?;
@@ -597,12 +603,24 @@ pub fn get_sync_diagnostics(state: &AppState) -> Result<SyncDiagnostics, DbError
             |row| row.get(0),
         )?;
         let queue_failed: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL AND NOT (last_error LIKE 'RESOLVED:%') AND retry_count < 5",
+            "SELECT COUNT(*) FROM sync_queue sq
+             WHERE sq.last_error IS NOT NULL AND NOT (sq.last_error LIKE 'RESOLVED:%') AND sq.retry_count < 5
+               AND NOT (
+                 (sq.entity_type = 'member' AND EXISTS (SELECT 1 FROM members m WHERE m.id = sq.entity_local_id AND m.remote_id IS NOT NULL AND m.remote_id != ''))
+                 OR (sq.entity_type = 'attendance' AND EXISTS (SELECT 1 FROM attendance_logs al WHERE al.id = sq.entity_local_id AND al.remote_id IS NOT NULL AND al.remote_id != ''))
+                 OR (sq.entity_type = 'membership' AND EXISTS (SELECT 1 FROM memberships ms WHERE ms.id = sq.entity_local_id AND ms.remote_id IS NOT NULL AND ms.remote_id != ''))
+               )",
             [],
             |row| row.get(0),
         )?;
         let queue_blocked: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL AND NOT (last_error LIKE 'RESOLVED:%') AND retry_count >= 5",
+            "SELECT COUNT(*) FROM sync_queue sq
+             WHERE sq.last_error IS NOT NULL AND NOT (sq.last_error LIKE 'RESOLVED:%') AND sq.retry_count >= 5
+               AND NOT (
+                 (sq.entity_type = 'member' AND EXISTS (SELECT 1 FROM members m WHERE m.id = sq.entity_local_id AND m.remote_id IS NOT NULL AND m.remote_id != ''))
+                 OR (sq.entity_type = 'attendance' AND EXISTS (SELECT 1 FROM attendance_logs al WHERE al.id = sq.entity_local_id AND al.remote_id IS NOT NULL AND al.remote_id != ''))
+                 OR (sq.entity_type = 'membership' AND EXISTS (SELECT 1 FROM memberships ms WHERE ms.id = sq.entity_local_id AND ms.remote_id IS NOT NULL AND ms.remote_id != ''))
+               )",
             [],
             |row| row.get(0),
         )?;
@@ -664,10 +682,7 @@ pub fn get_sync_diagnostics(state: &AppState) -> Result<SyncDiagnostics, DbError
              LEFT JOIN sync_queue sq ON sq.entity_type = 'member' AND sq.entity_local_id = m.id
              WHERE m.deleted_at IS NULL
                AND COALESCE(m.hidden_locally, 0) = 0
-               AND (
-                 (m.remote_id IS NULL OR m.remote_id = '')
-                 OR (sq.last_error IS NOT NULL AND sq.last_error NOT LIKE 'RESOLVED:%')
-               )
+               AND (m.remote_id IS NULL OR m.remote_id = '')
              GROUP BY m.id
              ORDER BY m.id DESC
              LIMIT 200",
@@ -909,11 +924,23 @@ pub fn get_upload_verification_report(state: &AppState) -> Result<UploadVerifica
             [], |row| row.get(0),
         )?;
         let queue_failed: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL AND NOT (last_error LIKE 'RESOLVED:%') AND retry_count < 5",
+            "SELECT COUNT(*) FROM sync_queue sq
+             WHERE sq.last_error IS NOT NULL AND NOT (sq.last_error LIKE 'RESOLVED:%') AND sq.retry_count < 5
+               AND NOT (
+                 (sq.entity_type = 'member' AND EXISTS (SELECT 1 FROM members m WHERE m.id = sq.entity_local_id AND m.remote_id IS NOT NULL AND m.remote_id != ''))
+                 OR (sq.entity_type = 'attendance' AND EXISTS (SELECT 1 FROM attendance_logs al WHERE al.id = sq.entity_local_id AND al.remote_id IS NOT NULL AND al.remote_id != ''))
+                 OR (sq.entity_type = 'membership' AND EXISTS (SELECT 1 FROM memberships ms WHERE ms.id = sq.entity_local_id AND ms.remote_id IS NOT NULL AND ms.remote_id != ''))
+               )",
             [], |row| row.get(0),
         )?;
         let queue_blocked: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL AND NOT (last_error LIKE 'RESOLVED:%') AND retry_count >= 5",
+            "SELECT COUNT(*) FROM sync_queue sq
+             WHERE sq.last_error IS NOT NULL AND NOT (sq.last_error LIKE 'RESOLVED:%') AND sq.retry_count >= 5
+               AND NOT (
+                 (sq.entity_type = 'member' AND EXISTS (SELECT 1 FROM members m WHERE m.id = sq.entity_local_id AND m.remote_id IS NOT NULL AND m.remote_id != ''))
+                 OR (sq.entity_type = 'attendance' AND EXISTS (SELECT 1 FROM attendance_logs al WHERE al.id = sq.entity_local_id AND al.remote_id IS NOT NULL AND al.remote_id != ''))
+                 OR (sq.entity_type = 'membership' AND EXISTS (SELECT 1 FROM memberships ms WHERE ms.id = sq.entity_local_id AND ms.remote_id IS NOT NULL AND ms.remote_id != ''))
+               )",
             [], |row| row.get(0),
         )?;
         let members_no_remote_id: i64 = conn.query_row(
@@ -1251,7 +1278,13 @@ pub fn get_local_center_counts(state: &AppState, center: &str) -> Result<LocalCe
             [center], |row| row.get(0),
         )?;
         let blocked: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL AND NOT (last_error LIKE 'RESOLVED:%')",
+            "SELECT COUNT(*) FROM sync_queue sq
+             WHERE sq.last_error IS NOT NULL AND NOT (sq.last_error LIKE 'RESOLVED:%')
+               AND NOT (
+                 (sq.entity_type = 'member' AND EXISTS (SELECT 1 FROM members m WHERE m.id = sq.entity_local_id AND m.remote_id IS NOT NULL AND m.remote_id != ''))
+                 OR (sq.entity_type = 'attendance' AND EXISTS (SELECT 1 FROM attendance_logs al WHERE al.id = sq.entity_local_id AND al.remote_id IS NOT NULL AND al.remote_id != ''))
+                 OR (sq.entity_type = 'membership' AND EXISTS (SELECT 1 FROM memberships ms WHERE ms.id = sq.entity_local_id AND ms.remote_id IS NOT NULL AND ms.remote_id != ''))
+               )",
             [], |row| row.get(0),
         )?;
         Ok(LocalCenterCounts {
