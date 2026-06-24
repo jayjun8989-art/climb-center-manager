@@ -24,8 +24,10 @@ pub use diagnostic::{run_diagnostic, DiagnosticReport};
 pub use safe_sync::{
     safe_sync_dry_run, resolve_member_queue_items, backfill_membership_remote_id,
     backfill_attendance_remote_id, get_attendance_candidates, save_safe_sync_report,
+    cleanup_dry_run, execute_cleanup, save_cleanup_report,
     SafeSyncDryRun, SafeSyncMembershipCandidate, SafeSyncAttendanceCandidate,
     SafeSyncMemberQueueItem, ResolveMemberQueueResult,
+    CleanupDryRun, CleanupResult,
 };
 pub use pull_import::{
     backfill_member_remote_ids_from_id_map, count_active_members, import_pull_snapshot,

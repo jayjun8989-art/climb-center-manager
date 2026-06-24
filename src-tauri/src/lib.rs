@@ -140,6 +140,9 @@ pub fn run() {
             commands::backfill_attendance_remote_id_cmd,
             commands::get_attendance_candidates_cmd,
             commands::save_safe_sync_report_cmd,
+            commands::cleanup_dry_run_cmd,
+            commands::execute_cleanup_cmd,
+            commands::save_cleanup_report_cmd,
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|error| {

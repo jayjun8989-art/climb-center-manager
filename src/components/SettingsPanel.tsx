@@ -11,6 +11,7 @@ import { repairSyncQueue, runSyncVerificationReport, type SyncVerificationReport
 import { getSupabaseClient } from "../lib/supabase/client";
 import { invoke } from "@tauri-apps/api/core";
 import { safeSyncDryRun, executeSafeSync, type SafeSyncDryRun, type SafeSyncResult } from "../sync/safeSync";
+import type { CleanupDryRun, CleanupResult } from "../sync/cleanupTypes";
 
 // ---------------------------------------------------------------------------
 // Diagnostic report types (v1.0.54)
@@ -193,6 +194,10 @@ export function SettingsPanel({
   const [safeSyncConfirmOpen, setSafeSyncConfirmOpen] = useState(false);
   const [safeSyncResult, setSafeSyncResult] = useState<SafeSyncResult | null>(null);
   const [safeSyncProgress, setSafeSyncProgress] = useState("");
+  const [queueCleanupBusy, setQueueCleanupBusy] = useState(false);
+  const [queueCleanupDryRun, setQueueCleanupDryRun] = useState<CleanupDryRun | null>(null);
+  const [queueCleanupConfirmOpen, setQueueCleanupConfirmOpen] = useState(false);
+  const [queueCleanupResult, setQueueCleanupResult] = useState<CleanupResult & { reportFilePath?: string } | null>(null);
   const [forcePullResult, setForcePullResult] = useState<{
     serverCount: number;
     fetchedCount: number;
@@ -502,6 +507,40 @@ export function SettingsPanel({
       setSafeSyncProgress("");
     } finally {
       setSafeSyncBusy(false);
+    }
+  }
+
+  async function handleQueueCleanupDryRun() {
+    setQueueCleanupBusy(true);
+    setQueueCleanupDryRun(null);
+    setQueueCleanupResult(null);
+    try {
+      const dr = await invoke<CleanupDryRun>("cleanup_dry_run_cmd");
+      setQueueCleanupDryRun(dr);
+      setQueueCleanupConfirmOpen(true);
+    } catch (error) {
+      onNotify(`큐 정리 dry-run 실패: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setQueueCleanupBusy(false);
+    }
+  }
+
+  async function handleQueueCleanupExecute() {
+    setQueueCleanupConfirmOpen(false);
+    setQueueCleanupBusy(true);
+    try {
+      const result = await invoke<CleanupResult>("execute_cleanup_cmd");
+      const json = JSON.stringify(result, null, 2);
+      let reportFilePath: string | undefined;
+      try {
+        reportFilePath = await invoke<string>("save_cleanup_report_cmd", { json });
+      } catch { /* ignore */ }
+      setQueueCleanupResult({ ...result, reportFilePath });
+      onNotify(`큐 정리 완료 — member resolved:${result.memberQueueResolved}, attendance resolved:${result.attendanceQueueResolved}, test hidden:${result.testMembersHidden}`);
+    } catch (error) {
+      onNotify(`큐 정리 실패: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setQueueCleanupBusy(false);
     }
   }
 
@@ -1828,6 +1867,66 @@ export function SettingsPanel({
                   {safeSyncResult.reportFilePath && (
                     <div className="text-[9px] text-[var(--muted)] font-mono break-all">
                       리포트 저장: {safeSyncResult.reportFilePath}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── 큐 정리 + 테스트 숨김 버튼 ── */}
+              <div className="mt-3">
+                <button
+                  className="btn btn-secondary w-full"
+                  disabled={queueCleanupBusy}
+                  onClick={() => void handleQueueCleanupDryRun()}
+                >
+                  <RefreshCw size={16} className={queueCleanupBusy ? "animate-spin" : ""} />
+                  {queueCleanupBusy ? "처리 중..." : "큐 정리 + 테스트 데이터 숨김"}
+                </button>
+              </div>
+
+              {queueCleanupConfirmOpen && queueCleanupDryRun && (
+                <div className="mt-3 rounded-xl border-2 border-amber-500 bg-[var(--panel)] p-3 text-[11px] space-y-2">
+                  <div className="font-semibold text-amber-400">큐 정리 + 테스트 숨김 — dry-run 요약</div>
+                  <div className="space-y-0.5 text-[var(--muted)]">
+                    <div>member queue resolved 후보: <span className="font-semibold text-emerald-500">{queueCleanupDryRun.resolvableMemberQueue}건</span></div>
+                    <div>attendance queue resolved 후보: <span className="font-semibold text-emerald-500">{queueCleanupDryRun.resolvableAttendanceQueue}건</span></div>
+                    <div>테스트 회원 숨김 후보: <span className="font-semibold text-amber-400">{queueCleanupDryRun.testMembersToHide.length}건</span>
+                      {queueCleanupDryRun.testMembersToHide.length > 0 && (
+                        <span className="text-[var(--muted)]"> ({queueCleanupDryRun.testMembersToHide.map(m => m.name).join(", ")})</span>
+                      )}
+                    </div>
+                    <div>BLOCK_TEST_DATA 유지: <span className="font-semibold text-red-400">{queueCleanupDryRun.blockTestData}건</span></div>
+                    <div>MANUAL_REVIEW 유지: <span className="font-semibold text-amber-400">{queueCleanupDryRun.manualReview}건</span></div>
+                  </div>
+                  <div className="text-[10px] text-amber-400 mt-2">
+                    이 작업은 서버에 업로드/삭제하지 않고, 로컬 큐 정리와 테스트 데이터 숨김만 합니다. 계속할까요?
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <button className="btn btn-secondary flex-1" onClick={() => setQueueCleanupConfirmOpen(false)}>취소</button>
+                    <button className="btn btn-secondary flex-1 !border-emerald-500 !text-emerald-500" onClick={() => void handleQueueCleanupExecute()}>확인 — 실행</button>
+                  </div>
+                </div>
+              )}
+
+              {queueCleanupResult && (
+                <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 text-[11px] space-y-2">
+                  <div className="font-semibold text-emerald-500">큐 정리 + 테스트 숨김 결과</div>
+                  <div className="space-y-0.5 text-[var(--muted)]">
+                    <div>member queue resolved: <span className="text-emerald-500 font-semibold">{queueCleanupResult.memberQueueResolved}</span></div>
+                    <div>attendance queue resolved: <span className="text-emerald-500 font-semibold">{queueCleanupResult.attendanceQueueResolved}</span></div>
+                    <div>테스트 회원 숨김: <span className="text-amber-400 font-semibold">{queueCleanupResult.testMembersHidden}</span></div>
+                  </div>
+                  {queueCleanupResult.errors.length > 0 && (
+                    <details>
+                      <summary className="cursor-pointer text-red-400">오류 {queueCleanupResult.errors.length}건</summary>
+                      <div className="mt-1 max-h-32 overflow-y-auto rounded border border-[var(--border)] bg-[var(--bg)] p-2 font-mono text-[9px] text-red-400 space-y-0.5">
+                        {queueCleanupResult.errors.map((e, i) => <div key={i}>{e}</div>)}
+                      </div>
+                    </details>
+                  )}
+                  {queueCleanupResult.reportFilePath && (
+                    <div className="text-[9px] text-[var(--muted)] font-mono break-all">
+                      리포트 저장: {queueCleanupResult.reportFilePath}
                     </div>
                   )}
                 </div>

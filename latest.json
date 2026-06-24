@@ -1,11 +1,11 @@
 {
-    "version": "1.0.56",
-    "pub_date": "2026-06-22T10:00:00Z",
-    "notes": "v1.0.56: UI filter hotfix — 1개월 미등록 필터 수정, 주니어 분류 개선",
+    "version": "1.0.57",
+    "pub_date": "2026-06-24T09:00:00Z",
+    "notes": "v1.0.57: final queue cleanup and test data hide",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWRiQVBWNVlpc1pLS1kwSkZwS21KbDRHN1EvM0o4dmtRa2lTSnpzWkNiRUQzYmkxbmdhbVJVUVJkMlZwTmFLSnlhMEhJTXRzdU5jUGpUK0FCc2x3MkFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyMTIyMjkxCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC41Nl94NjQtc2V0dXAuZXhlCjgyR2VzV3Z1V3lxemlGUXAvaHJYQTFPMWZjYk1wSTIwZmRiUVF2T0REamVSMjNWY1huM3VORjIremkyZjRjaE5hTE5XUDNrOG41b083a2tZeHVrRENRPT0K",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.56/ClimbCenterManager_1.0.56_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWY1b1hRZTBsRDBBY2RTcm1tazhONklYT0wvV1UyRm95cnBvdmZoVkZ3WVlFVHVSN3dHSEZJdE92MDJERmRycFo3YVd2NStjN0xrb2p6dlRtS1BvYXdjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyMjkyNTY0CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC41N194NjQtc2V0dXAuZXhlCm5ZWWVZc3BnUlRBbzZJc1BKcm0rMUZmMGc0MjBXYmx2UlVMRXczNGZDdnVqOUM5VndpTlRFRTNmRHY1SjhUSEsxNG52Y3JyaURZU043dzhqaEI0NERnPT0K",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.57/ClimbCenterManager_1.0.57_x64-setup.exe"
         }
     }
 }

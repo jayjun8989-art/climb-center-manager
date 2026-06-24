@@ -355,6 +355,174 @@ pub fn get_attendance_candidates(state: &AppState) -> Result<Vec<SafeSyncAttenda
 // Save result report JSON
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Cleanup dry-run
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupDryRun {
+    pub generated_at: String,
+    pub resolvable_member_queue: usize,
+    pub resolvable_attendance_queue: usize,
+    pub test_members_to_hide: Vec<TestMemberToHide>,
+    pub block_test_data: usize,
+    pub manual_review: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TestMemberToHide {
+    pub id: i64,
+    pub name: String,
+    pub phone: Option<String>,
+}
+
+pub fn cleanup_dry_run(state: &AppState) -> Result<CleanupDryRun, DbError> {
+    state.with_conn(|conn| {
+        // Resolvable member queue: entity_type=member, member has remote_id, not already resolved
+        let resolvable_member: usize = conn.query_row(
+            "SELECT COUNT(*) FROM sync_queue sq
+             JOIN members m ON m.id = sq.entity_local_id
+             WHERE sq.entity_type = 'member'
+               AND (m.remote_id IS NOT NULL AND m.remote_id != '')
+               AND NOT (sq.last_error IS NOT NULL AND sq.last_error LIKE 'RESOLVED%')",
+            [],
+            |row| row.get::<_, usize>(0),
+        )?;
+
+        // Resolvable attendance queue: entity_type=attendance, attendance has remote_id
+        let resolvable_att: usize = conn.query_row(
+            "SELECT COUNT(*) FROM sync_queue sq
+             JOIN attendance_logs al ON al.id = sq.entity_local_id
+             WHERE sq.entity_type = 'attendance'
+               AND (al.remote_id IS NOT NULL AND al.remote_id != '')
+               AND NOT (sq.last_error IS NOT NULL AND sq.last_error LIKE 'RESOLVED%')",
+            [],
+            |row| row.get::<_, usize>(0),
+        )?;
+
+        // Test members to hide
+        let mut stmt = conn.prepare(
+            "SELECT id, name, phone FROM members
+             WHERE COALESCE(hidden_locally, 0) = 0
+               AND deleted_at IS NULL
+               AND (
+                 (name = 'ddd' AND phone = 'ddd')
+                 OR (name = 'dddd' AND phone = 'ddd')
+                 OR (name = 'dfdfd' AND phone = 'ddff')
+               )"
+        )?;
+        let test_members: Vec<TestMemberToHide> = stmt.query_map([], |row| {
+            Ok(TestMemberToHide {
+                id: row.get(0)?,
+                name: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
+                phone: row.get(2)?,
+            })
+        })?.filter_map(|r| r.ok()).collect();
+
+        // BLOCK_TEST_DATA count
+        let block_test: usize = conn.query_row(
+            "SELECT COUNT(*) FROM sync_queue sq
+             JOIN members m ON m.id = sq.entity_local_id AND sq.entity_type = 'member'
+             WHERE sq.last_error LIKE '%테스트%' OR sq.last_error LIKE '%차단%'",
+            [],
+            |row| row.get::<_, usize>(0),
+        ).unwrap_or(0);
+
+        // MANUAL_REVIEW count (member queue with no remote_id, not resolved, not test-blocked)
+        let manual_review: usize = conn.query_row(
+            "SELECT COUNT(*) FROM sync_queue sq
+             LEFT JOIN members m ON m.id = sq.entity_local_id AND sq.entity_type = 'member'
+             WHERE sq.entity_type = 'member'
+               AND (m.remote_id IS NULL OR m.remote_id = '')
+               AND NOT (sq.last_error IS NOT NULL AND sq.last_error LIKE 'RESOLVED%')
+               AND NOT (sq.last_error IS NOT NULL AND (sq.last_error LIKE '%테스트%' OR sq.last_error LIKE '%차단%'))",
+            [],
+            |row| row.get::<_, usize>(0),
+        ).unwrap_or(0);
+
+        Ok(CleanupDryRun {
+            generated_at: now_string(),
+            resolvable_member_queue: resolvable_member,
+            resolvable_attendance_queue: resolvable_att,
+            test_members_to_hide: test_members,
+            block_test_data: block_test,
+            manual_review,
+        })
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Execute cleanup
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupResult {
+    pub member_queue_resolved: usize,
+    pub attendance_queue_resolved: usize,
+    pub test_members_hidden: usize,
+    pub errors: Vec<String>,
+}
+
+pub fn execute_cleanup(state: &AppState) -> Result<CleanupResult, DbError> {
+    state.with_conn(|conn| {
+        let mut errors = Vec::new();
+
+        // 1. Resolve member queue items where member already has remote_id
+        let member_resolved = conn.execute(
+            "UPDATE sync_queue SET last_error = 'RESOLVED: member remote_id already exists; upload no longer needed'
+             WHERE entity_type = 'member'
+               AND NOT (last_error IS NOT NULL AND last_error LIKE 'RESOLVED%')
+               AND entity_local_id IN (
+                 SELECT id FROM members WHERE remote_id IS NOT NULL AND remote_id != ''
+               )",
+            [],
+        ).unwrap_or_else(|e| { errors.push(format!("member queue resolve: {}", e)); 0 });
+
+        // 2. Resolve attendance queue items where attendance already has remote_id
+        let att_resolved = conn.execute(
+            "UPDATE sync_queue SET last_error = 'RESOLVED: attendance remote_id already exists; upload no longer needed'
+             WHERE entity_type = 'attendance'
+               AND NOT (last_error IS NOT NULL AND last_error LIKE 'RESOLVED%')
+               AND entity_local_id IN (
+                 SELECT id FROM attendance_logs WHERE remote_id IS NOT NULL AND remote_id != ''
+               )",
+            [],
+        ).unwrap_or_else(|e| { errors.push(format!("attendance queue resolve: {}", e)); 0 });
+
+        // 3. Hide test members
+        let hidden = conn.execute(
+            "UPDATE members SET hidden_locally = 1
+             WHERE COALESCE(hidden_locally, 0) = 0
+               AND deleted_at IS NULL
+               AND (
+                 (name = 'ddd' AND phone = 'ddd')
+                 OR (name = 'dddd' AND phone = 'ddd')
+                 OR (name = 'dfdfd' AND phone = 'ddff')
+               )",
+            [],
+        ).unwrap_or_else(|e| { errors.push(format!("test member hide: {}", e)); 0 });
+
+        Ok(CleanupResult {
+            member_queue_resolved: member_resolved,
+            attendance_queue_resolved: att_resolved,
+            test_members_hidden: hidden,
+            errors,
+        })
+    })
+}
+
+pub fn save_cleanup_report(state: &AppState, json: &str) -> Result<String, DbError> {
+    let app_data_dir = state.db_path.parent()
+        .ok_or_else(|| DbError::Message("앱 데이터 경로를 찾을 수 없습니다".to_string()))?;
+    let path = app_data_dir.join("cleanup_queue_result.json");
+    std::fs::write(&path, json)
+        .map_err(|e| DbError::Message(format!("리포트 저장 실패: {}", e)))?;
+    Ok(path.to_string_lossy().to_string())
+}
+
 pub fn save_safe_sync_report(state: &AppState, json: &str) -> Result<String, DbError> {
     let app_data_dir = state.db_path.parent()
         .ok_or_else(|| DbError::Message("앱 데이터 경로를 찾을 수 없습니다".to_string()))?;

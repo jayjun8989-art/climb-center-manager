@@ -20,6 +20,8 @@ use crate::db::{
     backfill_attendance_remote_id, get_attendance_candidates, save_safe_sync_report,
     SafeSyncDryRun, SafeSyncMembershipCandidate, SafeSyncAttendanceCandidate,
     ResolveMemberQueueResult,
+    cleanup_dry_run, execute_cleanup, save_cleanup_report,
+    CleanupDryRun, CleanupResult,
 };
 use crate::db::{list_members_with_remote_id, repair_center_mapping};
 use crate::models::{
@@ -734,4 +736,26 @@ pub fn save_safe_sync_report_cmd(
     json: String,
 ) -> Result<String, String> {
     save_safe_sync_report(&state, &json).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn cleanup_dry_run_cmd(
+    state: State<'_, AppState>,
+) -> Result<CleanupDryRun, String> {
+    cleanup_dry_run(&state).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn execute_cleanup_cmd(
+    state: State<'_, AppState>,
+) -> Result<CleanupResult, String> {
+    execute_cleanup(&state).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_cleanup_report_cmd(
+    state: State<'_, AppState>,
+    json: String,
+) -> Result<String, String> {
+    save_cleanup_report(&state, &json).map_err(|e| e.to_string())
 }
