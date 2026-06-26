@@ -430,7 +430,7 @@ pub fn cleanup_dry_run(state: &AppState) -> Result<CleanupDryRun, DbError> {
                AND (m.remote_id IS NULL OR m.remote_id = '')
                AND EXISTS (
                  SELECT 1 FROM members m2
-                 WHERE m2.center = m.center AND m2.name = m.name
+                 WHERE UPPER(m2.center) = UPPER(m.center) AND TRIM(m2.name) = TRIM(m.name)
                    AND m2.deleted_at IS NULL AND m2.id != m.id
                    AND m2.remote_id IS NOT NULL AND m2.remote_id != ''
                )"
@@ -537,7 +537,7 @@ pub fn execute_cleanup(state: &AppState) -> Result<CleanupResult, DbError> {
                AND (remote_id IS NULL OR remote_id = '')
                AND EXISTS (
                  SELECT 1 FROM members m2
-                 WHERE m2.center = members.center AND m2.name = members.name
+                 WHERE UPPER(m2.center) = UPPER(members.center) AND TRIM(m2.name) = TRIM(members.name)
                    AND m2.deleted_at IS NULL AND m2.id != members.id
                    AND m2.remote_id IS NOT NULL AND m2.remote_id != ''
                )",
