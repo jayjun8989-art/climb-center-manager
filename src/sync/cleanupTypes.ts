@@ -9,6 +9,7 @@ export interface CleanupDryRun {
   resolvableMemberQueue: number;
   resolvableAttendanceQueue: number;
   testMembersToHide: TestMemberToHide[];
+  localDupMembersToHide: TestMemberToHide[];
   blockTestData: number;
   manualReview: number;
 }
@@ -17,5 +18,6 @@ export interface CleanupResult {
   memberQueueResolved: number;
   attendanceQueueResolved: number;
   testMembersHidden: number;
+  localDupMembersHidden: number;
   errors: string[];
 }

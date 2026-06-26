@@ -366,6 +366,7 @@ pub struct CleanupDryRun {
     pub resolvable_member_queue: usize,
     pub resolvable_attendance_queue: usize,
     pub test_members_to_hide: Vec<TestMemberToHide>,
+    pub local_dup_members_to_hide: Vec<TestMemberToHide>,
     pub block_test_data: usize,
     pub manual_review: usize,
 }
@@ -421,6 +422,27 @@ pub fn cleanup_dry_run(state: &AppState) -> Result<CleanupDryRun, DbError> {
             })
         })?.filter_map(|r| r.ok()).collect();
 
+        // Local-only duplicate members to hide (no remote_id, same name+center has remote_id)
+        let mut dup_stmt = conn.prepare(
+            "SELECT m.id, m.name, m.phone FROM members m
+             WHERE m.deleted_at IS NULL
+               AND COALESCE(m.hidden_locally, 0) = 0
+               AND (m.remote_id IS NULL OR m.remote_id = '')
+               AND EXISTS (
+                 SELECT 1 FROM members m2
+                 WHERE m2.center = m.center AND m2.name = m.name
+                   AND m2.deleted_at IS NULL AND m2.id != m.id
+                   AND m2.remote_id IS NOT NULL AND m2.remote_id != ''
+               )"
+        )?;
+        let local_dup_members: Vec<TestMemberToHide> = dup_stmt.query_map([], |row| {
+            Ok(TestMemberToHide {
+                id: row.get(0)?,
+                name: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
+                phone: row.get(2)?,
+            })
+        })?.filter_map(|r| r.ok()).collect();
+
         // BLOCK_TEST_DATA count
         let block_test: usize = conn.query_row(
             "SELECT COUNT(*) FROM sync_queue sq
@@ -447,6 +469,7 @@ pub fn cleanup_dry_run(state: &AppState) -> Result<CleanupDryRun, DbError> {
             resolvable_member_queue: resolvable_member,
             resolvable_attendance_queue: resolvable_att,
             test_members_to_hide: test_members,
+            local_dup_members_to_hide: local_dup_members,
             block_test_data: block_test,
             manual_review,
         })
@@ -463,6 +486,7 @@ pub struct CleanupResult {
     pub member_queue_resolved: usize,
     pub attendance_queue_resolved: usize,
     pub test_members_hidden: usize,
+    pub local_dup_members_hidden: usize,
     pub errors: Vec<String>,
 }
 
@@ -505,10 +529,37 @@ pub fn execute_cleanup(state: &AppState) -> Result<CleanupResult, DbError> {
             [],
         ).unwrap_or_else(|e| { errors.push(format!("test member hide: {}", e)); 0 });
 
+        // 4. Hide local-only duplicate members (no remote_id, same name+center has remote_id)
+        let dup_hidden = conn.execute(
+            "UPDATE members SET hidden_locally = 1
+             WHERE COALESCE(hidden_locally, 0) = 0
+               AND deleted_at IS NULL
+               AND (remote_id IS NULL OR remote_id = '')
+               AND EXISTS (
+                 SELECT 1 FROM members m2
+                 WHERE m2.center = members.center AND m2.name = members.name
+                   AND m2.deleted_at IS NULL AND m2.id != members.id
+                   AND m2.remote_id IS NOT NULL AND m2.remote_id != ''
+               )",
+            [],
+        ).unwrap_or_else(|e| { errors.push(format!("local dup hide: {}", e)); 0 });
+
+        // 5. Resolve sync_queue for hidden local-only members
+        conn.execute(
+            "UPDATE sync_queue SET last_error = 'RESOLVED: local duplicate hidden; server member exists'
+             WHERE entity_type = 'member'
+               AND NOT (last_error IS NOT NULL AND last_error LIKE 'RESOLVED%')
+               AND entity_local_id IN (
+                 SELECT id FROM members WHERE COALESCE(hidden_locally, 0) = 1
+               )",
+            [],
+        ).ok();
+
         Ok(CleanupResult {
             member_queue_resolved: member_resolved,
             attendance_queue_resolved: att_resolved,
             test_members_hidden: hidden,
+            local_dup_members_hidden: dup_hidden,
             errors,
         })
     })
