@@ -1,11 +1,11 @@
 {
-    "version": "1.0.62",
-    "pub_date": "2026-06-26T10:00:00Z",
-    "notes": "v1.0.62: local duplicate hide",
+    "version": "1.0.63",
+    "pub_date": "2026-06-26T11:00:00Z",
+    "notes": "v1.0.63: fix local duplicate hide",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWRhUEJsdG5NSEh2MDROZFV0ZXkwZW0xdFBjM0FXWmozSVVsNkhMMlo4TTVkOEh4WkNZdDlNYUFGVHNQcm9kYjRwNlpBRGtYYlFjT1dTRlpzWFJGWGdrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyNDY0MzE1CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC42Ml94NjQtc2V0dXAuZXhlCmhzN2dNOS9jUDF3dmFhdTN2MlZUbHNkZ1lNbkpXcUFXTWh0R3FkbHRySE1rNjlhWkt0THRTWW5HR2VGK2F4RTU3U013dkp0K0ZSbDN6TnJLSTdkQUNBPT0K",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.62/ClimbCenterManager_1.0.62_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWJ1RG9oc01CV0ozc1Btc1pKK1ZvOGhlazk0aTF6SGJvSGFCb0VLNFp6QmxHMUxlektRTTN3dzVXanhxcmxZOWZ3OUxmOTlZYUpKWTR3NUovR0xGandZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyNDY1MjM4CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC42M194NjQtc2V0dXAuZXhlCjNOREJISzhBNVQrcVBJV2czUy9nL1hzOVpQOW01cGgwK0crbXZYd3dscHJGTDJGT2ZNakw3RFVpaXUyNFFoVXBlOUsxVmR2QU9kS2tjZkY3SXVyWkF3PT0K",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.63/ClimbCenterManager_1.0.63_x64-setup.exe"
         }
     }
 }
