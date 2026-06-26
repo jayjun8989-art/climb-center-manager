@@ -154,7 +154,12 @@ fn diagnose_memberships(state: &AppState) -> Result<DiagSection<DiagMembershipIt
             "SELECT ms.id, ms.membership_type, ms.pass_type, ms.start_date, ms.end_date,
                     ms.remaining_count, ms.status, ms.member_id,
                     m.name, m.phone, m.member_no, m.center, m.remote_id,
-                    m.hidden_locally, m.deleted_at
+                    m.hidden_locally, m.deleted_at,
+                    EXISTS (
+                      SELECT 1 FROM memberships ms2
+                      WHERE ms2.member_id = ms.member_id AND ms2.id != ms.id
+                        AND ms2.remote_id IS NOT NULL AND ms2.remote_id != ''
+                    ) AS member_has_other_ms_with_rid
              FROM memberships ms
              LEFT JOIN members m ON m.id = ms.member_id
              WHERE (ms.remote_id IS NULL OR ms.remote_id = '')
@@ -178,6 +183,7 @@ fn diagnose_memberships(state: &AppState) -> Result<DiagSection<DiagMembershipIt
                 let member_remote_id: Option<String> = row.get(12)?;
                 let member_hidden_locally: i64 = row.get::<_, Option<i64>>(13)?.unwrap_or(0);
                 let member_deleted_at: Option<String> = row.get(14)?;
+                let member_has_other_ms: bool = row.get::<_, i64>(15)? != 0;
 
                 let is_test = is_test_data(&member_name, &member_phone);
 
@@ -202,6 +208,11 @@ fn diagnose_memberships(state: &AppState) -> Result<DiagSection<DiagMembershipIt
                                 "member soft-deleted (deleted_at={:?}) — 수동 확인 필요",
                                 member_deleted_at
                             ),
+                        )
+                    } else if member_has_other_ms {
+                        (
+                            "LOCAL_DUPLICATE_MEMBERSHIP".to_string(),
+                            "같은 회원에 remote_id 있는 회원권이 이미 존재 — 업로드 불필요, backfill 후보".to_string(),
                         )
                     } else {
                         (

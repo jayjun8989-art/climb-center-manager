@@ -536,7 +536,7 @@ export function SettingsPanel({
         reportFilePath = await invoke<string>("save_cleanup_report_cmd", { json });
       } catch { /* ignore */ }
       setQueueCleanupResult({ ...result, reportFilePath });
-      onNotify(`큐 정리 완료 — member resolved:${result.memberQueueResolved}, attendance resolved:${result.attendanceQueueResolved}, test hidden:${result.testMembersHidden}, dup hidden:${result.localDupMembersHidden}`);
+      onNotify(`큐 정리 완료 — member resolved:${result.memberQueueResolved}, att resolved:${result.attendanceQueueResolved}, test hidden:${result.testMembersHidden}, dup hidden:${result.localDupMembersHidden}, ms backfill:${result.localDupMembershipsBackfilled}`);
     } catch (error) {
       onNotify(`큐 정리 실패: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
@@ -1900,6 +1900,7 @@ export function SettingsPanel({
                         <span className="text-[var(--muted)]"> ({queueCleanupDryRun.localDupMembersToHide.map(m => m.name).join(", ")})</span>
                       )}
                     </div>
+                    <div>회원권 중복 backfill 후보: <span className="font-semibold text-sky-400">{queueCleanupDryRun.localDupMemberships}건</span></div>
                     <div>BLOCK_TEST_DATA 유지: <span className="font-semibold text-red-400">{queueCleanupDryRun.blockTestData}건</span></div>
                     <div>MANUAL_REVIEW 유지: <span className="font-semibold text-amber-400">{queueCleanupDryRun.manualReview}건</span></div>
                   </div>
@@ -1921,6 +1922,7 @@ export function SettingsPanel({
                     <div>attendance queue resolved: <span className="text-emerald-500 font-semibold">{queueCleanupResult.attendanceQueueResolved}</span></div>
                     <div>테스트 회원 숨김: <span className="text-amber-400 font-semibold">{queueCleanupResult.testMembersHidden}</span></div>
                     <div>로컬 중복 숨김: <span className="text-amber-400 font-semibold">{queueCleanupResult.localDupMembersHidden}</span></div>
+                    <div>회원권 중복 backfill: <span className="text-sky-400 font-semibold">{queueCleanupResult.localDupMembershipsBackfilled}</span></div>
                   </div>
                   {queueCleanupResult.errors.length > 0 && (
                     <details>
