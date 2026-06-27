@@ -1,11 +1,11 @@
 {
-    "version": "1.0.65",
-    "pub_date": "2026-06-27T06:00:00Z",
-    "notes": "v1.0.65: Supabase immediate sync for cancel/pause/resume + admin guards",
+    "version": "1.0.66",
+    "pub_date": "2026-06-27T07:00:00Z",
+    "notes": "v1.0.66: 운영 상태 점검 (원클릭 Health Check)",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVRBallFMExVSXVsTnNQYXVPYktKY0l4dmZISlcwMy9lT0RoQVNLWnN4OXVjc0ZrQ3pDOVFZbVN3Wjk2ZW54b2hZWWhtcWkvN1pIeUhnaWYrdzNJZ0FZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyNTM4NzU0CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC42NV94NjQtc2V0dXAuZXhlCjZDYTlXQjR1STVoYlA1Y0dLVE9RNThrQWJ1UE9ZYThZTWJBZDRUYm15a0NPL0hLd3R3czZWQk5CNFZ0MGFVazFZQ3ZHbXlCNklYcG9BalZPNjIybENRPT0K",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.65/ClimbCenterManager_1.0.65_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWZNKytweHoxd1RBYkZ4WDBqRi8xd1FieEdpNVBNQXlTV09sYVFRVDVFMmZ2SEN2VjBlV25VUEFkRUd3V1NVN29DM0pwLzNISGorSC9zdVduWUFKRVFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyNTM5NTc3CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC42Nl94NjQtc2V0dXAuZXhlClFGOUlhNElwb1oyR1JkaktGOU96QXpUdUpOU25iQ1Bxb2dXOGNaTVhOQmtlNW5NU2NCR3o5MG52TlRvVTJkanY5SHl6UEJuTG82ZE1jWUM2a2p6eURBPT0K",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.66/ClimbCenterManager_1.0.66_x64-setup.exe"
         }
     }
 }
