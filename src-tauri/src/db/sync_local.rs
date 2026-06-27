@@ -1257,10 +1257,11 @@ pub fn get_local_center_counts(state: &AppState, center: &str) -> Result<LocalCe
              WHERE m.deleted_at IS NULL AND al.canceled_at IS NULL AND UPPER(m.center) = UPPER(?1)",
             [center], |row| row.get(0),
         )?;
-        // D: members without remote_id
+        // D: members without remote_id (visible only — excludes hidden/duplicate)
         let members_no_remote_id: i64 = conn.query_row(
             "SELECT COUNT(*) FROM members WHERE deleted_at IS NULL
-             AND UPPER(center) = UPPER(?1) AND (remote_id IS NULL OR remote_id = '')",
+             AND UPPER(center) = UPPER(?1) AND (remote_id IS NULL OR remote_id = '')
+             AND COALESCE(hidden_locally, 0) = 0 AND COALESCE(is_local_duplicate, 0) = 0",
             [center], |row| row.get(0),
         )?;
         // H: memberships without remote_id

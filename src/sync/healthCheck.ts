@@ -3,6 +3,7 @@ import { checkOnline, getSyncStatus, getServerCenterConsistency } from "./engine
 import { getSession } from "../lib/supabase/auth";
 import { isSupabaseConfigured } from "../lib/supabase/config";
 import { getAppVersion, checkForUpdate } from "../lib/updater";
+import { safeInvoke } from "../lib/tauri";
 
 export type HealthVerdict = "ok" | "ok_info" | "caution" | "admin_required" | "server_error" | "offline";
 
@@ -90,7 +91,14 @@ export async function runHealthCheck(center: Center | undefined): Promise<Health
 
       const noRemote = c.local_members_no_remote_id ?? 0;
       if (noRemote > 0) {
-        items.push({ label: "remote_id 없는 표시 회원", value: `${noRemote}명`, status: "error" });
+        let detail = `${noRemote}명`;
+        try {
+          const unlinked = await safeInvoke<Array<{ name: string; local_id: number }>>("get_local_members_for_matching_cmd", { center });
+          if (unlinked && unlinked.length > 0) {
+            detail += ` (${unlinked.slice(0, 3).map(m => m.name).join(", ")})`;
+          }
+        } catch { /* */ }
+        items.push({ label: "remote_id 없는 표시 회원", value: detail, status: "error" });
         dataIssue = true;
         centerDataClean = false;
       } else {
