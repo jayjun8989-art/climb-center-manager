@@ -769,13 +769,14 @@ export function SettingsPanel({
             {healthResult && (
               <div className="mt-3 space-y-2">
                 <div className={`rounded-xl p-3 text-center text-sm font-semibold ${
-                  healthResult.verdict === "ok" ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/30" :
+                  healthResult.verdict === "ok" || healthResult.verdict === "ok_info" ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/30" :
                   healthResult.verdict === "caution" ? "bg-amber-500/10 text-amber-400 border border-amber-500/30" :
                   healthResult.verdict === "admin_required" ? "bg-red-500/10 text-red-400 border border-red-500/30" :
                   "bg-gray-500/10 text-gray-400 border border-gray-500/30"
                 }`}>
                   <div className="text-lg">{healthResult.verdictLabel}</div>
                   <div className="mt-1 text-xs font-normal opacity-80">{healthResult.verdictMessage}</div>
+                  <div className="mt-1 text-[10px] font-normal opacity-60">{healthResult.action}</div>
                 </div>
                 <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 text-[11px] space-y-1">
                   {healthResult.items.map((item, i) => (
@@ -789,6 +790,19 @@ export function SettingsPanel({
                       }`}>{item.value}</span>
                     </div>
                   ))}
+                  {healthResult.infoItems.length > 0 && (
+                    <details className="pt-1">
+                      <summary className="cursor-pointer text-[10px] text-[var(--muted)]">참고 항목 {healthResult.infoItems.length}건 (운영 영향 없음)</summary>
+                      <div className="mt-1 space-y-0.5">
+                        {healthResult.infoItems.map((item, i) => (
+                          <div key={i} className="flex justify-between text-[var(--muted)]">
+                            <span>{item.label}</span>
+                            <span>{item.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
                   <div className="pt-1 text-[9px] text-[var(--muted)]">점검 시간: {healthResult.checkedAt}</div>
                 </div>
               </div>
@@ -1567,11 +1581,11 @@ export function SettingsPanel({
           </div>
           )}
 
-          {center && (
+          {canSyncPush && center && (
             <div className="rounded-2xl border border-[var(--border)] p-4">
               <div className="flex items-center gap-2 text-sm font-semibold">
                 <ShieldAlert size={16} className="text-amber-500" />
-                로컬 중복 회원 정리
+                로컬 중복 회원 정리 <span className="text-[10px] text-amber-400">(관리자)</span>
               </div>
               <p className="mt-1 text-[11px] leading-relaxed text-[var(--muted)]">
                 과거 동기화 오류로 내 PC에만 같은 회원이 여러 줄로 보일 수 있습니다. 아래 기능은
@@ -1600,12 +1614,12 @@ export function SettingsPanel({
             </div>
           )}
 
-          {center && (
+          {canSyncPush && center && (
             <div className="rounded-2xl border border-[var(--border)] p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-sm font-semibold">
                   <RefreshCw size={16} className="text-sky-500" />
-                  동기화 진단
+                  동기화 진단 <span className="text-[10px] text-amber-400">(관리자)</span>
                 </div>
                 <button
                   className="btn btn-secondary !px-3"

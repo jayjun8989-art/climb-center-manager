@@ -1267,14 +1267,23 @@ pub fn get_local_center_counts(state: &AppState, center: &str) -> Result<LocalCe
         let memberships_no_remote_id: i64 = conn.query_row(
             "SELECT COUNT(*) FROM memberships ms
              JOIN members m ON m.id = ms.member_id
-             WHERE m.deleted_at IS NULL AND UPPER(m.center) = UPPER(?1) AND ms.remote_id IS NULL",
+             WHERE m.deleted_at IS NULL AND UPPER(m.center) = UPPER(?1)
+               AND (ms.remote_id IS NULL OR ms.remote_id = '')
+               AND COALESCE(m.hidden_locally, 0) = 0
+               AND NOT EXISTS (
+                 SELECT 1 FROM memberships ms2
+                 WHERE ms2.member_id = ms.member_id AND ms2.id != ms.id
+                   AND ms2.remote_id IS NOT NULL AND ms2.remote_id != ''
+               )",
             [center], |row| row.get(0),
         )?;
-        // I: attendance_logs without remote_id
         let attendance_no_remote_id: i64 = conn.query_row(
             "SELECT COUNT(*) FROM attendance_logs al
              JOIN members m ON m.id = al.member_id
-             WHERE m.deleted_at IS NULL AND UPPER(m.center) = UPPER(?1) AND al.remote_id IS NULL",
+             WHERE m.deleted_at IS NULL AND UPPER(m.center) = UPPER(?1)
+               AND (al.remote_id IS NULL OR al.remote_id = '')
+               AND COALESCE(m.hidden_locally, 0) = 0
+               AND al.canceled_at IS NULL",
             [center], |row| row.get(0),
         )?;
         let blocked: i64 = conn.query_row(
