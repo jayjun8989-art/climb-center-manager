@@ -31,6 +31,7 @@ import type {
   LocalCenterCounts,
 } from "../types";
 import { uploadLocalMemberNow, matchServerMembersForCenter, getServerCenterConsistency } from "../sync/engine";
+import { triggerImmediatePush } from "../sync/directWrite";
 import {
   defaultBackupInfo,
   defaultDashboardStats,
@@ -124,23 +125,29 @@ export const api = {
     });
   },
 
-  addMember(
+  async addMember(
     input: MemberInput,
     options?: { enqueueSync?: boolean },
   ): Promise<MutationResult<MemberListItem>> {
-    return writeCommand(
+    const result = await writeCommand(
       "add_member",
       { input, enqueue_sync: options?.enqueueSync ?? true },
       () => fallbackAddMember(input),
     );
+    triggerImmediatePush();
+    return result;
   },
 
-  editMember(id: number, input: MemberInput): Promise<MutationResult<MemberListItem>> {
-    return writeCommand("edit_member", { id, input }, () => fallbackEditMember(id, input));
+  async editMember(id: number, input: MemberInput): Promise<MutationResult<MemberListItem>> {
+    const result = await writeCommand("edit_member", { id, input }, () => fallbackEditMember(id, input));
+    triggerImmediatePush();
+    return result;
   },
 
-  removeMember(id: number): Promise<MutationResult<boolean>> {
-    return writeCommand("remove_member", { id }, () => fallbackRemoveMember(id));
+  async removeMember(id: number): Promise<MutationResult<boolean>> {
+    const result = await writeCommand("remove_member", { id }, () => fallbackRemoveMember(id));
+    triggerImmediatePush();
+    return result;
   },
 
   hasAttendanceToday(
@@ -158,13 +165,13 @@ export const api = {
     return readCommand("has_attendance_on_date_cmd", { memberId, date }, () => false);
   },
 
-  recordAttendance(
+  async recordAttendance(
     member: MemberListItem | { id?: number | null; member_id?: number | null; membership_id?: number | null },
     options?: { membershipId?: number | null; forceDuplicate?: boolean; checkinDate?: string | null; editor?: string | null },
   ): Promise<MutationResult<MemberListItem>> {
     const memberId = resolveMemberLocalId(member);
     const membershipId = options?.membershipId ?? member.membership_id ?? null;
-    return writeCommand(
+    const result = await writeCommand(
       "record_attendance",
       {
         memberId,
@@ -175,6 +182,8 @@ export const api = {
       },
       () => fallbackRecordAttendance(memberId),
     );
+    triggerImmediatePush();
+    return result;
   },
 
   getNextMemberNo(center: Center): Promise<number> {
@@ -189,14 +198,16 @@ export const api = {
     );
   },
 
-  cancelAttendance(
+  async cancelAttendance(
     attendanceId: number,
     reason?: string,
     editor?: string | null,
   ): Promise<MutationResult<MemberListItem>> {
-    return writeCommand("cancel_attendance_cmd", { attendanceId, reason: reason ?? null, editor: editor ?? null }, () => {
+    const result = await writeCommand("cancel_attendance_cmd", { attendanceId, reason: reason ?? null, editor: editor ?? null }, () => {
       throw new Error("출석 취소는 데스크톱 앱에서만 지원합니다.");
     });
+    triggerImmediatePush();
+    return result;
   },
 
   listLockers(center: Center): Promise<import("../types").LockerListItem[]> {
@@ -225,20 +236,24 @@ export const api = {
     return readCommand("fetch_pause_logs", { memberId }, () => []);
   },
 
-  pauseMembership(membershipId: number, reason?: string): Promise<MemberListItem> {
-    return writeCommand(
+  async pauseMembership(membershipId: number, reason?: string): Promise<MemberListItem> {
+    const result = await writeCommand(
       "pause_membership_command",
       { membershipId: membershipId, reason: reason ?? null },
       () => {
         throw new Error("브라우저 미리보기에서는 정지 기능을 지원하지 않습니다.");
       },
     );
+    triggerImmediatePush();
+    return result;
   },
 
-  resumeMembership(membershipId: number): Promise<MemberListItem> {
-    return writeCommand("resume_membership_command", { membershipId }, () => {
+  async resumeMembership(membershipId: number): Promise<MemberListItem> {
+    const result = await writeCommand("resume_membership_command", { membershipId }, () => {
       throw new Error("브라우저 미리보기에서는 해제 기능을 지원하지 않습니다.");
     });
+    triggerImmediatePush();
+    return result;
   },
 
   fetchDashboardStats(center: Center): Promise<DashboardStats> {

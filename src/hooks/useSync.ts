@@ -134,7 +134,16 @@ export function useSync(enabled: boolean, syncContext: SyncErrorContext, centerI
         })
         .catch(() => undefined);
     }, SYNC_INTERVAL_MS);
-    return () => window.clearInterval(timer);
+
+    const onPushNow = () => {
+      if (enabled) syncNow().catch(() => undefined);
+    };
+    window.addEventListener("climb-sync-push-now", onPushNow);
+
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("climb-sync-push-now", onPushNow);
+    };
   }, [enabled, refreshStatus, syncNow]);
 
   useEffect(() => {

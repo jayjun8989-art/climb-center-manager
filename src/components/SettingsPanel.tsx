@@ -935,11 +935,12 @@ export function SettingsPanel({
             </p>
           </div>
 
-          {/* ── 업로드 검증 리포트 ── */}
+          {/* ── 업로드 검증 리포트 (관리자 전용) ── */}
+          {canSyncPush && (
           <div className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--panel-strong)] px-4 py-4">
             <div className="mb-3 flex items-center gap-2">
               <Upload size={18} className="text-sky-500" />
-              <p className="text-sm font-semibold text-[var(--text)]">업로드 검증 리포트</p>
+              <p className="text-sm font-semibold text-[var(--text)]">업로드 검증 리포트 <span className="text-[10px] text-amber-400">(관리자)</span></p>
             </div>
             <p className="mb-3 text-xs text-[var(--muted)]">
               이 PC에만 있고 Supabase 서버에 아직 업로드되지 않은 데이터를 확인합니다.
@@ -1128,9 +1129,10 @@ export function SettingsPanel({
               </div>
             )}
           </div>
+          )}
 
-          {/* ── 서버 회원 매칭 검사 ── */}
-          {center && (
+          {/* ── 서버 회원 매칭 검사 (관리자 전용) ── */}
+          {canSyncPush && center && (
             <div className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--panel-strong)] px-4 py-4">
               <div className="mb-3 flex items-center gap-2">
                 <ShieldAlert size={18} className="text-sky-500" />
@@ -1763,7 +1765,8 @@ export function SettingsPanel({
                 </div>
               )}
 
-              {/* ── 검증된 회원권·출석 처리 버튼 ── */}
+              {/* ── 검증된 회원권·출석 처리 버튼 (관리자 전용) ── */}
+              {canSyncPush && (<>
               <div className="mt-3">
                 <button
                   className="btn btn-secondary w-full"
@@ -1939,6 +1942,8 @@ export function SettingsPanel({
                   )}
                 </div>
               )}
+
+              </>)}
 
               {verifyReport && (
                 <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 text-[11px]">

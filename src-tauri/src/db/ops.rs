@@ -1598,6 +1598,10 @@ pub fn pause_membership(
         Ok((member_id, center))
     })?;
 
+    if let Ok(payload) = crate::db::sync_local::build_member_sync_payload_json(state, member_id) {
+        let _ = crate::db::sync_local::enqueue_sync_item(state, "member", member_id, "update", &payload);
+    }
+
     refresh_member_status(state, member_id)?;
     get_member_list_item_by_id(state, member_id)
 }
@@ -1649,6 +1653,11 @@ pub fn resume_membership(
     })?;
 
     let _ = remaining_days;
+
+    if let Ok(payload) = crate::db::sync_local::build_member_sync_payload_json(state, member_id) {
+        let _ = crate::db::sync_local::enqueue_sync_item(state, "member", member_id, "update", &payload);
+    }
+
     refresh_member_status(state, member_id)?;
     get_member_list_item_by_id(state, member_id)
 }

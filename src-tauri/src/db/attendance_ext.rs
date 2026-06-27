@@ -296,6 +296,11 @@ pub fn cancel_attendance(
         Ok(())
     })?;
 
+    // Enqueue sync for attendance cancel + member update
+    if let Ok(payload) = super::sync_local::build_member_sync_payload_json(state, member_id) {
+        let _ = super::sync_local::enqueue_sync_item(state, "member", member_id, "update", &payload);
+    }
+
     refresh_member_status(state, member_id)?;
     get_member_list_item_by_id(state, member_id)
 }
