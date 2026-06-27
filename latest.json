@@ -1,11 +1,11 @@
 {
-    "version": "1.0.66",
-    "pub_date": "2026-06-27T07:00:00Z",
-    "notes": "v1.0.66: 운영 상태 점검 (원클릭 Health Check)",
+    "version": "1.0.67",
+    "pub_date": "2026-06-27T08:00:00Z",
+    "notes": "v1.0.67: health check verdict improvement + staff/admin UI separation",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWZNKytweHoxd1RBYkZ4WDBqRi8xd1FieEdpNVBNQXlTV09sYVFRVDVFMmZ2SEN2VjBlV25VUEFkRUd3V1NVN29DM0pwLzNISGorSC9zdVduWUFKRVFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyNTM5NTc3CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC42Nl94NjQtc2V0dXAuZXhlClFGOUlhNElwb1oyR1JkaktGOU96QXpUdUpOU25iQ1Bxb2dXOGNaTVhOQmtlNW5NU2NCR3o5MG52TlRvVTJkanY5SHl6UEJuTG82ZE1jWUM2a2p6eURBPT0K",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.66/ClimbCenterManager_1.0.66_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVg3RGdNWS9RWG5GNEJOdkhmOHZEa3EwZjlsNVp5enczajFZcmgyTWxpRzdUYTBNWkI4T0RBQ1BuRGdyTktkeUF5eTJ3MW5BWG9mSDB2TnhUd1E5T1E4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyNTQ1NDQ1CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC42N194NjQtc2V0dXAuZXhlCk5rQlJGVk4xNXhTbktIY3pvRGpTaXJ3cVRDUFNSSmJmdUZQVGtVVEZhQ1dwMXhpamZHLzNiM2hmQU51VUc1dGJlUDdQcjJ4RlJ1N0FHdzMxWW5jL0NnPT0K",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.67/ClimbCenterManager_1.0.67_x64-setup.exe"
         }
     }
 }
