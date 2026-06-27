@@ -12,6 +12,7 @@ import { getSupabaseClient } from "../lib/supabase/client";
 import { invoke } from "@tauri-apps/api/core";
 import { safeSyncDryRun, executeSafeSync, type SafeSyncDryRun, type SafeSyncResult } from "../sync/safeSync";
 import type { CleanupDryRun, CleanupResult } from "../sync/cleanupTypes";
+import { runHealthCheck, type HealthCheckResult } from "../sync/healthCheck";
 
 // ---------------------------------------------------------------------------
 // Diagnostic report types (v1.0.54)
@@ -189,6 +190,8 @@ export function SettingsPanel({
   const [forcePullBusy, setForcePullBusy] = useState(false);
   const [diagBusy, setDiagBusy] = useState(false);
   const [diagReport, setDiagReport] = useState<DiagnosticReport | null>(null);
+  const [healthBusy, setHealthBusy] = useState(false);
+  const [healthResult, setHealthResult] = useState<HealthCheckResult | null>(null);
   const [safeSyncBusy, setSafeSyncBusy] = useState(false);
   const [safeSyncDryRunResult, setSafeSyncDryRunResult] = useState<SafeSyncDryRun | null>(null);
   const [safeSyncConfirmOpen, setSafeSyncConfirmOpen] = useState(false);
@@ -476,6 +479,18 @@ export function SettingsPanel({
     }
   }
 
+  async function handleHealthCheck() {
+    setHealthBusy(true);
+    try {
+      const result = await runHealthCheck(center);
+      setHealthResult(result);
+    } catch (error) {
+      onNotify(`점검 실패: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setHealthBusy(false);
+    }
+  }
+
   async function handleSafeSyncDryRun() {
     setSafeSyncBusy(true);
     setSafeSyncDryRunResult(null);
@@ -737,6 +752,49 @@ export function SettingsPanel({
         </div>
 
         <div className="max-h-[85vh] space-y-4 overflow-y-auto px-6 py-5">
+          {/* ── 운영 상태 점검 ── */}
+          <div className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--panel-strong)] px-4 py-4">
+            <div className="mb-3 flex items-center gap-2">
+              <ShieldAlert size={18} className="text-emerald-500" />
+              <p className="text-sm font-semibold text-[var(--text)]">운영 상태 점검</p>
+            </div>
+            <button
+              className="btn btn-secondary w-full"
+              disabled={healthBusy}
+              onClick={() => void handleHealthCheck()}
+            >
+              <RefreshCw size={16} className={healthBusy ? "animate-spin" : ""} />
+              {healthBusy ? "점검 중..." : "운영 상태 점검"}
+            </button>
+            {healthResult && (
+              <div className="mt-3 space-y-2">
+                <div className={`rounded-xl p-3 text-center text-sm font-semibold ${
+                  healthResult.verdict === "ok" ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/30" :
+                  healthResult.verdict === "caution" ? "bg-amber-500/10 text-amber-400 border border-amber-500/30" :
+                  healthResult.verdict === "admin_required" ? "bg-red-500/10 text-red-400 border border-red-500/30" :
+                  "bg-gray-500/10 text-gray-400 border border-gray-500/30"
+                }`}>
+                  <div className="text-lg">{healthResult.verdictLabel}</div>
+                  <div className="mt-1 text-xs font-normal opacity-80">{healthResult.verdictMessage}</div>
+                </div>
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 text-[11px] space-y-1">
+                  {healthResult.items.map((item, i) => (
+                    <div key={i} className="flex justify-between">
+                      <span className="text-[var(--muted)]">{item.label}</span>
+                      <span className={`font-semibold ${
+                        item.status === "ok" ? "text-emerald-500" :
+                        item.status === "warn" ? "text-amber-400" :
+                        item.status === "error" ? "text-red-400" :
+                        "text-[var(--text)]"
+                      }`}>{item.value}</span>
+                    </div>
+                  ))}
+                  <div className="pt-1 text-[9px] text-[var(--muted)]">점검 시간: {healthResult.checkedAt}</div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {canManageAccount && (
             <div className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--panel-strong)] px-4 py-4">
               <div className="mb-3 flex items-center gap-2">
