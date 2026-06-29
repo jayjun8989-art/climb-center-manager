@@ -1284,6 +1284,8 @@ pub fn get_local_center_counts(state: &AppState, center: &str) -> Result<LocalCe
              WHERE m.deleted_at IS NULL AND UPPER(m.center) = UPPER(?1)
                AND (al.remote_id IS NULL OR al.remote_id = '')
                AND COALESCE(m.hidden_locally, 0) = 0
+               AND COALESCE(m.is_local_duplicate, 0) = 0
+               AND (m.remote_id IS NOT NULL AND m.remote_id != '')
                AND al.canceled_at IS NULL",
             [center], |row| row.get(0),
         )?;

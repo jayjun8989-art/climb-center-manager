@@ -77,7 +77,7 @@ export async function runHealthCheck(center: Center | undefined): Promise<Health
     }
   } catch { /* */ }
 
-  items.push({ label: "마지막 서버→PC", value: lastPull ? lastPull.slice(0, 19).replace("T", " ") : "없음", status: lastPull ? "ok" : "warn" });
+  items.push({ label: "마지막 서버→PC", value: lastPull ? lastPull.slice(0, 19).replace("T", " ") : "없음", status: lastPull ? "ok" : "info" });
 
   // 6. Center consistency — this is the actual data check
   let centerDataClean = true;
