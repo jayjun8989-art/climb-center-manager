@@ -372,6 +372,14 @@ pub fn fetch_sync_status(state: &AppState) -> Result<SyncStatus, DbError> {
                  (sq.entity_type = 'member' AND EXISTS (SELECT 1 FROM members m WHERE m.id = sq.entity_local_id AND m.remote_id IS NOT NULL AND m.remote_id != ''))
                  OR (sq.entity_type = 'attendance' AND EXISTS (SELECT 1 FROM attendance_logs al WHERE al.id = sq.entity_local_id AND al.remote_id IS NOT NULL AND al.remote_id != ''))
                  OR (sq.entity_type = 'membership' AND EXISTS (SELECT 1 FROM memberships ms WHERE ms.id = sq.entity_local_id AND ms.remote_id IS NOT NULL AND ms.remote_id != ''))
+               )
+               AND NOT (
+                 sq.entity_type = 'attendance' AND EXISTS (
+                   SELECT 1 FROM attendance_logs al2
+                   JOIN members m2 ON m2.id = al2.member_id
+                   WHERE al2.id = sq.entity_local_id
+                     AND m2.name IN ('ddd','dddd','dfdfd','온클','목요일','주니어','주니어 1')
+                 )
                )",
             [],
             |row| row.get(0),
@@ -1286,7 +1294,8 @@ pub fn get_local_center_counts(state: &AppState, center: &str) -> Result<LocalCe
                AND COALESCE(m.hidden_locally, 0) = 0
                AND COALESCE(m.is_local_duplicate, 0) = 0
                AND (m.remote_id IS NOT NULL AND m.remote_id != '')
-               AND al.canceled_at IS NULL",
+               AND al.canceled_at IS NULL
+               AND m.name NOT IN ('ddd','dddd','dfdfd','온클','목요일','주니어','주니어 1')",
             [center], |row| row.get(0),
         )?;
         let blocked: i64 = conn.query_row(
