@@ -365,7 +365,8 @@ pub struct SyncStatus {
 
 pub fn fetch_sync_status(state: &AppState) -> Result<SyncStatus, DbError> {
     state.with_conn(|conn| {
-        let pending_count: i64 = conn.query_row(
+        let test_in = super::test_data::test_names_sql_not_in();
+        let pending_sql = format!(
             "SELECT COUNT(*) FROM sync_queue sq
              WHERE sq.last_error IS NULL
                AND NOT (
@@ -378,12 +379,11 @@ pub fn fetch_sync_status(state: &AppState) -> Result<SyncStatus, DbError> {
                    SELECT 1 FROM attendance_logs al2
                    JOIN members m2 ON m2.id = al2.member_id
                    WHERE al2.id = sq.entity_local_id
-                     AND m2.name IN ('ddd','dddd','dfdfd','온클','목요일','주니어','주니어 1')
+                     AND m2.name IN {test_in}
                  )
-               )",
-            [],
-            |row| row.get(0),
-        )?;
+               )"
+        );
+        let pending_count: i64 = conn.query_row(&pending_sql, [], |row| row.get(0))?;
 
         let failed_count: i64 = conn.query_row(
             "SELECT COUNT(*) FROM sync_queue sq
@@ -1286,7 +1286,8 @@ pub fn get_local_center_counts(state: &AppState, center: &str) -> Result<LocalCe
                )",
             [center], |row| row.get(0),
         )?;
-        let attendance_no_remote_id: i64 = conn.query_row(
+        let test_not_in = super::test_data::test_names_sql_not_in();
+        let att_sql = format!(
             "SELECT COUNT(*) FROM attendance_logs al
              JOIN members m ON m.id = al.member_id
              WHERE m.deleted_at IS NULL AND UPPER(m.center) = UPPER(?1)
@@ -1295,8 +1296,10 @@ pub fn get_local_center_counts(state: &AppState, center: &str) -> Result<LocalCe
                AND COALESCE(m.is_local_duplicate, 0) = 0
                AND (m.remote_id IS NOT NULL AND m.remote_id != '')
                AND al.canceled_at IS NULL
-               AND m.name NOT IN ('ddd','dddd','dfdfd','온클','목요일','주니어','주니어 1')",
-            [center], |row| row.get(0),
+               AND m.name NOT IN {test_not_in}"
+        );
+        let attendance_no_remote_id: i64 = conn.query_row(
+            &att_sql, [center], |row| row.get(0),
         )?;
         let blocked: i64 = conn.query_row(
             "SELECT COUNT(*) FROM sync_queue sq

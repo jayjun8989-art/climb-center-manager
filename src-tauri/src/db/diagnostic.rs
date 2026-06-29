@@ -4,20 +4,7 @@ use rusqlite::OptionalExtension;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-const TEST_NAMES: &[&str] = &["ddd", "dddd", "dfdfd", "주니어", "주니어 1", "온클", "목요일"];
-const TEST_PHONES: &[&str] = &["ddd", "ddff", "ㅎㅎㅎㅎ", "ㅈㅈㅈ", "939ㅇ"];
-
-fn is_test_data(name: &str, phone: &Option<String>) -> bool {
-    if TEST_NAMES.iter().any(|&n| n == name.trim()) {
-        return true;
-    }
-    if let Some(p) = phone {
-        if TEST_PHONES.iter().any(|&tp| tp == p.trim()) {
-            return true;
-        }
-    }
-    false
-}
+use super::test_data::is_test_data;
 
 fn has_remote_id(v: &Option<String>) -> bool {
     v.as_deref().map(|s| !s.trim().is_empty()).unwrap_or(false)

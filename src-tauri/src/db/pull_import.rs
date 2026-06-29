@@ -298,17 +298,7 @@ fn phone_normalized(phone: &Option<String>) -> Option<String> {
 }
 
 fn is_test_data_member(name: &str, phone: &Option<String>) -> bool {
-    const TEST_NAMES: &[&str] = &["ddd", "dddd", "dfdfd", "주니어", "주니어 1", "온클"];
-    const TEST_PHONES: &[&str] = &["ddd", "ddff", "ㅎㅎㅎㅎ", "ㅈㅈㅈ", "939ㅇ"];
-    if TEST_NAMES.iter().any(|&n| n == name.trim()) {
-        return true;
-    }
-    if let Some(p) = phone {
-        if TEST_PHONES.iter().any(|&tp| tp == p.trim()) {
-            return true;
-        }
-    }
-    false
+    super::test_data::is_test_data(name, phone)
 }
 
 fn find_local_member_id(

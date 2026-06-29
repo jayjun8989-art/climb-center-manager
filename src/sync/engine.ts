@@ -45,15 +45,7 @@ async function fetchAllPages<T>(
 // ---------------------------------------------------------------------------
 // Test-data detection — blocks upload of clearly invalid/test member entries.
 // ---------------------------------------------------------------------------
-const TEST_DATA_NAMES = new Set(["ddd", "dddd", "dfdfd", "주니어", "주니어 1", "온클", "목요일"]);
-const TEST_DATA_PHONES = new Set(["ddd", "ddff", "ㅎㅎㅎㅎ", "ㅈㅈㅈ"]);
-
-function isTestDataMember(name: string, phone: string | null | undefined): boolean {
-  return (
-    TEST_DATA_NAMES.has(name.trim()) ||
-    TEST_DATA_PHONES.has((phone ?? "").trim())
-  );
-}
+import { isTestDataMember } from "./testDataPatterns";
 
 type MemberSyncPayload = MemberInput & {
   center: Center;

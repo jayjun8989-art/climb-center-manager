@@ -182,4 +182,4 @@ for (const t of tests) {
 }
 
 console.log(`\n${passed} passed, ${failed} failed out of ${tests.length} tests`);
-if (failed > 0) process.exit(1);
+if (failed > 0) throw new Error(`${failed} tests failed`);

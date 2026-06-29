@@ -11,6 +11,7 @@ mod status;
 mod sync_local;
 pub mod diagnostic;
 pub mod safe_sync;
+pub mod test_data;
 
 pub use attendance_ext::{
     cancel_attendance, check_attendance_with_options, has_attendance_today, has_attendance_on_date,
