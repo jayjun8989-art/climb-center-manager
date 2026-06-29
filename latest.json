@@ -1,11 +1,11 @@
 {
-    "version": "1.0.70",
-    "pub_date": "2026-06-27T11:00:00Z",
-    "notes": "v1.0.70: master stabilization — staff pause/resume + ONCLE pull guidance",
+    "version": "1.0.71",
+    "pub_date": "2026-06-29T10:00:00Z",
+    "notes": "v1.0.71: test data pattern fix",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVFMZnE1WXkwTVpJeG5JRmcwMFFnZUdvd3QzM2tBWTZMMjcrMUErRkdCMm5nUUUwdjlVelRXZ0ZXU1FlL0t1WDAyaWVTQkpQUVRpYVY4VHM0ZUc2OWdzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyNzAwMzUzCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC43MF94NjQtc2V0dXAuZXhlCjRjbDc4SkhvaEkydWZWdlhhZS9FTkRuSU9Bc3V2SmIvWHNPbWVLQloySUlpd043ZExxdGNtaHprZDN4VkJod2svb2Q4NENmcTgzMWhYbFRZTzVrV0JBPT0K",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.70/ClimbCenterManager_1.0.70_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVo0WlVRY291NHhwSEF0ZVZpR1ovOThqNEFuOVY1Z2tqZERnMkdqcEtSd3Yrb2tuWFFCY2tDZWo2d1ZMZjExREd4OXYxSWJsVGxMNE5waWZwT3ozZFFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyNzE1ODU5CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC43MV94NjQtc2V0dXAuZXhlCmVWWVozWFcwNzVxaUVOTmIxeEw5VU12V3I4VUw5SGYzT2pGUG5jb1FzV1J3KythVGZmYTNlM21QbWpPN1dqODFUaVBQTkc4V0xCeTZHSmZQWk9LY0NRPT0K",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.71/ClimbCenterManager_1.0.71_x64-setup.exe"
         }
     }
 }
