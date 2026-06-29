@@ -67,11 +67,11 @@ export function canDeleteMember(role: CenterRole | null): boolean {
 }
 
 export function canPauseMembership(role: CenterRole | null): boolean {
-  return role === "owner" || role === "admin";
+  return role === "owner" || role === "admin" || role === "staff";
 }
 
 export function canResumeMembership(role: CenterRole | null): boolean {
-  return role === "owner" || role === "admin";
+  return role === "owner" || role === "admin" || role === "staff";
 }
 
 export function canManageStaff(role: CenterRole | null): boolean {

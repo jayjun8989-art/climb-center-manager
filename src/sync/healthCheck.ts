@@ -107,7 +107,12 @@ export async function runHealthCheck(center: Center | undefined): Promise<Health
 
       if (c.server_members > 0 && c.local_display_members !== c.server_members) {
         const diff = c.local_display_members - c.server_members;
-        if (Math.abs(diff) > 2) {
+        if (c.local_display_members < c.server_members * 0.5) {
+          items.push({ label: "회원 수 차이", value: `서버 ${c.server_members}명 vs 화면 ${c.local_display_members}명`, status: "error" });
+          items.push({ label: "권장 조치", value: "설정 → Supabase에서 불러오기 실행", status: "warn" });
+          dataIssue = true;
+          centerDataClean = false;
+        } else if (Math.abs(diff) > 2) {
           items.push({ label: "회원 수 차이", value: `${diff > 0 ? "+" : ""}${diff}명`, status: "warn" });
           centerDataClean = false;
           syncWarning = true;
@@ -182,7 +187,9 @@ export async function runHealthCheck(center: Center | undefined): Promise<Health
 
   // Final verdict
   if (dataIssue) {
-    return fin("admin_required", "관리자 확인 필요", "운영 데이터 불일치가 있습니다.", "관리자에게 연락하세요", items, infoItems, now);
+    const actionItems = items.filter(i => i.label === "권장 조치");
+    const actionText = actionItems.length > 0 ? actionItems.map(i => i.value).join(", ") : "관리자에게 연락하세요";
+    return fin("admin_required", "관리자 확인 필요", "운영 데이터 불일치가 있습니다.", actionText, items, infoItems, now);
   }
   if (syncWarning) {
     return fin("caution", "주의", "운영은 가능하지만 일부 항목을 확인해주세요.", "잠시 후 다시 점검하거나 관리자에게 문의", items, infoItems, now);
