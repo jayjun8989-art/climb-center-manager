@@ -4,7 +4,7 @@ use rusqlite::OptionalExtension;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-const TEST_NAMES: &[&str] = &["ddd", "dddd", "dfdfd", "주니어", "주니어 1", "온클"];
+const TEST_NAMES: &[&str] = &["ddd", "dddd", "dfdfd", "주니어", "주니어 1", "온클", "목요일"];
 const TEST_PHONES: &[&str] = &["ddd", "ddff", "ㅎㅎㅎㅎ", "ㅈㅈㅈ", "939ㅇ"];
 
 fn is_test_data(name: &str, phone: &Option<String>) -> bool {
