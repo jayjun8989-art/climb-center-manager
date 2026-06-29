@@ -1,11 +1,11 @@
 {
-    "version": "1.0.73",
-    "pub_date": "2026-06-29T12:00:00Z",
-    "notes": "v1.0.73: exclude test data from operational counts",
+    "version": "1.0.74",
+    "pub_date": "2026-06-29T14:00:00Z",
+    "notes": "v1.0.74: shared test_data classifier",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVFLZ1NTR3V0a2dJQ1pMV1JFRm8xNzh3cEpZYVlwZ1Y0bE5JbE94SmM3Y1IxS2tkK1VMZHRiS2l2SXZxTTcyQWlKNEVKU3pKQTJyN2JxQ3M4UGpoMWc0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyNzE5NDgxCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC43M194NjQtc2V0dXAuZXhlCkcvMWo3czJsaGk1TGE1ZnpsdFVsVlVSb3JhU09nbjdOVkNYOTluV3FwWU00MmZvMUFDWXMwUEFkdG4ySXpTQU83bytpYjA4Yjc4Tk5xNGNjb2EyT0RnPT0K",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.73/ClimbCenterManager_1.0.73_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVFhSUhSZTYrcE5rWGZvT2VQS1dTbnRGYXdTekN5U2ptQkFnelhXQ0lSVUkvTXJTaHFYbmVSN0pmcmxISHFoS0k3Q0tmbk5FNndtZ1VUWU5OT3lZTXc0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyNzIwMjU4CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC43NF94NjQtc2V0dXAuZXhlCjYzMEZ1NDJRQlQ3amZrU3hDSWZGa01LekNLOTY5QjBuaVZPUUpXbm9WY2VTWWQwVHdLL0FoUWRuNG90UTZ6UmxGL3ZYS2xBUU9wVncvUEpiTTRvNUNnPT0K",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.74/ClimbCenterManager_1.0.74_x64-setup.exe"
         }
     }
 }
