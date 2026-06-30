@@ -1,11 +1,11 @@
 {
-    "version": "1.0.74",
-    "pub_date": "2026-06-29T14:00:00Z",
-    "notes": "v1.0.74: shared test_data classifier",
+    "version": "1.0.75",
+    "pub_date": "2026-06-30T07:00:00Z",
+    "notes": "v1.0.75: fix silent permission block on delete button",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVFhSUhSZTYrcE5rWGZvT2VQS1dTbnRGYXdTekN5U2ptQkFnelhXQ0lSVUkvTXJTaHFYbmVSN0pmcmxISHFoS0k3Q0tmbk5FNndtZ1VUWU5OT3lZTXc0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyNzIwMjU4CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC43NF94NjQtc2V0dXAuZXhlCjYzMEZ1NDJRQlQ3amZrU3hDSWZGa01LekNLOTY5QjBuaVZPUUpXbm9WY2VTWWQwVHdLL0FoUWRuNG90UTZ6UmxGL3ZYS2xBUU9wVncvUEpiTTRvNUNnPT0K",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.74/ClimbCenterManager_1.0.74_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWQ0cjNEbjRpZUNHMjVNc2VlNFFnT1gzYnEvQTlETWhuQkZMWjFsbkliZG1ONXRuSmlRcW1EOGlUZHVqUnQ5eE5iYzQyWWlQQXgvaENBVGlFZm5TV3djPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyODAxODUyCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC43NV94NjQtc2V0dXAuZXhlClRkaFFVR2p0djl2MUQ2OXFTc1FiSmxqY1VTOWhTK0NKZmZVWjhPbUprNmNJQjRqY2NLcUhYZm5YU3o1ZHZNQ3ZKWVdvSG1CNjFTMzc3azRzN0c5ZEJ3PT0K",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.75/ClimbCenterManager_1.0.75_x64-setup.exe"
         }
     }
 }
