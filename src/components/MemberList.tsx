@@ -195,8 +195,7 @@ export function MemberList({
                     </button>
                     <button
                       className="btn btn-danger !px-3 !py-2"
-                      disabled={!permissions.canDeleteMember}
-                      title={!permissions.canDeleteMember ? permissions.denyReason : "삭제"}
+                      title={!permissions.canDeleteMember ? "이 작업은 관리자 권한이 필요합니다." : "삭제"}
                       onClick={(event) => {
                         event.stopPropagation();
                         onDelete(member);

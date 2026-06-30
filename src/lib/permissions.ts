@@ -3,7 +3,7 @@ import { ADMIN_EXPORT_EMAILS, canExportRoster as canExportRosterByEmail } from "
 
 export { ADMIN_EXPORT_EMAILS, canExportRosterByEmail as canExportRoster };
 
-export const PERMISSION_DENIED = "권한이 없습니다";
+export const PERMISSION_DENIED = "이 작업은 관리자 권한이 필요합니다.";
 export const REGISTER_DENIED = "이 센터에 회원을 등록할 권한이 없습니다";
 
 export const LOGIN_ACCOUNT_LABELS: Record<LoginAccountKind, string> = {
