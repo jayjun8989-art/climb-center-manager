@@ -1,11 +1,11 @@
 {
-    "version": "1.0.76",
-    "pub_date": "2026-06-30T08:00:00Z",
-    "notes": "v1.0.76: critical fix - canManageDangerousSync permission separation",
+    "version": "1.0.77",
+    "pub_date": "2026-06-30T09:00:00Z",
+    "notes": "v1.0.77: allow staff to cancel attendance",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVFqT1V4TjVrR0dRaCt0RlIrQnZoK0lIeFZXRm9EQVRiWWovYUx4Ujc2dzExOGxYZHF5V3RVQmhCeFBnZzEyWTlnL2c5MjgrYXBXQXRHU0dWZHVJY3dRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyODAzNTkyCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC43Nl94NjQtc2V0dXAuZXhlCkJXMjVhdDVTTnZ5bmswdERwRWRoYXBwVUxlOW1hdW4zUGxnbDhweWlvRzB5NWduaW0raDFiSU0xL1o2MHdIeU5ydjQyaVlUOFVkdnR1YVh2UGp0NURRPT0K",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.76/ClimbCenterManager_1.0.76_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWZWZlh0VWVNM0NCOWc1NTZWNHBnN3JkK1pGeElTZGZ1cXdLQm04V0J4L2QxZ0N3RzJRR0VwWll5a1hDWVRMcjRYUHJOS05ETDdNM0lEN2VrNUMwZ1FnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyODA0ODE0CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC43N194NjQtc2V0dXAuZXhlCmt4eFBWOFpwVFZaaFh3ejIwY1UxcHp2Q0dad2t3aXBRbm9kdXhvdllzNW9ONXFZRWRyZXlqNGIyUkZZeXBkb0s2TUM3ekFPaWpHV0lQczJvTit0VERRPT0K",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.77/ClimbCenterManager_1.0.77_x64-setup.exe"
         }
     }
 }
