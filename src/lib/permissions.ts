@@ -87,7 +87,7 @@ export function canCheckAttendance(role: CenterRole | null): boolean {
 }
 
 export function canCancelAttendance(role: CenterRole | null): boolean {
-  return role === "owner" || role === "admin";
+  return role === "owner" || role === "admin" || role === "staff";
 }
 
 export function canManageLocker(role: CenterRole | null): boolean {
