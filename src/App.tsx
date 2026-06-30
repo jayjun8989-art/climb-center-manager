@@ -918,8 +918,8 @@ export default function App() {
         canCheckUpdate={permissions.canCheckUpdate}
         canManageAccount={permissions.canManageAccount}
         canExportRoster={permissions.canExportRoster}
-        canSyncPush={permissions.canSyncPush}
         canSyncPull={permissions.canSyncPull}
+        canManageDangerousSync={permissions.canManageDangerousSync}
         currentLoginId={currentLoginId}
         onChangeLoginId={async (loginId) => {
           await updateLoginId(loginId);
@@ -1034,7 +1034,7 @@ export default function App() {
           return { serverCount, fetchedCount, localDbCount, localDisplayCount, noRemoteIdCount, displayCount, message, verdict, missingCount, missingSample, diagFilePath };
         }}
         onPushToSupabase={
-          permissions.canSyncPush
+          permissions.canManageDangerousSync
             ? () => {
                 if (!canSync) {
                   setToast(permissions.denyReason);

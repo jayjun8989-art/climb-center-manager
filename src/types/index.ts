@@ -369,6 +369,7 @@ export interface PermissionSet {
   canCheckUpdate: boolean;
   canSyncPush: boolean;
   canSyncPull: boolean;
+  canManageDangerousSync: boolean;
   canViewRoster: boolean;
   canExportRoster: boolean;
   denyReason: string;

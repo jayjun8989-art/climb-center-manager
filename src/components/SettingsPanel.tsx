@@ -71,8 +71,8 @@ interface SettingsPanelProps {
   canCheckUpdate?: boolean;
   canManageAccount?: boolean;
   canExportRoster?: boolean;
-  canSyncPush?: boolean;
   canSyncPull?: boolean;
+  canManageDangerousSync?: boolean;
   currentLoginId?: string;
   onChangeLoginId?: (loginId: string) => Promise<void>;
   onChangePassword?: (password: string) => Promise<void>;
@@ -125,8 +125,8 @@ export function SettingsPanel({
   canCheckUpdate = true,
   canManageAccount = false,
   canExportRoster = false,
-  canSyncPush = false,
   canSyncPull = true,
+  canManageDangerousSync = false,
   currentLoginId = "",
   onChangeLoginId,
   onChangePassword,
@@ -1008,7 +1008,7 @@ export function SettingsPanel({
           </div>
 
           {/* ── 업로드 검증 리포트 (관리자 전용) ── */}
-          {canSyncPush && (
+          {canManageDangerousSync && (
           <div className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--panel-strong)] px-4 py-4">
             <div className="mb-3 flex items-center gap-2">
               <Upload size={18} className="text-sky-500" />
@@ -1204,7 +1204,7 @@ export function SettingsPanel({
           )}
 
           {/* ── 서버 회원 매칭 검사 (관리자 전용) ── */}
-          {canSyncPush && center && (
+          {canManageDangerousSync && center && (
             <div className="rounded-[1.2rem] border border-[var(--border)] bg-[var(--panel-strong)] px-4 py-4">
               <div className="mb-3 flex items-center gap-2">
                 <ShieldAlert size={18} className="text-sky-500" />
@@ -1482,7 +1482,7 @@ export function SettingsPanel({
                   ? "연결됨"
                   : "오프라인"}
             </p>
-            {canSyncPush && (
+            {canManageDangerousSync && (
               <p className="mt-1">
                 마지막 업로드: {formatDateTimeSeoul(syncStatus?.last_push_at) || "-"}
               </p>
@@ -1544,7 +1544,7 @@ export function SettingsPanel({
                 Supabase에서 불러오기
               </button>
             )}
-            {canSyncPush && onPushToSupabase && (
+            {canManageDangerousSync && onPushToSupabase && (
               <button
                 className="btn btn-primary"
                 disabled={!syncConfigured || !syncOnline || syncBusy}
@@ -1581,7 +1581,7 @@ export function SettingsPanel({
           </div>
           )}
 
-          {canSyncPush && center && (
+          {canManageDangerousSync && center && (
             <div className="rounded-2xl border border-[var(--border)] p-4">
               <div className="flex items-center gap-2 text-sm font-semibold">
                 <ShieldAlert size={16} className="text-amber-500" />
@@ -1614,7 +1614,7 @@ export function SettingsPanel({
             </div>
           )}
 
-          {canSyncPush && center && (
+          {canManageDangerousSync && center && (
             <div className="rounded-2xl border border-[var(--border)] p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-sm font-semibold">
@@ -1838,7 +1838,7 @@ export function SettingsPanel({
               )}
 
               {/* ── 검증된 회원권·출석 처리 버튼 (관리자 전용) ── */}
-              {canSyncPush && (<>
+              {canManageDangerousSync && (<>
               <div className="mt-3">
                 <button
                   className="btn btn-secondary w-full"

@@ -125,6 +125,16 @@ export function canSyncPush(role: CenterRole | null): boolean {
   return role === "owner" || role === "admin" || role === "staff";
 }
 
+/**
+ * Admin-only gate for dangerous sync/diagnostic/recovery operations
+ * (서버 기준 강제 불러오기, 큐 정리, 검증된 처리 실행, 서버 회원 매칭 등).
+ * Unlike canSyncPush (which covers routine background sync staff shouldn't even
+ * need to think about), this never includes "staff".
+ */
+export function canManageDangerousSync(role: CenterRole | null): boolean {
+  return role === "owner" || role === "admin";
+}
+
 export function canSyncPull(role: CenterRole | null): boolean {
   return hasCenterAccess(role);
 }
@@ -168,6 +178,7 @@ export function buildPermissionSet(
       canCheckUpdate: true,
       canSyncPush: true,
       canSyncPull: true,
+      canManageDangerousSync: true,
       canViewRoster: true,
       canExportRoster: true,
       denyReason: PERMISSION_DENIED,
@@ -198,6 +209,7 @@ export function buildPermissionSet(
     canCheckUpdate: canCheckUpdate(role),
     canSyncPush: canSyncPush(role),
     canSyncPull: canSyncPull(role),
+    canManageDangerousSync: canManageDangerousSync(role),
     canViewRoster: canViewRoster(role),
     canExportRoster: canExportRosterByEmail(loginEmail),
     denyReason: PERMISSION_DENIED,
