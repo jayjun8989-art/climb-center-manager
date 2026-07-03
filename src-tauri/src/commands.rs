@@ -380,6 +380,21 @@ pub fn fetch_remote_id(
     get_remote_id(&state, &entity_type, local_id).map_err(|e| e.to_string())
 }
 
+/// Returns true if the member (by local_id) is active (not deleted, not hidden, not duplicate).
+/// Used by the sync engine to decide whether to discard stuck attendance queue items.
+#[tauri::command]
+pub fn is_member_syncable(state: State<'_, AppState>, local_id: i64) -> Result<bool, String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM members WHERE id=?1 AND deleted_at IS NULL AND COALESCE(hidden_locally,0)=0 AND COALESCE(is_local_duplicate,0)=0",
+            rusqlite::params![local_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    Ok(count > 0)
+}
+
 #[tauri::command]
 pub fn get_sync_diagnostics(state: State<'_, AppState>) -> Result<crate::db::SyncDiagnostics, String> {
     crate::db::get_sync_diagnostics(&state).map_err(|e| e.to_string())

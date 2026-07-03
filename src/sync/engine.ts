@@ -480,6 +480,23 @@ export async function pushMemberQueueItem(
             }, payload.center),
           };
         }
+      } else {
+        // Phone-null members: check by exact name to prevent infinite duplicate creation.
+        const { count: nameDupCount } = await supabase
+          .from("members")
+          .select("*", { count: "exact", head: true })
+          .eq("center_id", centerId)
+          .eq("name", row.name)
+          .is("phone", null)
+          .is("deleted_at", null);
+        if ((nameDupCount ?? 0) > 0) {
+          return {
+            ok: false,
+            error: formatSyncFailure(item, "등록 차단", {
+              message: `서버에 동일 이름(전화번호 없음) 후보 ${nameDupCount}명 존재 — 수동 확인 후 "서버 회원 매칭 연결"을 먼저 진행하세요.`,
+            }, payload.center),
+          };
+        }
       }
       const data = await upsertRemoteMember(supabase, row, centerId, payload.phone);
       await upsertRemoteMembership(supabase, payload, data.id, centerId);
@@ -742,7 +759,16 @@ export async function pushSyncQueue(syncContext?: SyncErrorContext): Promise<Syn
       const memberRemoteId = await fetchRemoteId("member", payload.local_member_id);
       const membershipRemoteId = await fetchRemoteId("membership", payload.local_membership_id);
       if (!memberRemoteId || !membershipRemoteId) {
-        // Leave as pending (not blocked) — will retry on next push once member syncs.
+        // If the member is no longer active (hidden/deleted), discard the queue item.
+        const memberActive = await safeInvoke<boolean>("is_member_syncable", {
+          local_id: payload.local_member_id,
+        });
+        if (!memberActive) {
+          await safeInvoke("complete_sync_queue_item", { id: item.id });
+          skipped += 1;
+          continue;
+        }
+        // Member is active but not yet synced — retry on next push.
         pending += 1;
         continue;
       }
