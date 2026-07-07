@@ -2,24 +2,21 @@ import { useEffect } from "react";
 import { Tabs, router } from "expo-router";
 import { Alert } from "react-native";
 import { useApp } from "../../src/context/AppContext";
-import { GRABON_ADMIN_EMAIL } from "../../src/lib/admin";
 
 export default function AdminLayout() {
-  const { session, loading, signOut } = useApp();
+  const { session, loading, roles, isAdmin, signOut } = useApp();
 
   useEffect(() => {
     if (loading) return;
-    if (!session || session.user.email !== GRABON_ADMIN_EMAIL) {
+    if (!session || !isAdmin) {
       void signOut().then(() => {
-        Alert.alert("접근 제한", "모바일 앱은 관리자 계정만 사용할 수 있습니다.");
+        Alert.alert("접근 제한", "관리자 계정만 사용할 수 있습니다.");
         router.replace("/login");
       });
     }
-  }, [session, loading, signOut]);
+  }, [session, loading, isAdmin, signOut]);
 
-  if (loading || !session || session.user.email !== GRABON_ADMIN_EMAIL) {
-    return null;
-  }
+  if (loading || !session || !isAdmin) return null;
 
   return (
     <Tabs
@@ -31,10 +28,12 @@ export default function AdminLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: "GRABON Manager", tabBarLabel: "홈" }} />
+      <Tabs.Screen name="attendance" options={{ title: "출석 체크", tabBarLabel: "출석" }} />
       <Tabs.Screen name="members" options={{ title: "회원", tabBarLabel: "회원" }} />
       <Tabs.Screen name="status" options={{ title: "회원 현황", tabBarLabel: "현황" }} />
       <Tabs.Screen name="more" options={{ title: "더보기", tabBarLabel: "더보기" }} />
       <Tabs.Screen name="member/[id]" options={{ href: null, title: "회원 상세" }} />
+      <Tabs.Screen name="member/new" options={{ href: null, title: "신규 회원 등록" }} />
       <Tabs.Screen name="lockers" options={{ href: null, title: "락카 현황" }} />
       <Tabs.Screen name="locker/[id]" options={{ href: null, title: "락카 수정" }} />
       <Tabs.Screen name="changes" options={{ href: null, title: "변경 내역" }} />

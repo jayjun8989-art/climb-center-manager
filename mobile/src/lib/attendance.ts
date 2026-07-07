@@ -19,24 +19,17 @@ export async function hasAttendanceToday(memberId: string): Promise<boolean> {
     .is("canceled_at", null)
     .gte("checkin_at", start)
     .lte("checkin_at", end);
-
   if (error) throw new Error(error.message);
   return (count ?? 0) > 0;
 }
 
 export async function recordAttendance(memberId: string): Promise<void> {
   const supabase = getSupabase();
-  const { error } = await supabase.rpc("rpc_record_attendance", {
-    p_member_id: memberId,
-  });
+  const { error } = await supabase.rpc("rpc_record_attendance", { p_member_id: memberId });
   if (error) {
     const msg = error.message;
-    if (msg.includes("???") || msg.includes("access denied")) {
-      throw new Error("??? ????.");
-    }
-    if (msg.toLowerCase().includes("not found")) {
-      throw new Error("??? ?? ? ????.");
-    }
+    if (msg.includes("권한") || msg.includes("access denied")) throw new Error("권한이 없습니다.");
+    if (msg.toLowerCase().includes("not found")) throw new Error("회원을 찾을 수 없습니다.");
     throw new Error(msg);
   }
 }

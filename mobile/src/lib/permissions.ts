@@ -1,6 +1,6 @@
 import type { Center, CenterRole, PermissionSet, UserCenterRoleRow } from "../types";
 
-export const PERMISSION_DENIED = "??? ????";
+export const PERMISSION_DENIED = "권한이 없습니다";
 
 export function getEffectiveRole(roles: UserCenterRoleRow[], center: Center): CenterRole | null {
   if (roles.some((r) => r.role === "owner")) return "owner";
@@ -32,4 +32,8 @@ export function buildPermissionSet(role: CenterRole | null): PermissionSet {
     canDeleteMember: role === "owner" || role === "admin",
     denyReason: PERMISSION_DENIED,
   };
+}
+
+export function isAdminOrOwner(roles: UserCenterRoleRow[]): boolean {
+  return roles.some((r) => r.role === "owner" || r.role === "admin");
 }

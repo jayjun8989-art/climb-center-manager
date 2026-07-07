@@ -5,7 +5,6 @@ import type { Center } from "../../src/types";
 
 function CenterSwitcher() {
   const { center, setCenter, accessibleCenters } = useApp();
-
   return (
     <View style={styles.centers}>
       {(["ONCLE", "GRABIT"] as Center[]).map((c) => {
@@ -27,7 +26,6 @@ function CenterSwitcher() {
 
 export default function AppLayout() {
   const { signOut } = useApp();
-
   return (
     <Tabs
       screenOptions={{
@@ -37,35 +35,27 @@ export default function AppLayout() {
         tabBarActiveTintColor: "#0284c7",
         headerRight: () => (
           <Pressable onPress={() => void signOut().then(() => router.replace("/login"))} style={{ marginRight: 12 }}>
-            <Text style={{ color: "#fff", fontSize: 13 }}>????</Text>
+            <Text style={{ color: "#fff", fontSize: 13 }}>로그아웃</Text>
           </Pressable>
         ),
         headerTitle: () => (
           <View>
-            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>???? ??</Text>
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>클라이밍 센터</Text>
             <CenterSwitcher />
           </View>
         ),
       }}
     >
-      <Tabs.Screen name="attendance" options={{ title: "??", tabBarLabel: "?? ??" }} />
-      <Tabs.Screen name="members" options={{ title: "??", tabBarLabel: "?? ??" }} />
-      <Tabs.Screen
-        name="member/[id]"
-        options={{ href: null, title: "?? ??" }}
-      />
+      <Tabs.Screen name="attendance" options={{ title: "출석", tabBarLabel: "출석 체크" }} />
+      <Tabs.Screen name="members" options={{ title: "회원", tabBarLabel: "회원 목록" }} />
+      <Tabs.Screen name="member/[id]" options={{ href: null, title: "회원 상세" }} />
     </Tabs>
   );
 }
 
 const styles = StyleSheet.create({
   centers: { flexDirection: "row", gap: 6, marginTop: 4 },
-  chip: {
-    paddingHorizontal: 10,
-    paddingVertical: 2,
-    borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.2)",
-  },
+  chip: { paddingHorizontal: 10, paddingVertical: 2, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.2)" },
   chipActive: { backgroundColor: "#fff" },
   chipDisabled: { opacity: 0.4 },
   chipText: { color: "#e0f2fe", fontSize: 12, fontWeight: "600" },
