@@ -74,12 +74,12 @@ pub fn check_attendance_with_options(
         return Err(DbError::Message("미래 날짜로는 출석 체크할 수 없습니다.".into()));
     }
 
-    if has_attendance_on_date(state, member_id, &date)? {
-        return Err(DbError::Message("이미 해당 날짜에 출석 기록이 있습니다.".into()));
-    }
-
     let member = get_member(state, member_id)?
         .ok_or_else(|| DbError::Message("회원을 찾을 수 없습니다.".into()))?;
+
+    if member.member_type != "junior" && has_attendance_on_date(state, member_id, &date)? {
+        return Err(DbError::Message("이미 해당 날짜에 출석 기록이 있습니다.".into()));
+    }
 
     let membership = if let Some(mid) = membership_id {
         state.with_conn(|conn| {
