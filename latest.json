@@ -1,11 +1,11 @@
 {
-    "version": "1.0.79",
-    "pub_date": "2026-07-03T09:00:00Z",
-    "notes": "v1.0.79: 동기화 큐 개선 및 전화번호 없는 회원 중복 생성 방지",
+    "version": "1.0.80",
+    "pub_date": "2026-07-21T09:00:00Z",
+    "notes": "v1.0.80: 주니어 회원 당일 중복 출석 허용",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWFoZ21PbDQ1RVNBdXZLSk5xYmozUWdHUWliZCtJdEIyN0RxMkhOS2QyZ3NXcndrcjMzUWJMQzNLOVFVNHFKYzdta0FqU3VVNGEycFJvK3hYd2RNZEFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgzMDc0NTAxCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC43OV94NjQtc2V0dXAuZXhlCnp3MkJpcUZZZnJmRlAwQ1I5NVByNFFyRVZnMjN3TlJ6SEM3dzk0OUFJZWVzbGhMTjM1aGRtZ2NaU1FLR2YzSWRXWEhyeVlQVmxWM1VRR3dnL1ZYaERnPT0K",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.79/ClimbCenterManager_1.0.79_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWRodlphTGdJQXhCb3E1OVFadWxTdDduOS9TQVJScm8zU0R6WkRDV0VqRUFnNVZLZ3ZlT21ndnpPSW0rOTZWdy8yeUNOeTBJSkl0NC9ueWFoWnExSlFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NjI0MDk1CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC44MF94NjQtc2V0dXAuZXhlCmwvdWhJclFrZnBhckdSOHlISUZESVpHbVUrU3RuaE5uOFlWa29KS3BIaVJmWnJ0YlE5Y1YvTjhmY25jOCt2OXo0bDBCbE5Tb1EwNjVrZGVQSVdBWEF3PT0K",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.80/ClimbCenterManager_1.0.80_x64-setup.exe"
         }
     }
 }
