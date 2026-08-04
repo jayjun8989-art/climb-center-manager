@@ -167,6 +167,13 @@ pub fn map_legacy_membership(
             None,
             None,
         ),
+        "monthly_2" => (
+            "60days".into(),
+            "period".into(),
+            None,
+            None,
+            None,
+        ),
         "monthly_3" => (
             "90days".into(),
             "period".into(),

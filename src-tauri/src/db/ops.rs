@@ -2257,7 +2257,7 @@ fn validate_member_input(input: &MemberInput) -> Result<(), DbError> {
         return Err(DbError::Message("\u{C13C}\u{D130}\u{B97C} \u{C120}\u{D0DD}\u{D574}\u{C8FC}\u{C138}\u{C694}.".into()));
     }
     match input.membership_type.as_str() {
-        "monthly_1" | "monthly_3" | "monthly_6" => {
+        "monthly_1" | "monthly_2" | "monthly_3" | "monthly_6" => {
             if input.end_date.as_ref().map(|s| s.is_empty()).unwrap_or(true) {
                 return Err(DbError::Message("\u{C885}\u{B8CC}\u{C77C}\u{C744} \u{C785}\u{B825}\u{D574}\u{C8FC}\u{C138}\u{C694}.".into()));
             }
