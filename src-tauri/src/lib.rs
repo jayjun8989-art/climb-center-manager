@@ -110,6 +110,7 @@ pub fn run() {
             commands::map_remote_id,
             commands::complete_member_sync_push,
             commands::fetch_remote_id,
+            commands::is_member_syncable,
             commands::enqueue_sync,
             commands::count_local_members,
             commands::ensure_local_db_ready,

@@ -1,11 +1,11 @@
 {
-    "version": "1.0.81",
-    "pub_date": "2026-08-04T09:00:00Z",
-    "notes": "v1.0.81: 주니어 중복 출석 허용 + 기간 직접입력 오류 수정",
+    "version": "1.0.82",
+    "pub_date": "2026-08-05T09:00:00Z",
+    "notes": "v1.0.82: 무한 회원 생성 근본 원인 수정 (sync retry 루프 차단)",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVhSdjUrYlhzU0hMNXNub05lS09XQSs1ZlhWYmdKSGxxMFVIRWxwZFhNaFBHcEh3RG45bzF1c242anlYd3JLaVBYb25MTytiRzZ3a0VKZThSVnRLTGdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg1ODMyMzI4CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC44MV94NjQtc2V0dXAuZXhlCjZkaFhVdDNxVHBaUzhvTzRkcWJ4Y3FEOUxaaW9haVhLUnp1OXlBelIvSy9pYTAxRGN4RFJNSHNXc2Ruc3p4VjlLb0cxZXozaGxjeWd5amkvSmFXQUNBPT0K",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.81/ClimbCenterManager_1.0.81_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVo4MXpIeXMybVk0N2dpV2JSeVpCS0ZyUWpUMXg5TXl6YndpQUFQYjYvRi9URkt3bi8rTXh4V1hFOWZlQWFqaFNNdTZTOVA0T3ZLeWtuYXhjM2g4ZHdrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg1OTE5NTQ0CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC44Ml94NjQtc2V0dXAuZXhlCmM3R3ErSVdvNzkxVGVwbVNYaWhMaUZqNzFsWUpoWkM5cXJnRnhpckQzdlBoeHhYc0R5OHFMUTVkeFR6VWkyRm5DZVJ0WHBoMTVQUWRZZHVQTWNPTkJ3PT0K",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.82/ClimbCenterManager_1.0.82_x64-setup.exe"
         }
     }
 }

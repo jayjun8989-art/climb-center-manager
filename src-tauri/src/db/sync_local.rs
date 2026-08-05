@@ -282,6 +282,16 @@ pub fn repair_member_sync_queue(state: &AppState) -> Result<RepairSyncQueueResul
             continue;
         }
 
+        // Don't reset errors that indicate permanent failures (duplicate detection, blocked data)
+        // These should stay failed to prevent infinite retry loops that flood the server.
+        let is_permanent_failure = item.last_error.as_deref()
+            .map(|err| err.contains("후보") || err.contains("차단") || err.contains("테스트 데이터"))
+            .unwrap_or(false);
+        if is_permanent_failure {
+            failed += 1;
+            continue;
+        }
+
         match build_member_sync_payload_json(state, item.entity_local_id) {
             Ok(mut payload_json) => {
                 if item.operation == "soft_delete" {

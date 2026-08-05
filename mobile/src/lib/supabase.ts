@@ -7,7 +7,7 @@ let client: SupabaseClient | null = null;
 
 export function getSupabase(): SupabaseClient {
   if (!isSupabaseConfigured()) {
-    throw new Error("Supabase ??? ??????. mobile/.env ??? ?????.");
+    throw new Error("Supabase 설정 필요. mobile/.env 파일을 확인하세요.");
   }
   if (!client) {
     const { url, anonKey } = getSupabaseConfig();

@@ -1,4 +1,4 @@
-import { Tabs, router } from "expo-router";
+import { Redirect, Tabs } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useApp } from "../../src/context/AppContext";
 import type { Center } from "../../src/types";
@@ -25,7 +25,11 @@ function CenterSwitcher() {
 }
 
 export default function AppLayout() {
-  const { signOut } = useApp();
+  const { session, loading, rolesLoading, signOut } = useApp();
+
+  if (loading || rolesLoading) return null;
+  if (!session) return <Redirect href="/login" />;
+
   return (
     <Tabs
       screenOptions={{
@@ -34,7 +38,7 @@ export default function AppLayout() {
         headerTitleStyle: { fontWeight: "700" },
         tabBarActiveTintColor: "#0284c7",
         headerRight: () => (
-          <Pressable onPress={() => void signOut().then(() => router.replace("/login"))} style={{ marginRight: 12 }}>
+          <Pressable onPress={() => void signOut()} style={{ marginRight: 12 }}>
             <Text style={{ color: "#fff", fontSize: 13 }}>로그아웃</Text>
           </Pressable>
         ),

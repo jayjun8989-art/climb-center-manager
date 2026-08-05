@@ -8,7 +8,6 @@ import {
   type ReactNode,
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
-import { router } from "expo-router";
 import type { Center, PermissionSet, UserCenterRoleRow } from "../types";
 import {
   buildPermissionSet,
@@ -24,6 +23,7 @@ type AppContextValue = {
   session: Session | null;
   user: User | null;
   loading: boolean;
+  rolesLoading: boolean;
   center: Center;
   setCenter: (center: Center) => void;
   roles: UserCenterRoleRow[];
@@ -41,15 +41,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [rolesLoading, setRolesLoading] = useState(false);
   const [center, setCenter] = useState<Center>("ONCLE");
   const [roles, setRoles] = useState<UserCenterRoleRow[]>([]);
-  const [rolesLoaded, setRolesLoaded] = useState(false);
 
   const refreshRoles = useCallback(async () => {
-    if (!user) { setRoles([]); setRolesLoaded(true); return; }
-    const next = await fetchMyRoles(user.id);
-    setRoles(next);
-    setRolesLoaded(true);
+    if (!user) { setRoles([]); return; }
+    setRolesLoading(true);
+    try {
+      const next = await fetchMyRoles(user.id);
+      setRoles(next);
+    } catch {
+      setRoles([]);
+    } finally {
+      setRolesLoading(false);
+    }
   }, [user]);
 
   useEffect(() => {
@@ -63,36 +69,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
-      if (!nextSession) { setRoles([]); setRolesLoaded(false); }
+      if (!nextSession) setRoles([]);
     });
     return () => sub.subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
     if (!user) return;
-    refreshRoles().catch(() => { setRoles([]); setRolesLoaded(true); });
+    void refreshRoles();
   }, [user, refreshRoles]);
-
-  // Navigate after roles are loaded
-  useEffect(() => {
-    if (!rolesLoaded || !session) return;
-    if (isAdminOrOwner(roles)) {
-      router.replace("/(admin)");
-    } else if (roles.length > 0) {
-      router.replace("/(app)/attendance");
-    }
-  }, [rolesLoaded, roles, session]);
-
-  const accessibleCenters = useMemo(() => getAccessibleCenters(roles), [roles]);
-  const effectiveRole = useMemo(() => getEffectiveRole(roles, center), [roles, center]);
-  const permissions = useMemo(() => buildPermissionSet(effectiveRole), [effectiveRole]);
-  const isAdmin = useMemo(() => isAdminOrOwner(roles), [roles]);
 
   useEffect(() => {
     if (accessibleCenters.length > 0 && !accessibleCenters.includes(center)) {
       setCenter(accessibleCenters[0]);
     }
-  }, [accessibleCenters, center]);
+  });
+
+  const accessibleCenters = useMemo(() => getAccessibleCenters(roles), [roles]);
+  const effectiveRole = useMemo(() => getEffectiveRole(roles, center), [roles, center]);
+  const permissions = useMemo(() => buildPermissionSet(effectiveRole), [effectiveRole]);
+  const isAdmin = useMemo(() => isAdminOrOwner(roles), [roles]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const supabase = getSupabase();
@@ -104,11 +100,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const supabase = getSupabase();
     await supabase.auth.signOut();
     setRoles([]);
-    setRolesLoaded(false);
   }, []);
 
   const value: AppContextValue = {
-    session, user, loading, center, setCenter, roles, permissions,
+    session, user, loading, rolesLoading, center, setCenter, roles, permissions,
     accessibleCenters, isAdmin, signIn, signOut, refreshRoles,
   };
 
@@ -117,6 +112,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 export function useApp() {
   const ctx = useContext(AppContext);
-  if (!ctx) throw new Error("AppProvider가 없습니다.");
+  if (!ctx) throw new Error("useApp must be used within AppProvider");
   return ctx;
 }

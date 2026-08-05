@@ -1,22 +1,12 @@
-import { useEffect } from "react";
-import { Tabs, router } from "expo-router";
-import { Alert } from "react-native";
+import { Redirect } from "expo-router";
+import { Tabs } from "expo-router";
 import { useApp } from "../../src/context/AppContext";
 
 export default function AdminLayout() {
-  const { session, loading, roles, isAdmin, signOut } = useApp();
+  const { session, loading, rolesLoading, isAdmin } = useApp();
 
-  useEffect(() => {
-    if (loading) return;
-    if (!session || !isAdmin) {
-      void signOut().then(() => {
-        Alert.alert("접근 제한", "관리자 계정만 사용할 수 있습니다.");
-        router.replace("/login");
-      });
-    }
-  }, [session, loading, isAdmin, signOut]);
-
-  if (loading || !session || !isAdmin) return null;
+  if (loading || rolesLoading) return null;
+  if (!session || !isAdmin) return <Redirect href="/login" />;
 
   return (
     <Tabs
