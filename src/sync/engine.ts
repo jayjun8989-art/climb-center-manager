@@ -95,7 +95,9 @@ async function completeMemberPush(
   remoteId: string,
   remoteUpdatedAt?: string | null,
 ) {
-  await safeInvoke("complete_member_sync_push", {
+  // Use invokeCommand so failures surface and are caught by the caller,
+  // causing the queue item to be marked failed rather than silently retried.
+  await invokeCommand("complete_member_sync_push", {
     queue_id: queueId,
     local_member_id: localMemberId,
     remote_id: remoteId,
@@ -463,6 +465,22 @@ export async function pushMemberQueueItem(
 
   try {
     if (operation === "insert") {
+      // If a previous push already inserted this member but completeMemberPush failed,
+      // the remote_id may already be saved in id_map. Treat it like an update instead.
+      const existingRemoteId = await fetchRemoteId("member", item.entity_local_id);
+      if (existingRemoteId) {
+        const { data, error } = await supabase
+          .from("members")
+          .update(row)
+          .eq("id", existingRemoteId)
+          .select("id, updated_at")
+          .single();
+        if (error) throw error;
+        await upsertRemoteMembership(supabase, payload, data.id, centerId);
+        await completeMemberPush(item.id, item.entity_local_id, data.id, data.updated_at);
+        return { ok: true };
+      }
+
       // Server duplicate check before inserting a new member
       const phone = row.phone?.replace(/[^0-9]/g, "") ?? null;
       if (phone && phone.length >= 7) {
@@ -499,6 +517,14 @@ export async function pushMemberQueueItem(
         }
       }
       const data = await upsertRemoteMember(supabase, row, centerId, payload.phone);
+      // Save the remote_id mapping immediately before attempting completeMemberPush,
+      // so that if completeMemberPush fails, the next cycle detects the existing remote_id
+      // above and skips re-insertion.
+      await safeInvoke("map_remote_id", {
+        entity_type: "member",
+        local_id: item.entity_local_id,
+        remote_id: data.id,
+      });
       await upsertRemoteMembership(supabase, payload, data.id, centerId);
       await completeMemberPush(item.id, item.entity_local_id, data.id, data.updated_at);
       return { ok: true };
