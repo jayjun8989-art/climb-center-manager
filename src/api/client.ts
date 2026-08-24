@@ -110,10 +110,10 @@ export const api = {
       {
         center: params.center,
         search: params.search ?? "",
-        member_group: params.memberGroup ?? "all",
-        status_filter: params.statusFilter ?? "all",
+        memberGroup: params.memberGroup ?? "all",
+        statusFilter: params.statusFilter ?? "all",
         page: params.page ?? 1,
-        page_size: params.pageSize ?? 50,
+        pageSize: params.pageSize ?? 50,
       },
       () => fallbackGetMembers(params),
     );
@@ -131,7 +131,7 @@ export const api = {
   ): Promise<MutationResult<MemberListItem>> {
     const result = await writeCommand(
       "add_member",
-      { input, enqueue_sync: options?.enqueueSync ?? true },
+      { input, enqueueSync: options?.enqueueSync ?? true },
       () => fallbackAddMember(input),
     );
     triggerImmediatePush();
