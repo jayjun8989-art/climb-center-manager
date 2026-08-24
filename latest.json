@@ -1,11 +1,11 @@
 {
-    "version": "1.0.85",
-    "pub_date": "2026-08-24T10:00:00Z",
-    "notes": "v1.0.85: 5분마다 자동 pull - 다른 컴퓨터에서 등록한 회원이 자동으로 동기화됩니다",
+    "version": "1.0.86",
+    "pub_date": "2026-08-24T10:30:00Z",
+    "notes": "v1.0.86: 1분마다 자동 pull + UI 자동 갱신 수정",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVhvaldkK3RWWnR6TzRIZkluV1hJblNIdFo4YUhSc2F2WXBtTGkrcDNTVE9jU0RRNWpiUEErUENTYk1tY1RvRkJhaHFxUnRkUjNvM2x5MnhSbUpWNVFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg3NTcwNTIwCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC44NV94NjQtc2V0dXAuZXhlCkU3bTNYSW1lQXZvSS9reVlTZm1YMndoSDlvMmg5Ui9xU0hsS3R1b2plTlJUdmNDUWZ4cHVnbUVEVWd1cjFwWXBMQlJQcUFFQmdzMWhLZm8yd3AydUJ3PT0K",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.85/ClimbCenterManager_1.0.85_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWFHUHVHaWM4aWVXcWhIUHUrTFJBZGp5dUVTKzBhUlF0MWdPdVExd3dpSHdYbnozMURnS2J1T20wRFZEVEVmWStwNkJobk9KallpeVFEaDNWK0FmWWdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg3NTcxNzM5CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC44Nl94NjQtc2V0dXAuZXhlCmFZWGl5N3N1MEcwMU94c3NYa1FXUUpidjF3RUl4eHRDd1ZNVFNRYkNzV3FRZk5TblJXTE40OXJzTUxBQWtMR0VWN21pQ3ZvYi9iL3hUcmExRTRCY0RnPT0K",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.86/ClimbCenterManager_1.0.86_x64-setup.exe"
         }
     }
 }

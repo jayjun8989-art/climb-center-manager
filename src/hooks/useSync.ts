@@ -13,7 +13,7 @@ import {
 import type { PullRunResult, SyncPhase, SyncRunResult, SyncStatus } from "../sync/types";
 
 const SYNC_INTERVAL_MS = 60_000;
-const PULL_INTERVAL_MS = 5 * 60_000; // 5분마다 자동 pull
+const PULL_INTERVAL_MS = 60_000; // 1분마다 자동 pull
 
 export function useSync(enabled: boolean, syncContext: SyncErrorContext, centerIds?: string[]) {
   const [configured] = useState(isSupabaseConfigured());
@@ -138,7 +138,13 @@ export function useSync(enabled: boolean, syncContext: SyncErrorContext, centerI
 
     const pullTimer = window.setInterval(() => {
       if (enabled && !runningRef.current) {
-        pullNow({ centerIds }).catch(() => undefined);
+        pullNow({ centerIds })
+          .then((result) => {
+            if (result && (result.importedMembers > 0 || result.updatedMembers > 0 || result.importedMemberships > 0)) {
+              window.dispatchEvent(new CustomEvent("climb-sync-pull-complete"));
+            }
+          })
+          .catch(() => undefined);
       }
     }, PULL_INTERVAL_MS);
 
