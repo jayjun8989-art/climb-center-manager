@@ -55,6 +55,7 @@ export function formatMembershipLabel(member: MemberListRow): string {
   const type = member.membership_type;
   if (member.pass_type === "count") return `회수권 · 잔여 ${member.remaining_count ?? 0}회`;
   if (type === "30days") return "기간 1개월";
+  if (type === "60days") return "기간 2개월";
   if (type === "90days") return "기간 3개월";
   if (type === "180days") return "기간 6개월";
   if (type === "junior") return `주니어 ${member.total_count ?? ""}회`;

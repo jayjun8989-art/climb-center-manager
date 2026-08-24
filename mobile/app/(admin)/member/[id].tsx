@@ -18,6 +18,7 @@ const MEMBER_TYPES = [
 
 const MEMBERSHIP_TYPES = [
   { value: "30days", label: "1개월", passType: "period" },
+  { value: "60days", label: "2개월", passType: "period" },
   { value: "90days", label: "3개월", passType: "period" },
   { value: "180days", label: "6개월", passType: "period" },
   { value: "count", label: "회수권", passType: "count" },

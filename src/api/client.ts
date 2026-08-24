@@ -387,15 +387,15 @@ export const api = {
   },
 
   requeueMemberForUpload(memberId: number): Promise<number> {
-    return writeCommand("requeue_member_for_upload_cmd", { member_id: memberId }, () => 0);
+    return writeCommand("requeue_member_for_upload_cmd", { memberId }, () => 0);
   },
 
   excludeMemberFromUpload(memberId: number): Promise<number> {
-    return writeCommand("exclude_member_from_upload_cmd", { member_id: memberId }, () => 0);
+    return writeCommand("exclude_member_from_upload_cmd", { memberId }, () => 0);
   },
 
   setMemberHiddenLocally(memberId: number): Promise<void> {
-    return writeCommand("set_member_hidden_locally_cmd", { member_id: memberId }, () => undefined as void);
+    return writeCommand("set_member_hidden_locally_cmd", { memberId }, () => undefined as void);
   },
 
   uploadLocalMember(memberId: number): Promise<{ ok: boolean; message: string }> {
@@ -403,7 +403,7 @@ export const api = {
   },
 
   linkMemberRemoteId(localId: number, remoteId: string): Promise<void> {
-    return actionCommand("link_member_remote_id_cmd", { local_id: localId, remote_id: remoteId });
+    return actionCommand("link_member_remote_id_cmd", { localId, remoteId });
   },
 
   matchServerMembers(center: Center): Promise<ServerMatchReport> {

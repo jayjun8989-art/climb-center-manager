@@ -83,8 +83,8 @@ async function updateSyncState(key: string, value: string) {
 async function fetchRemoteId(entityType: string, localId: number): Promise<string | null> {
   return (
     (await safeInvoke<string | null>("fetch_remote_id", {
-      entity_type: entityType,
-      local_id: localId,
+      entityType,
+      localId,
     })) ?? null
   );
 }
@@ -98,10 +98,10 @@ async function completeMemberPush(
   // Use invokeCommand so failures surface and are caught by the caller,
   // causing the queue item to be marked failed rather than silently retried.
   await invokeCommand("complete_member_sync_push", {
-    queue_id: queueId,
-    local_member_id: localMemberId,
-    remote_id: remoteId,
-    remote_updated_at: remoteUpdatedAt ?? null,
+    queueId,
+    localMemberId,
+    remoteId,
+    remoteUpdatedAt: remoteUpdatedAt ?? null,
   });
 }
 
@@ -213,9 +213,9 @@ async function mapRemoteMembershipId(
   remoteMembershipId: string,
 ): Promise<void> {
   await safeInvoke("map_remote_id", {
-    entity_type: "membership",
-    local_id: localMembershipId,
-    remote_id: remoteMembershipId,
+    entityType: "membership",
+    localId: localMembershipId,
+    remoteId: remoteMembershipId,
   });
 }
 
@@ -521,9 +521,9 @@ export async function pushMemberQueueItem(
       // so that if completeMemberPush fails, the next cycle detects the existing remote_id
       // above and skips re-insertion.
       await safeInvoke("map_remote_id", {
-        entity_type: "member",
-        local_id: item.entity_local_id,
-        remote_id: data.id,
+        entityType: "member",
+        localId: item.entity_local_id,
+        remoteId: data.id,
       });
       await upsertRemoteMembership(supabase, payload, data.id, centerId);
       await completeMemberPush(item.id, item.entity_local_id, data.id, data.updated_at);
@@ -648,7 +648,7 @@ export async function uploadLocalMemberNow(localId: number): Promise<{ ok: boole
   if (!session) return { ok: false, message: "로그인이 필요합니다." };
 
   // Re-queue a fresh INSERT item for this member
-  const queueId = await safeInvoke<number>("requeue_member_for_upload_cmd", { member_id: localId });
+  const queueId = await safeInvoke<number>("requeue_member_for_upload_cmd", { memberId: localId });
   if (!queueId) return { ok: false, message: "업로드 대기 항목 생성에 실패했습니다." };
 
   const queue = await fetchLocalQueue(100);
@@ -787,7 +787,7 @@ export async function pushSyncQueue(syncContext?: SyncErrorContext): Promise<Syn
       if (!memberRemoteId || !membershipRemoteId) {
         // If the member is no longer active (hidden/deleted), discard the queue item.
         const memberActive = await safeInvoke<boolean>("is_member_syncable", {
-          local_id: payload.local_member_id,
+          localId: payload.local_member_id,
         });
         if (!memberActive) {
           await safeInvoke("complete_sync_queue_item", { id: item.id });
