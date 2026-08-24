@@ -13,6 +13,7 @@ import {
 import type { PullRunResult, SyncPhase, SyncRunResult, SyncStatus } from "../sync/types";
 
 const SYNC_INTERVAL_MS = 60_000;
+const PULL_INTERVAL_MS = 5 * 60_000; // 5분마다 자동 pull
 
 export function useSync(enabled: boolean, syncContext: SyncErrorContext, centerIds?: string[]) {
   const [configured] = useState(isSupabaseConfigured());
@@ -125,7 +126,7 @@ export function useSync(enabled: boolean, syncContext: SyncErrorContext, centerI
 
   useEffect(() => {
     refreshStatus().catch(() => undefined);
-    const timer = window.setInterval(() => {
+    const pushTimer = window.setInterval(() => {
       refreshStatus()
         .then(({ nextOnline, nextStatus }) => {
           if (nextOnline && enabled && (nextStatus.pending_count ?? 0) > 0) {
@@ -135,16 +136,23 @@ export function useSync(enabled: boolean, syncContext: SyncErrorContext, centerI
         .catch(() => undefined);
     }, SYNC_INTERVAL_MS);
 
+    const pullTimer = window.setInterval(() => {
+      if (enabled && !runningRef.current) {
+        pullNow({ centerIds }).catch(() => undefined);
+      }
+    }, PULL_INTERVAL_MS);
+
     const onPushNow = () => {
       if (enabled) syncNow().catch(() => undefined);
     };
     window.addEventListener("climb-sync-push-now", onPushNow);
 
     return () => {
-      window.clearInterval(timer);
+      window.clearInterval(pushTimer);
+      window.clearInterval(pullTimer);
       window.removeEventListener("climb-sync-push-now", onPushNow);
     };
-  }, [enabled, refreshStatus, syncNow]);
+  }, [enabled, refreshStatus, syncNow, pullNow, centerIds]);
 
   useEffect(() => {
     if (!enabled) {
