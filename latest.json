@@ -1,11 +1,11 @@
 {
-    "version": "1.0.89",
+    "version": "1.0.90",
     "pub_date": "2026-08-28T00:00:00Z",
-    "notes": "v1.0.89: 회원권 수정 버그 수정 - 비기너→스마트 전환 에러, 일수 preset 버튼 오류 해결",
+    "notes": "v1.0.90: 인원 수 불일치 근본 해결 - pull 시 센터별 서버 기준으로 완전 동기화",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVl4ZHVXSHlGdVMxZnp2UEMwZW9GYXZIVkhwUGRwN3NjLzY5bTIwRExLb2RpMzFBc2VDOEw4S3J5bktXbkxRQmNKNG9idE0wYWJwWTFhSkYwRFEyTFFFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg3OTA5MDQ4CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC44OV94NjQtc2V0dXAuZXhlCmwyNjJpenM4bjB6bEFLSXlERFFCQVNNVXpYdzNaL0x0N3B4SXpFSGNlTWlGN09qQWlFMUNUNS9sNktvV0pUTVRmZVZFRzgwOTRKWmFHcnhhNkNya0FBPT0K",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.89/ClimbCenterManager_1.0.89_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWQ1R2NHNldTVnVZRGJzWXFRdVVyVEN4NWNRQjZiazdsVysrWHEvWEhNMldJS0wzQ1NKSGZtbXovUnJ6LzB5QzB5TlI5QW1zazQyS3JDbU1jblJOdWdnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg3OTEwMDgzCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC45MF94NjQtc2V0dXAuZXhlCjdtSU01NmVGTk96YnJUMFNSLzA4aytBWDZYK3hwN25Nc2xEOXZnUWVOdHZWSDIrOU5BMmNXc0ZKS2k0NXNjNTBiQU1xazdGOWxHUjJ3SGFsNHpqTkN3PT0K",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.90/ClimbCenterManager_1.0.90_x64-setup.exe"
         }
     }
 }
