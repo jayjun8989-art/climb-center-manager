@@ -841,6 +841,39 @@ pub fn import_pull_snapshot(state: &AppState, snapshot: PullSnapshot) -> Result<
 
     eprintln!("[pull_import] post-pull backfill: {}", backfilled);
 
+    // Purge local members whose remote_id no longer exists on the server.
+    // These are members that were hard-deleted on the server (e.g., cleanup of duplicates).
+    // We soft-delete them locally so the UI stops showing them.
+    let server_remote_ids: std::collections::HashSet<&str> = snapshot.members.iter()
+        .map(|m| m.remote_id.as_str())
+        .collect();
+    let mut purged_count = 0_i64;
+    state.with_conn(|conn| {
+        // Collect local remote_ids that are NOT in server snapshot
+        let mut stmt = conn.prepare(
+            "SELECT id, remote_id FROM members WHERE deleted_at IS NULL AND remote_id IS NOT NULL AND remote_id != '' AND COALESCE(hidden_locally, 0) = 0"
+        )?;
+        let to_purge: Vec<(i64, String)> = stmt.query_map([], |r| {
+            Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?))
+        })?.filter_map(|r| r.ok())
+          .filter(|(_, rid)| !server_remote_ids.contains(rid.as_str()))
+          .collect();
+
+        let now = chrono::Utc::now().to_rfc3339();
+        for (local_id, rid) in &to_purge {
+            conn.execute(
+                "UPDATE members SET deleted_at = ?1 WHERE id = ?2 AND deleted_at IS NULL",
+                rusqlite::params![now, local_id],
+            )?;
+            eprintln!("[pull_import] purged local member id={} remote_id={} (not on server)", local_id, rid);
+            purged_count += 1;
+        }
+        Ok(())
+    }).unwrap_or_else(|e| eprintln!("[pull_import] purge failed: {}", e));
+    if purged_count > 0 {
+        eprintln!("[pull_import] purged {} local members no longer on server", purged_count);
+    }
+
     // Compute missing remote_ids (server rows not found in local DB)
     let missing_rows: Vec<&PullMemberRow> = snapshot.members.iter()
         .filter(|m| !local_remote_id_set.contains(&m.remote_id))
