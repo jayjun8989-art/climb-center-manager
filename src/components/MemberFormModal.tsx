@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/client";
 import type { Center, MemberInput, MemberListItem, MembershipCategory } from "../types";
 import {
@@ -72,6 +72,7 @@ export function MemberFormModal({
 
   // Period (월권/기간권) custom duration support
   const [periodCustom, setPeriodCustom] = useState(false);
+  const presetJustSelectedRef = useRef(false);
 
   // 횟수권 (session) editable totals
   const [sessionTotal, setSessionTotal] = useState<number>(SESSION_TOTAL_COUNT);
@@ -203,7 +204,10 @@ export function MemberFormModal({
   useEffect(() => {
 
     if (category === "monthly" && startDate && !periodCustom) {
-
+      if (presetJustSelectedRef.current) {
+        presetJustSelectedRef.current = false;
+        return;
+      }
       setEndDate(calcMonthlyEndDate(startDate, monthlyDuration));
 
     }
@@ -614,6 +618,7 @@ export function MemberFormModal({
                     className="btn btn-secondary"
 
                     onClick={() => {
+                      presetJustSelectedRef.current = true;
                       setPeriodCustom(false);
                       setEndDate(calcEndDateFromDays(startDate, days));
                     }}

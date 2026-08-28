@@ -56,7 +56,7 @@ pub fn create_v2_schema(conn: &Connection) -> SqlResult<()> {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             member_id INTEGER NOT NULL REFERENCES members(id),
             membership_type TEXT NOT NULL
-                CHECK(membership_type IN ('30days', '90days', '180days', '5times', '8times', '16times', 'junior', 'trial')),
+                CHECK(membership_type IN ('30days', '60days', '90days', '180days', '5times', '8times', '16times', 'junior', 'trial')),
             pass_type TEXT NOT NULL CHECK(pass_type IN ('period', 'count')),
             start_date TEXT NOT NULL,
             end_date TEXT,

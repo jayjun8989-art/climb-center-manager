@@ -120,6 +120,77 @@ pub fn ensure_local_schema(conn: &Connection) -> SqlResult<()> {
         ",
     )?;
 
+    fix_memberships_check_constraint(conn)?;
+
     super::migration::set_schema_version(conn, LATEST_SCHEMA_VERSION)?;
+    Ok(())
+}
+
+/// Recreates the memberships table if its CHECK constraint is missing '60days'.
+/// SQLite does not support ALTER TABLE DROP CONSTRAINT, so we must rename + recreate.
+fn fix_memberships_check_constraint(conn: &Connection) -> SqlResult<()> {
+    // Check if the current memberships CHECK already includes '60days'
+    let create_sql: String = conn.query_row(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='memberships'",
+        [],
+        |row| row.get(0),
+    ).unwrap_or_default();
+
+    if create_sql.contains("'60days'") || create_sql.contains("\"60days\"") {
+        return Ok(()); // already fixed
+    }
+
+    // Recreate with updated CHECK using a temp table approach
+    conn.execute_batch("
+        PRAGMA foreign_keys = OFF;
+
+        CREATE TABLE IF NOT EXISTS memberships_fix (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            member_id INTEGER NOT NULL REFERENCES members(id),
+            membership_type TEXT NOT NULL
+                CHECK(membership_type IN ('30days','60days','90days','180days','5times','8times','16times','junior','trial')),
+            pass_type TEXT NOT NULL CHECK(pass_type IN ('period', 'count')),
+            start_date TEXT NOT NULL,
+            end_date TEXT,
+            total_count INTEGER,
+            used_count INTEGER NOT NULL DEFAULT 0,
+            remaining_count INTEGER,
+            status TEXT NOT NULL DEFAULT 'active'
+                CHECK(status IN ('active', 'paused', 'expired', 'finished')),
+            price REAL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            remote_id TEXT,
+            sync_status TEXT NOT NULL DEFAULT 'pending',
+            remote_updated_at TEXT
+        );
+
+        INSERT OR IGNORE INTO memberships_fix
+            SELECT id, member_id,
+                CASE membership_type
+                    WHEN '30days' THEN '30days'
+                    WHEN '60days' THEN '60days'
+                    WHEN '90days' THEN '90days'
+                    WHEN '180days' THEN '180days'
+                    WHEN '5times' THEN '5times'
+                    WHEN '8times' THEN '8times'
+                    WHEN '16times' THEN '16times'
+                    WHEN 'junior' THEN 'junior'
+                    WHEN 'trial' THEN 'trial'
+                    WHEN 'monthly' THEN '30days'
+                    WHEN 'session' THEN '5times'
+                    ELSE '30days'
+                END,
+                pass_type, start_date, end_date, total_count, used_count,
+                remaining_count, status, price, created_at, updated_at,
+                remote_id, COALESCE(sync_status, 'pending'), remote_updated_at
+        FROM memberships;
+
+        DROP TABLE memberships;
+        ALTER TABLE memberships_fix RENAME TO memberships;
+
+        PRAGMA foreign_keys = ON;
+    ")?;
+
     Ok(())
 }

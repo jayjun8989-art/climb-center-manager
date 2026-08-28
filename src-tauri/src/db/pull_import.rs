@@ -524,11 +524,47 @@ fn upsert_member(
     Ok((local_id, true, false, None))
 }
 
+/// Maps simplified server membership types back to the local SQLite types
+/// that satisfy the local CHECK constraint (30days, 90days, 180days, 5times, 8times, 16times, junior, trial).
+fn normalize_server_membership_type(server_type: &str, start_date: &str, end_date: Option<&str>) -> String {
+    match server_type {
+        "monthly" => {
+            // Determine local type from duration
+            let days = match end_date {
+                Some(end) if !end.is_empty() => {
+                    if let (Ok(s), Ok(e)) = (
+                        chrono::NaiveDate::parse_from_str(start_date, "%Y-%m-%d"),
+                        chrono::NaiveDate::parse_from_str(end, "%Y-%m-%d"),
+                    ) {
+                        (e - s).num_days() + 1
+                    } else {
+                        30
+                    }
+                }
+                _ => 30,
+            };
+            if days >= 150 { "180days".into() }
+            else if days >= 80 { "90days".into() }
+            else if days >= 50 { "60days".into() }
+            else { "30days".into() }
+        }
+        "session" => "5times".into(),
+        // already valid local types
+        "30days" | "60days" | "90days" | "180days" | "5times" | "8times" | "16times" | "junior" | "trial" => server_type.into(),
+        _ => "30days".into(),
+    }
+}
+
 fn upsert_membership(
     conn: &rusqlite::Connection,
     row: &PullMembershipRow,
     member_local_id: i64,
 ) -> Result<(i64, bool), DbError> {
+    let local_membership_type = normalize_server_membership_type(
+        &row.membership_type,
+        &row.start_date,
+        row.end_date.as_deref(),
+    );
     if let Some(local_id) = find_local_membership_id(conn, &row.remote_id)? {
         conn.execute(
             "UPDATE memberships SET
@@ -538,7 +574,7 @@ fn upsert_membership(
              WHERE id = ?13",
             params![
                 member_local_id,
-                row.membership_type,
+                local_membership_type,
                 row.pass_type,
                 row.start_date,
                 row.end_date,
@@ -568,7 +604,7 @@ fn upsert_membership(
          ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, 'synced', ?12)",
         params![
             member_local_id,
-            row.membership_type,
+            local_membership_type,
             row.pass_type,
             row.start_date,
             row.end_date,

@@ -98,6 +98,7 @@ pub fn center_uuid_for_code(center: &str) -> Option<&'static str> {
 fn db_membership_to_legacy_type(membership_type: &str) -> String {
     match membership_type {
         "30days" => "monthly_1".into(),
+        "60days" => "monthly_2".into(),
         "90days" => "monthly_3".into(),
         "180days" => "monthly_6".into(),
         "5times" => "session".into(),
