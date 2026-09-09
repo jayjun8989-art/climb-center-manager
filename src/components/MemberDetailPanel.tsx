@@ -12,7 +12,6 @@ import {
   MEMBER_TYPE_LABELS,
   paymentMethodLabel,
   phoneFormat,
-  resolveMemberLocalId,
 } from "../utils/member";
 import {
   AttendanceCalendar,
@@ -47,8 +46,15 @@ export function MemberDetailPanel({ member, onAttendance, onUpdated, permissions
       return;
     }
 
+    // Supabase-only members (id=0) have no local DB row yet — skip detail fetch.
+    const memberId = member.id || null;
+    if (!memberId) {
+      setDetail(null);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
-    const memberId = resolveMemberLocalId(member);
     api
       .getMemberDetail(memberId)
       .then(setDetail)
