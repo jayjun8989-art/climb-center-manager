@@ -31,7 +31,9 @@ import type {
   LocalCenterCounts,
 } from "../types";
 import { uploadLocalMemberNow, matchServerMembersForCenter, getServerCenterConsistency } from "../sync/engine";
-import { triggerImmediatePush } from "../sync/directWrite";
+import { triggerImmediatePush, supabaseAddMember, supabaseEditMember, syntheticMemberListItem } from "../sync/directWrite";
+import { fetchSupabaseMemberList } from "./supabaseMembers";
+import { isSupabaseConfigured } from "../lib/supabase/config";
 import {
   defaultBackupInfo,
   defaultDashboardStats,
@@ -97,7 +99,7 @@ async function actionCommand(
 }
 
 export const api = {
-  getMembers(params: {
+  async getMembers(params: {
     center: Center;
     search?: string;
     memberGroup?: MemberGroupFilter;
@@ -105,6 +107,35 @@ export const api = {
     page?: number;
     pageSize?: number;
   }): Promise<PaginatedMembers> {
+    // Supabase-direct read: always reflects the canonical server state so both
+    // computers see identical member counts without any local-cache drift.
+    if (isSupabaseConfigured()) {
+      try {
+        const result = await fetchSupabaseMemberList({
+          center: params.center,
+          search: params.search,
+          memberGroup: params.memberGroup,
+          statusFilter: params.statusFilter,
+          page: params.page,
+          page_size: params.pageSize,
+        });
+
+        return result;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[getMembers] Supabase 직접 조회 실패:", msg);
+        // Show error in UI so GRABIT can report what's failing
+        try {
+          window.dispatchEvent(
+            new CustomEvent("climb-supabase-error", { detail: `서버 조회 실패: ${msg}` }),
+          );
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    // Offline / Supabase unconfigured / Supabase error: fall back to local SQLite.
     return readCommand(
       "get_members",
       {
@@ -129,6 +160,11 @@ export const api = {
     input: MemberInput,
     options?: { enqueueSync?: boolean },
   ): Promise<MutationResult<MemberListItem>> {
+    if (isSupabaseConfigured()) {
+      const res = await supabaseAddMember(input);
+      if (!res.ok) throw new Error(res.error ?? "회원 등록 실패");
+      return { data: syntheticMemberListItem(input, res.remoteId), backup_warning: null };
+    }
     const result = await writeCommand(
       "add_member",
       { input, enqueueSync: options?.enqueueSync ?? true },
@@ -138,7 +174,16 @@ export const api = {
     return result;
   },
 
-  async editMember(id: number, input: MemberInput): Promise<MutationResult<MemberListItem>> {
+  async editMember(
+    id: number,
+    input: MemberInput,
+    remoteId?: string | null,
+  ): Promise<MutationResult<MemberListItem>> {
+    if (isSupabaseConfigured() && remoteId) {
+      const res = await supabaseEditMember(remoteId, input);
+      if (!res.ok) throw new Error(res.error ?? "회원 수정 실패");
+      return { data: syntheticMemberListItem(input, remoteId), backup_warning: null };
+    }
     const result = await writeCommand("edit_member", { id, input }, () => fallbackEditMember(id, input));
     triggerImmediatePush();
     return result;
@@ -256,7 +301,15 @@ export const api = {
     return result;
   },
 
-  fetchDashboardStats(center: Center): Promise<DashboardStats> {
+  async fetchDashboardStats(center: Center): Promise<DashboardStats> {
+    if (isSupabaseConfigured()) {
+      try {
+        const result = await fetchSupabaseMemberList({ center, page: 1, page_size: 10000 });
+        return defaultDashboardStats(result.members);
+      } catch {
+        // fall through to local SQLite
+      }
+    }
     return readCommand("fetch_dashboard_stats", { center }, () => {
       const members = fallbackGetMembers({ center, page: 1, pageSize: 10000 }).members;
       return defaultDashboardStats(members);

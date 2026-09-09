@@ -1,11 +1,11 @@
 {
-    "version": "1.0.104",
+    "version": "1.0.105",
     "pub_date": "2026-09-09T00:00:00Z",
-    "notes": "v1.0.104: 신규회원 등록 후 화면 오류(회원 ID를 찾을 수 없습니다) 수정",
+    "notes": "v1.0.105: 사이드바 회원 통계를 수파베스 기준으로 표시",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWZXMlQyOW9JYmJUTm9BVmdjcTRlOFRhRXFYY015VFM5Q1ZDWlViUlBoSE5yMHd3eXljcG9vNmk5RnQ3dTIwL09ZRmtjY2pMa0tNNEIrd0llVEpxZFFzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4OTMyMjQxCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xMDRfeDY0LXNldHVwLmV4ZQpmYnVXTGIxTDNqdnUzbi9qUUliMFdZMTBZeDc0SFRmVHlJNUFkMmcvLzYrckEvZjNiRkFsdUs1S1ByQ3BIVFIxTW5rUEZEeVdWbWJxOWhnMkoyUG5BUT09Cg==",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.104/ClimbCenterManager_1.0.104_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWN6YkIzWkZCWitTbHdvRGJhZ3FzZlQ5bzgzYW51K0dya05RN2lkdHhSdkd1QWkrTUQxNE9SUk9OTkdBcHlVTEY4VTZ2SENWWEpGaFExeEtVNC9LV3dVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4OTMzNTIzCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xMDVfeDY0LXNldHVwLmV4ZQp4SVNwU3VweUhWa25nSGNvck5VTHhUdDF4OU5VeThNa0poTVJtNXpJWTA2RXJmYXRZUXJIMWhPZW13eEtrNis2QVY0cGZ4Vm1zWlA3ZW83WDBtamJDZz09Cg==",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.105/ClimbCenterManager_1.0.105_x64-setup.exe"
         }
     }
 }
