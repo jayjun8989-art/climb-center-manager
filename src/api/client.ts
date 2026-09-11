@@ -281,10 +281,22 @@ export const api = {
     return readCommand("fetch_pause_logs", { memberId }, () => []);
   },
 
-  async pauseMembership(membershipId: number, reason?: string): Promise<MemberListItem> {
+  async pauseMembership(
+    membershipId: number,
+    reason?: string,
+    pauseDays?: number,
+    pauseStartDate?: string,
+    pauseEndDate?: string,
+  ): Promise<MemberListItem> {
     const result = await writeCommand(
       "pause_membership_command",
-      { membershipId: membershipId, reason: reason ?? null },
+      {
+        membershipId: membershipId,
+        reason: reason ?? null,
+        pauseDays: pauseDays ?? null,
+        pauseStartDate: pauseStartDate ?? null,
+        pauseEndDate: pauseEndDate ?? null,
+      },
       () => {
         throw new Error("브라우저 미리보기에서는 정지 기능을 지원하지 않습니다.");
       },

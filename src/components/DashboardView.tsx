@@ -19,13 +19,14 @@ import { useDashboardData } from "../hooks/useDashboardData";
 import { useRealtimeUpdates, type RealtimeStatus } from "../hooks/useRealtimeUpdates";
 import { centerIdForCode } from "../lib/supabase/centers";
 import { isSupabaseConfigured } from "../lib/supabase/config";
-import { setFocusCare, type FocusCareMember, type MonthlyTrendItem, type WeeklyMember } from "../lib/supabase/dashboard";
+import { setCenterGoals, setFocusCare, type FocusCareMember, type MonthlyTrendItem, type WeeklyMember } from "../lib/supabase/dashboard";
 import { CareLogModal } from "./CareLogModal";
-import type { Center } from "../types";
+import type { Center, PermissionSet } from "../types";
 
 interface DashboardViewProps {
   center: Center;
   isAuthenticated: boolean;
+  permissions: PermissionSet;
   onNotify: (msg: string) => void;
 }
 
@@ -155,14 +156,16 @@ function TrendChart({ items }: { items: MonthlyTrendItem[] }) {
   const maxVal = Math.max(...items.map((i) => i.adult_count + i.junior_count), 1);
   return (
     <div>
-      <div className="flex items-end gap-1.5 h-28">
+      <div className="flex items-end gap-1.5 h-36">
         {items.map((item) => {
           const adultH  = Math.round((item.adult_count  / maxVal) * 100);
           const juniorH = Math.round((item.junior_count / maxVal) * 100);
-          const total   = item.adult_count + item.junior_count;
           return (
-            <div key={item.month_label} className="flex-1 flex flex-col items-center gap-1">
-              <span className="text-[9px] text-[var(--muted)] tabular-nums">{total}</span>
+            <div key={item.month_label} className="flex-1 flex flex-col items-center gap-0.5">
+              {/* adult count */}
+              <span className="text-[8px] text-blue-500 tabular-nums font-medium leading-tight">{item.adult_count}</span>
+              {/* junior count */}
+              <span className="text-[8px] text-orange-500 tabular-nums font-medium leading-tight">{item.junior_count}</span>
               <div className="w-full flex flex-col-reverse rounded overflow-hidden"
                    style={{ height: `${Math.max(adultH + juniorH, 4)}%` }}>
                 <div className="w-full bg-blue-500/70"   style={{ flex: adultH }} />
@@ -174,8 +177,8 @@ function TrendChart({ items }: { items: MonthlyTrendItem[] }) {
         })}
       </div>
       <div className="mt-2 flex gap-4 text-[10px] text-[var(--muted)]">
-        <span><span className="inline-block w-2 h-2 rounded-sm bg-blue-500/70 mr-1" />성인 유효회원</span>
-        <span><span className="inline-block w-2 h-2 rounded-sm bg-orange-400/70 mr-1" />주니어 유효회원</span>
+        <span><span className="inline-block w-2 h-2 rounded-sm bg-blue-500/70 mr-1" />성인</span>
+        <span><span className="inline-block w-2 h-2 rounded-sm bg-orange-400/70 mr-1" />주니어</span>
       </div>
     </div>
   );
@@ -233,8 +236,9 @@ function CareRow({
 }
 
 // ── Main view ─────────────────────────────────────────────────────
-export function DashboardView({ center, isAuthenticated, onNotify }: DashboardViewProps) {
+export function DashboardView({ center, isAuthenticated, permissions, onNotify }: DashboardViewProps) {
   const enabled = isAuthenticated && isSupabaseConfigured();
+  const isAdmin = permissions.role === "owner" || permissions.role === "admin";
   const {
     counts, weeklyNew, weeklyExpired, trend, goals, care,
     weekStart, weekEnd, weekOffset,
@@ -246,6 +250,10 @@ export function DashboardView({ center, isAuthenticated, onNotify }: DashboardVi
   const [showNewList,     setShowNewList]     = useState(false);
   const [showExpiredList, setShowExpiredList] = useState(false);
   const [careModal,       setCareModal]       = useState<FocusCareMember | null>(null);
+  const [editingGoal,     setEditingGoal]     = useState(false);
+  const [goalAdult,       setGoalAdult]       = useState<number | "">(0);
+  const [goalJunior,      setGoalJunior]      = useState<number | "">(0);
+  const [goalSaving,      setGoalSaving]      = useState(false);
 
   useEffect(() => { setCenterId(centerIdForCode(center)); }, [center]);
 
@@ -268,6 +276,29 @@ export function DashboardView({ center, isAuthenticated, onNotify }: DashboardVi
   const careAdult  = care.filter((m) => m.member_type === "regular").length;
   const careJunior = care.filter((m) => m.member_type === "junior").length;
   const careDue    = care.filter((m) => m.today_due).length;
+
+  const handleOpenGoalEdit = () => {
+    setGoalAdult(goals?.adult_goal ?? 0);
+    setGoalJunior(goals?.junior_goal ?? 0);
+    setEditingGoal(true);
+  };
+
+  const handleSaveGoal = async () => {
+    setGoalSaving(true);
+    const result = await setCenterGoals(
+      center,
+      typeof goalAdult  === "number" ? goalAdult  : 0,
+      typeof goalJunior === "number" ? goalJunior : 0,
+    );
+    setGoalSaving(false);
+    if (!result.ok) {
+      onNotify(`목표 저장 실패: ${result.error}`);
+      return;
+    }
+    onNotify("목표 인원이 저장되었습니다.");
+    setEditingGoal(false);
+    void refresh();
+  };
 
   const handleFocusCareToggle = async (member: FocusCareMember) => {
     const result = await setFocusCare(member.member_id, false, center);
@@ -431,10 +462,73 @@ export function DashboardView({ center, isAuthenticated, onNotify }: DashboardVi
 
       {/* ── 4. 목표 달성률 ─────────────────────────────────── */}
       <div className="glass-panel rounded-[1.5rem] p-5 space-y-4">
-        <div className="flex items-center gap-2 text-sm font-semibold">
-          <Target size={16} />
-          목표 달성률
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <Target size={16} />
+            목표 달성률
+          </div>
+          {isAdmin && !editingGoal && (
+            <button
+              type="button"
+              className="btn btn-secondary text-xs !py-1.5 !px-3"
+              onClick={handleOpenGoalEdit}
+            >
+              목표 설정
+            </button>
+          )}
         </div>
+
+        {editingGoal && (
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 space-y-3">
+            <p className="text-xs font-medium text-[var(--muted)]">목표 인원 설정 (관리자)</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs mb-1 text-[var(--muted)]">성인 목표</label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    className="input flex-1 text-sm"
+                    min={0}
+                    value={goalAdult}
+                    onChange={(e) => setGoalAdult(e.target.value === "" ? "" : Number(e.target.value))}
+                  />
+                  <span className="text-sm text-[var(--muted)]">명</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs mb-1 text-[var(--muted)]">주니어 목표</label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    className="input flex-1 text-sm"
+                    min={0}
+                    value={goalJunior}
+                    onChange={(e) => setGoalJunior(e.target.value === "" ? "" : Number(e.target.value))}
+                  />
+                  <span className="text-sm text-[var(--muted)]">명</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="btn btn-secondary flex-1 text-sm"
+                onClick={() => setEditingGoal(false)}
+                disabled={goalSaving}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary flex-1 text-sm"
+                onClick={() => void handleSaveGoal()}
+                disabled={goalSaving}
+              >
+                {goalSaving ? "저장 중..." : "저장"}
+              </button>
+            </div>
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

@@ -728,6 +728,7 @@ export default function App() {
           <DashboardView
             center={center}
             isAuthenticated={auth.isAuthenticated}
+            permissions={permissions}
             onNotify={setToast}
           />
         )}
