@@ -1,6 +1,7 @@
 import { CalendarCheck2, PauseCircle, PlayCircle, XCircle } from "lucide-react";
 import { format, startOfMonth } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
+import { PauseModal } from "./PauseModal";
 import { api } from "../api/client";
 import type { AttendanceLog, MemberDetail, MemberListItem, PauseLog, Payment, PermissionSet } from "../types";
 import {
@@ -36,6 +37,7 @@ export function MemberDetailPanel({ member, onAttendance, onUpdated, permissions
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [message, setMessage] = useState("");
+  const [showPauseModal, setShowPauseModal] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
@@ -124,14 +126,20 @@ export function MemberDetailPanel({ member, onAttendance, onUpdated, permissions
     }
   }
 
-  async function handlePause() {
+  async function handlePauseConfirm(pauseDays: number, reason: string, startDate: string, endDate: string) {
     if (!currentMember.membership_id) return;
-    const reason = window.prompt("정지 사유를 입력해주세요.", "") ?? undefined;
+    setShowPauseModal(false);
     try {
-      const updated = await api.pauseMembership(currentMember.membership_id, reason);
+      const updated = await api.pauseMembership(
+        currentMember.membership_id,
+        reason || undefined,
+        pauseDays,
+        startDate,
+        endDate,
+      );
       onUpdated(updated);
       await refreshDetail();
-      setMessage("회원권이 정지되었습니다.");
+      setMessage(`회원권이 ${pauseDays}일 정지되었습니다.`);
     } catch (error) {
       setMessage(String(error));
     }
@@ -216,7 +224,7 @@ export function MemberDetailPanel({ member, onAttendance, onUpdated, permissions
               className="btn btn-secondary"
               disabled={!permissions.canPauseMembership}
               title={!permissions.canPauseMembership ? permissions.denyReason : undefined}
-              onClick={() => void handlePause()}
+              onClick={() => setShowPauseModal(true)}
             >
               <PauseCircle size={18} />
               회원권 정지
@@ -365,6 +373,16 @@ export function MemberDetailPanel({ member, onAttendance, onUpdated, permissions
           </RecordSection>
         </div>
       ) : null}
+
+      {showPauseModal && (
+        <PauseModal
+          memberName={currentMember.name}
+          onClose={() => setShowPauseModal(false)}
+          onConfirm={(pauseDays, reason, startDate, endDate) =>
+            void handlePauseConfirm(pauseDays, reason, startDate, endDate)
+          }
+        />
+      )}
     </section>
   );
 }

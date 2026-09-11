@@ -1,11 +1,11 @@
 {
-    "version": "1.0.110",
+    "version": "1.0.111",
     "pub_date": "2026-09-11T00:00:00Z",
-    "notes": "v1.0.110: 정지 날짜/일수 두 가지 방식, 목표 설정 관리자 전용, 월간 추이 성인/주니어 수치 분리 표시",
+    "notes": "v1.0.111: 회원 수정 오류 수정(member_type 'general'→'regular'), 정지 두 가지 방식 MemberDetailPanel 적용",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVI2V2JNZ0NUMUVhb3B0akpNMWhNRWFmRm9Hbno5a3Uvb3NTV081T3FXSXBjcWJoSGRqcENlZTFpVG5sYVppUGJBRWp6SkpsNWI4bXVTbUdEdzl5OVFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MTE5NTQ4CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xMTBfeDY0LXNldHVwLmV4ZQpqbWpNaVVoTVF4UUIzYk0zUFRZeGFsdk0wOHNFcTgvUlJMY0JNa1p6NUhKellWK013Y1pDNHlXbHlsc0ZFVU1rQ0NHSXRBdU5yZ3AxMGVQaDAzbE1CQT09Cg==",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.110/ClimbCenterManager_1.0.110_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVhWb0szWXI3dzZvVnMwVFhmYlhwVldsb3kvQnkwQ3pnTXkrbWRENi9sTUo4S2RZOFNtWVoxWmM2Y1F6WE5KcmNGQVRxSU53WU5EcnA0MWRGbEZLZWdrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MTIwMjM1CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xMTFfeDY0LXNldHVwLmV4ZQpjNnc2WkJUbTdrRmtOaW9PYlBRQ1V5MlNxZWtDbXhESkM3ZmhQYzZVMXh2U1hiYzZNZkFNVitwVWowNE96ck04QmFXbkswQXVVNitqejNUNTA1Q0FEZz09Cg==",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.111/ClimbCenterManager_1.0.111_x64-setup.exe"
         }
     }
 }

@@ -146,7 +146,7 @@ export async function supabaseAddMember(
     if (!centerId) return { ok: false, error: `센터 ID 매핑 실패: ${input.center}` };
 
     const memberType =
-      String(input.member_type ?? "").toLowerCase() === "junior" ? "junior" : "general";
+      String(input.member_type ?? "").toLowerCase() === "junior" ? "junior" : "regular";
 
     // Step 1: 회원 upsert (idempotent)
     const { data: memberData, error: mErr } = await withSessionRefresh(async () =>
@@ -241,7 +241,7 @@ export async function supabaseEditMember(
     const now = new Date().toISOString();
 
     const memberType =
-      String(input.member_type ?? "").toLowerCase() === "junior" ? "junior" : "general";
+      String(input.member_type ?? "").toLowerCase() === "junior" ? "junior" : "regular";
 
     const { error: mErr } = await withSessionRefresh(async () =>
       await client
@@ -314,7 +314,7 @@ export function syntheticMemberListItem(
     remote_id: remoteId ?? null,
     name: input.name,
     phone: input.phone ?? null,
-    member_type: (input.member_type as string) ?? "general",
+    member_type: (input.member_type as string) ?? "regular",
     center: input.center,
     memo: input.notes ?? null,
     status: "active",
