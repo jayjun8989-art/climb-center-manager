@@ -3,6 +3,7 @@ import {
   ClipboardList,
   CreditCard,
   KeyRound,
+  LayoutDashboard,
   ScrollText,
   Settings,
   Users,
@@ -11,6 +12,7 @@ import type { LucideIcon } from "lucide-react";
 import type { PermissionSet } from "../types";
 
 export type AppView =
+  | "dashboard"
   | "members"
   | "attendance"
   | "memberships"
@@ -26,6 +28,7 @@ interface MainNavProps {
 }
 
 const VIEW_ITEMS: { id: AppView; label: string; icon: LucideIcon }[] = [
+  { id: "dashboard", label: "대시보드", icon: LayoutDashboard },
   { id: "members", label: "회원 관리", icon: Users },
   { id: "attendance", label: "출석 체크", icon: CalendarCheck2 },
   { id: "memberships", label: "회원권 관리", icon: CreditCard },

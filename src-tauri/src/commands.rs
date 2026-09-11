@@ -774,3 +774,165 @@ pub fn save_cleanup_report_cmd(
 ) -> Result<String, String> {
     save_cleanup_report(&state, &json).map_err(|e| e.to_string())
 }
+
+#[derive(serde::Serialize)]
+pub struct LocalIdEntry {
+    pub remote_id: String,
+    pub local_member_id: Option<i64>,
+    pub local_membership_id: Option<i64>,
+}
+
+/// After a successful Supabase-direct read, clean up local orphan members:
+/// 1. Members with a remote_id NOT in the active server list → soft-delete.
+/// 2. Members with NO remote_id AND NOT in the sync_queue as pending → hide_locally.
+/// This ensures that once GRABIT gets a successful Supabase response, local data
+/// is permanently brought in line so fallback reads also show the correct count.
+#[tauri::command]
+pub fn cleanup_orphan_local_members_cmd(
+    state: State<'_, AppState>,
+    center: String,
+    active_remote_ids: Vec<String>,
+) -> Result<i64, String> {
+    use rusqlite::OptionalExtension;
+    let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    state.with_conn(|conn| {
+        let mut cleaned: i64 = 0;
+
+        // ── 1. Restore any members that were incorrectly soft-deleted but are still
+        //       active in Supabase (their remote_id is in the server list).
+        if !active_remote_ids.is_empty() {
+            // ?1 = now (updated_at), ?2 = center, ?3..N = remote_ids
+            let placeholders = active_remote_ids
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("?{}", i + 3))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let sql = format!(
+                "UPDATE members SET deleted_at = NULL, updated_at = ?1 \
+                 WHERE center = ?2 \
+                 AND deleted_at IS NOT NULL \
+                 AND remote_id IS NOT NULL AND remote_id != '' \
+                 AND remote_id IN ({})",
+                placeholders
+            );
+            let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![
+                Box::new(now.clone()),
+                Box::new(center.clone()),
+            ];
+            for rid in &active_remote_ids {
+                params.push(Box::new(rid.clone()));
+            }
+            let param_refs: Vec<&dyn rusqlite::ToSql> =
+                params.iter().map(|p| p.as_ref()).collect();
+            conn.execute(&sql, param_refs.as_slice())?;
+        }
+
+        // ── 2. Hide local-only members (no remote_id) not pending in sync_queue ──
+        let orphan_ids: Vec<i64> = conn
+            .prepare(
+                "SELECT id FROM members \
+                 WHERE center = ?1 AND deleted_at IS NULL \
+                 AND COALESCE(hidden_locally, 0) = 0 \
+                 AND (remote_id IS NULL OR remote_id = '')",
+            )?
+            .query_map([&center], |r| r.get(0))?
+            .filter_map(|r| r.ok())
+            .collect();
+        for id in orphan_ids {
+            let pending: Option<i64> = conn
+                .query_row(
+                    "SELECT id FROM sync_queue WHERE entity_type = 'member' \
+                     AND entity_local_id = ?1 AND operation = 'insert' \
+                     AND last_error IS NULL LIMIT 1",
+                    [id],
+                    |r| r.get(0),
+                )
+                .optional()?;
+            if pending.is_none() {
+                conn.execute(
+                    "UPDATE members SET hidden_locally = 1, updated_at = ?1 WHERE id = ?2",
+                    rusqlite::params![now, id],
+                )?;
+                // purge all sync_queue entries for this local-only member
+                conn.execute(
+                    "DELETE FROM sync_queue WHERE entity_type = 'member' AND entity_local_id = ?1",
+                    [id],
+                )?;
+                conn.execute(
+                    "DELETE FROM sync_queue WHERE entity_type = 'membership' AND entity_local_id IN \
+                     (SELECT id FROM memberships WHERE member_id = ?1)",
+                    [id],
+                )?;
+                conn.execute(
+                    "DELETE FROM sync_queue WHERE entity_type = 'attendance' AND entity_local_id IN \
+                     (SELECT id FROM attendance_logs WHERE member_id = ?1)",
+                    [id],
+                )?;
+                cleaned += 1;
+            }
+        }
+
+        Ok(cleaned)
+    })
+    .map_err(|e| e.to_string())
+}
+
+/// Batch-resolve Supabase member UUIDs → local SQLite integer ids.
+/// Used by the Supabase-direct member list so mutations can still use local ids.
+#[tauri::command]
+pub fn batch_get_local_ids_cmd(
+    state: State<'_, AppState>,
+    remote_ids: Vec<String>,
+) -> Result<Vec<LocalIdEntry>, String> {
+    use rusqlite::OptionalExtension;
+    state.with_conn(|conn| {
+        let result = remote_ids
+            .iter()
+            .map(|rid| {
+                // Resolve local member id from id_map (authoritative mapping table)
+                // or fall back to members.remote_id column (populated by pull_import).
+                let local_member_id: Option<i64> = conn
+                    .query_row(
+                        "SELECT local_id FROM id_map WHERE entity_type = 'member' AND remote_id = ?1",
+                        [rid],
+                        |r| r.get(0),
+                    )
+                    .optional()
+                    .ok()
+                    .flatten()
+                    .or_else(|| {
+                        conn.query_row(
+                            "SELECT id FROM members WHERE remote_id = ?1 AND deleted_at IS NULL LIMIT 1",
+                            [rid],
+                            |r| r.get(0),
+                        )
+                        .optional()
+                        .ok()
+                        .flatten()
+                    });
+
+                // Resolve the active/paused membership id for that member.
+                let local_membership_id: Option<i64> = local_member_id.and_then(|mid| {
+                    conn.query_row(
+                        "SELECT id FROM memberships WHERE member_id = ?1 \
+                         AND status IN ('active', 'paused') ORDER BY id DESC LIMIT 1",
+                        [mid],
+                        |r| r.get(0),
+                    )
+                    .optional()
+                    .ok()
+                    .flatten()
+                });
+
+                LocalIdEntry {
+                    remote_id: rid.clone(),
+                    local_member_id,
+                    local_membership_id,
+                }
+            })
+            .collect();
+        Ok(result)
+    })
+    .map_err(|e| e.to_string())
+}

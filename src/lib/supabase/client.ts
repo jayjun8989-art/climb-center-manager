@@ -30,8 +30,8 @@ export function getSupabaseClient(): SupabaseClient | null {
     clientIsDesktop = desktopApp;
     client = createClient(url, anonKey, {
       auth: {
-        persistSession: !desktopApp,
-        autoRefreshToken: !desktopApp,
+        persistSession: true,
+        autoRefreshToken: true,
         detectSessionInUrl: false,
       },
     });

@@ -144,6 +144,8 @@ pub fn run() {
             commands::cleanup_dry_run_cmd,
             commands::execute_cleanup_cmd,
             commands::save_cleanup_report_cmd,
+            commands::batch_get_local_ids_cmd,
+            commands::cleanup_orphan_local_members_cmd,
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|error| {

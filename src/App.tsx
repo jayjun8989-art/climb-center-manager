@@ -8,10 +8,12 @@ import { LockerManagementPanel } from "./components/LockerManagementPanel";
 import { LoginScreen } from "./components/LoginScreen";
 import { SelfCheckinPanel } from "./components/SelfCheckinPanel";
 import { MemberRosterPanel } from "./components/MemberRosterPanel";
+import { DashboardView } from "./components/DashboardView";
 import { MainNav, type AppView } from "./components/MainNav";
 import { MemberDetailPanel } from "./components/MemberDetailPanel";
 import { MemberFormModal } from "./components/MemberFormModal";
 import { MemberList } from "./components/MemberList";
+import { ConfirmDialog } from "./components/ConfirmDialog";
 import { MembershipManagementPanel } from "./components/MembershipManagementPanel";
 import { PaginationBar } from "./components/PaginationBar";
 import { SyncStatusBar } from "./components/SyncStatusBar";
@@ -77,7 +79,7 @@ export default function App() {
   const [selfCheckinOpen, setSelfCheckinOpen] = useState(false);
   const access = useCenterPermissions(center, auth.user, auth.isAuthenticated);
   const { permissions, accessibleCenters, roleLabel, roles, loading: rolesLoading, error: rolesError } = access;
-  const [activeView, setActiveView] = useState<AppView>("members");
+  const [activeView, setActiveView] = useState<AppView>("dashboard");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [attendanceSearch, setAttendanceSearch] = useState("");
   const [attendanceCheckinDate, setAttendanceCheckinDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -102,6 +104,7 @@ export default function App() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<MemberListItem | null>(null);
   const [toast, setToast] = useState("");
+  const [confirmDialog, setConfirmDialog] = useState<{ message: string; onConfirm: () => void } | null>(null);
   const [backupInfo, setBackupInfo] = useState<BackupInfo | null>(null);
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
   const [reportInfo, setReportInfo] = useState<ReportInfo | null>(null);
@@ -172,11 +175,12 @@ export default function App() {
 
   useEffect(() => {
     if (!permissions.enforced) return;
+    if (permissions.loading) return; // roles still loading — wait
     if (accessibleCenters.length === 0) return;
     if (!accessibleCenters.includes(center)) {
       setCenter(accessibleCenters[0]);
     }
-  }, [accessibleCenters, center, permissions.enforced]);
+  }, [accessibleCenters, center, permissions.enforced, permissions.loading]);
 
   const refreshStorageInfo = useCallback(async () => {
     const info = await api.fetchStorageInfo();
@@ -261,6 +265,14 @@ export default function App() {
     window.addEventListener("climb-sync-pull-complete", onPullComplete);
     return () => window.removeEventListener("climb-sync-pull-complete", onPullComplete);
   }, [refreshMembers, refreshDashboard, refreshLockers]);
+
+  useEffect(() => {
+    const onSupabaseError = (e: Event) => {
+      setToast((e as CustomEvent<string>).detail);
+    };
+    window.addEventListener("climb-supabase-error", onSupabaseError);
+    return () => window.removeEventListener("climb-supabase-error", onSupabaseError);
+  }, []);
 
   useEffect(() => {
     if (activeView === "lockers") {
@@ -387,7 +399,7 @@ export default function App() {
           permissions.canEditMember || permissions.canEditMemberMemo,
           permissions.denyReason,
         );
-        const result = await api.editMember(editingMember.id, payload);
+        const result = await api.editMember(editingMember.id, payload, editingMember.remote_id);
         setSelectedMember((current) =>
           current?.id === editingMember.id ? result.data : current,
         );
@@ -428,14 +440,44 @@ export default function App() {
       setToast(formatAppError(error));
       return;
     }
-    const confirmed = window.confirm(`${member.name} 회원을 삭제하시겠습니까?`);
-    if (!confirmed) return;
+
+    // Supabase-path members may have id=0 if not yet pulled to local DB.
+    // In that case we cannot soft-delete via local SQLite.
+    if (member.id === 0 && !member.remote_id) {
+      setToast("이 회원은 로컬 동기화가 필요합니다. 동기화 후 다시 시도해주세요.");
+      return;
+    }
+
+    setConfirmDialog({
+      message: `${member.name} 회원을 삭제하시겠습니까?`,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        await doDeleteMember(member);
+      },
+    });
+  }
+
+  async function doDeleteMember(member: MemberListItem) {
     try {
-      const result = await api.removeMember(member.id);
-      if (selectedMember?.id === member.id) setSelectedMember(null);
-      showMutationToast(setToast, "회원이 삭제되었습니다.", result);
+      if (member.id === 0 && member.remote_id) {
+        // Member exists only in Supabase on this machine — delete directly via Supabase.
+        const supabase = (await import("./lib/supabase/client")).getSupabaseClient();
+        if (!supabase) throw new Error("서버 연결을 확인해주세요.");
+        const now = new Date().toISOString();
+        const { error } = await supabase
+          .from("members")
+          .update({ deleted_at: now, status: "inactive", updated_at: now })
+          .eq("id", member.remote_id);
+        if (error) throw new Error(error.message);
+        if (selectedMember?.id === member.id) setSelectedMember(null);
+        setToast("회원이 삭제되었습니다.");
+      } else {
+        const result = await api.removeMember(member.id);
+        if (selectedMember?.id === member.id) setSelectedMember(null);
+        showMutationToast(setToast, "회원이 삭제되었습니다.", result);
+        sync.syncNow().catch(() => undefined);
+      }
       await Promise.all([refreshMembers(), refreshDashboard(), refreshBackupInfo()]);
-      sync.syncNow().catch(() => undefined);
     } catch (error) {
       setToast(formatAppError(error));
     }
@@ -635,7 +677,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen p-4 md:p-6">
-      {permissions.enforced && !permissions.hasCenterAccess && (
+      {permissions.enforced && !permissions.loading && !permissions.hasCenterAccess && (
         <div className="mx-auto mb-4 max-w-[1500px] rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-500">
           이 센터에 대한 권한이 없습니다. 관리자에게 센터 권한 부여를 요청하세요.
         </div>
@@ -676,7 +718,7 @@ export default function App() {
           permissions={permissions}
           accessibleCenters={accessibleCenters}
           showMemberFilters={activeView === "members" || activeView === "memberships"}
-          showStats={activeView === "members" || activeView === "expiring"}
+          showStats={activeView === "members" || activeView === "expiring" || activeView === "dashboard"}
         />
 
         <MainNav
@@ -745,6 +787,14 @@ export default function App() {
 
         {activeView === "members" && permissions.canViewStats && membershipSummary && (
           <p className="px-1 text-sm text-[var(--muted)]">회원권 구성 · {membershipSummary}</p>
+        )}
+
+        {activeView === "dashboard" && (
+          <DashboardView
+            center={center}
+            isAuthenticated={auth.isAuthenticated}
+            onNotify={setToast}
+          />
         )}
 
         {activeView === "members" && (
@@ -1057,6 +1107,15 @@ export default function App() {
           {toast}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDialog !== null}
+        message={confirmDialog?.message ?? ""}
+        danger
+        confirmLabel="삭제"
+        onConfirm={() => confirmDialog?.onConfirm()}
+        onCancel={() => setConfirmDialog(null)}
+      />
     </div>
   );
 }

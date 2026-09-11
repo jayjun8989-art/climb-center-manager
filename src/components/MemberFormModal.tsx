@@ -1,20 +1,21 @@
 import { X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { Center, MemberInput, MemberListItem, MembershipCategory } from "../types";
 import {
   calcDurationDays,
   calcEndDateFromDays,
-  calcMonthlyEndDate,
+  calcMonthlyEndDateSafe,
   calcSessionEndDate,
   dbMembershipToLegacy,
   getJuniorCountFromItem,
   getMonthlyDuration,
   JUNIOR_COUNT_PRESETS,
   JUNIOR_PERIOD_DAY_PRESETS,
+  MONTHLY_PRESET_DURATIONS,
+  type MonthlyPresetDuration,
   monthlyTypeFromDuration,
   normalizePhoneInput,
-  PERIOD_DAY_PRESETS,
   resolveCategory,
   SESSION_COUNT_PRESETS,
   SESSION_TOTAL_COUNT,
@@ -72,7 +73,6 @@ export function MemberFormModal({
 
   // Period (월권/기간권) custom duration support
   const [periodCustom, setPeriodCustom] = useState(false);
-  const presetJustSelectedRef = useRef(false);
 
   // 횟수권 (session) editable totals
   const [sessionTotal, setSessionTotal] = useState<number>(SESSION_TOTAL_COUNT);
@@ -132,7 +132,7 @@ export function MemberFormModal({
       }
       setStartDate(member.start_date ?? todayString());
       setEndDate(member.end_date ?? "");
-      setPeriodCustom(false);
+      setPeriodCustom(true); // preserve stored dates — do not recalculate on edit
       setJuniorPeriodCustom(false);
       {
         const total = member.total_count ?? SESSION_TOTAL_COUNT;
@@ -177,7 +177,7 @@ export function MemberFormModal({
 
     setStartDate(todayString());
 
-    setEndDate(calcMonthlyEndDate(todayString(), 1));
+    setEndDate(calcMonthlyEndDateSafe(todayString(), 1));
 
     setPeriodCustom(false);
     setJuniorPeriodCustom(false);
@@ -204,12 +204,10 @@ export function MemberFormModal({
   useEffect(() => {
 
     if (category === "monthly" && startDate && !periodCustom) {
-      if (presetJustSelectedRef.current) {
-        presetJustSelectedRef.current = false;
-        return;
+      const dur = monthlyDuration as MonthlyPresetDuration;
+      if (MONTHLY_PRESET_DURATIONS.includes(dur)) {
+        setEndDate(calcMonthlyEndDateSafe(startDate, dur));
       }
-      setEndDate(calcMonthlyEndDate(startDate, monthlyDuration));
-
     }
 
     if (category === "session" && startDate) {
@@ -308,10 +306,20 @@ export function MemberFormModal({
         return;
       }
 
-      const days = calcDurationDays(startDate, endDate);
-      const approxMonths = Math.round(days / 30);
-      const duration: MonthlyDuration =
-        approxMonths >= 6 ? 6 : approxMonths >= 3 ? 3 : approxMonths >= 2 ? 2 : 1;
+      if (endDate < startDate) {
+        setError("종료일이 시작일보다 빠릅니다. 날짜를 다시 확인해주세요.");
+        setSaving(false);
+        return;
+      }
+
+      let duration: MonthlyDuration;
+      if (!periodCustom && MONTHLY_PRESET_DURATIONS.includes(monthlyDuration as MonthlyPresetDuration)) {
+        duration = monthlyDuration;
+      } else {
+        const days = calcDurationDays(startDate, endDate);
+        const approxMonths = Math.round(days / 30);
+        duration = approxMonths >= 6 ? 6 : approxMonths >= 3 ? 3 : approxMonths >= 2 ? 2 : 1;
+      }
       membershipType = monthlyTypeFromDuration(duration);
 
       resolvedEndDate = endDate;
@@ -603,29 +611,29 @@ export function MemberFormModal({
 
             <div>
 
-              <label className="field-label">월권/기간권 기간</label>
+              <label className="field-label">이용기간 선택</label>
 
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-5 gap-2">
 
-                {PERIOD_DAY_PRESETS.map((days) => (
+                {MONTHLY_PRESET_DURATIONS.map((months) => (
 
                   <button
 
-                    key={days}
+                    key={months}
 
                     type="button"
 
-                    className="btn btn-secondary"
+                    className={`btn ${!periodCustom && monthlyDuration === months ? "btn-primary" : "btn-secondary"}`}
 
                     onClick={() => {
-                      presetJustSelectedRef.current = true;
+                      setMonthlyDuration(months);
                       setPeriodCustom(false);
-                      setEndDate(calcEndDateFromDays(startDate, days));
+                      if (startDate) setEndDate(calcMonthlyEndDateSafe(startDate, months));
                     }}
 
                   >
 
-                    {days}일
+                    {months}개월권
 
                   </button>
 
@@ -647,28 +655,12 @@ export function MemberFormModal({
 
               </div>
 
-              <div className="mt-2 grid gap-2 md:grid-cols-2">
-                <div>
-                  <label className="field-label text-xs">기간 (일)</label>
-                  <input
-                    className="input"
-                    type="number"
-                    min={1}
-                    value={startDate && endDate ? calcDurationDays(startDate, endDate) : ""}
-                    onChange={(e) => {
-                      const days = Math.max(1, Number(e.target.value) || 0);
-                      setPeriodCustom(true);
-                      setEndDate(calcEndDateFromDays(startDate, days));
-                    }}
-                  />
-                </div>
-              </div>
-
-              <p className="mt-2 text-xs text-[var(--muted)]">
-
-                빠른 기간 선택 또는 만료일을 직접 입력할 수 있습니다.
-
-              </p>
+              {startDate && endDate && (
+                <p className={`mt-2 text-sm font-medium ${endDate < startDate ? "text-red-500" : "text-[var(--foreground)]"}`}>
+                  이용기간: {startDate} ~ {endDate}
+                  {endDate < startDate && " (종료일이 시작일보다 빠릅니다)"}
+                </p>
+              )}
 
             </div>
 

@@ -267,6 +267,44 @@ export function calcMonthlyEndDate(startDate: string, months: MonthlyDuration): 
   return calcEndDateFromMonths(startDate, months);
 }
 
+/** Preset durations shown in the monthly membership UI. */
+export const MONTHLY_PRESET_DURATIONS = [1, 2, 3, 6] as const;
+export type MonthlyPresetDuration = (typeof MONTHLY_PRESET_DURATIONS)[number];
+
+/**
+ * Correct monthly end-date calculation for 1/3/6-month presets.
+ *
+ * Rule: start + N months → same day in target month → minus 1 day.
+ * If same day doesn't exist in target month → last day of target month.
+ *
+ * Pure arithmetic — no UTC conversion that could shift the date.
+ */
+export function calcMonthlyEndDateSafe(startDate: string, months: MonthlyPresetDuration): string {
+  const [y, m, d] = startDate.split("-").map(Number);
+
+  const totalMonths = (m - 1) + months;
+  const targetYear = y + Math.floor(totalMonths / 12);
+  const targetMonth = (totalMonths % 12) + 1;
+
+  // Days in target month via UTC (no DST ambiguity)
+  const daysInTarget = new Date(Date.UTC(targetYear, targetMonth, 0)).getUTCDate();
+
+  if (d <= daysInTarget) {
+    // Same day exists → end = day before (d - 1)
+    if (d > 1) return datePad(targetYear, targetMonth, d - 1);
+    // d === 1 → end = last day of previous month
+    const pm = targetMonth === 1 ? 12 : targetMonth - 1;
+    const py = targetMonth === 1 ? targetYear - 1 : targetYear;
+    return datePad(py, pm, new Date(Date.UTC(py, pm, 0)).getUTCDate());
+  }
+  // Same day doesn't exist → last day of target month
+  return datePad(targetYear, targetMonth, daysInTarget);
+}
+
+function datePad(y: number, m: number, d: number): string {
+  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
 export function calcSessionEndDate(startDate: string): string {
   return calcEndDateFromMonths(startDate, SESSION_VALIDITY_MONTHS);
 }

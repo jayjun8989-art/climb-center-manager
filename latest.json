@@ -1,11 +1,11 @@
 {
-    "version": "1.0.105",
-    "pub_date": "2026-09-09T00:00:00Z",
-    "notes": "v1.0.105: 사이드바 회원 통계를 수파베스 기준으로 표시",
+    "version": "1.0.106",
+    "pub_date": "2026-09-11T00:00:00Z",
+    "notes": "v1.0.106: 실시간 대시보드 + 집중케어 관리 기능 추가",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWN6YkIzWkZCWitTbHdvRGJhZ3FzZlQ5bzgzYW51K0dya05RN2lkdHhSdkd1QWkrTUQxNE9SUk9OTkdBcHlVTEY4VTZ2SENWWEpGaFExeEtVNC9LV3dVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4OTMzNTIzCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xMDVfeDY0LXNldHVwLmV4ZQp4SVNwU3VweUhWa25nSGNvck5VTHhUdDF4OU5VeThNa0poTVJtNXpJWTA2RXJmYXRZUXJIMWhPZW13eEtrNis2QVY0cGZ4Vm1zWlA3ZW83WDBtamJDZz09Cg==",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.105/ClimbCenterManager_1.0.105_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWUxanA1aHkyVENUNGFuRDRGNkUxcVNJbHJhQ2hYcEZmSTJJVGtWeHU2QVFKNG9kRUdkYVpkRVZKYnNKYVMya0tSenBNdVRPL1hxWXI4NDcwNGVtZGdnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MTE0MTM3CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xMDZfeDY0LXNldHVwLmV4ZQp4WXFRR2hOQXJSbXM1cUY3QTRyb0lsMFdYV3FZdWFaTTVMVmxrNHp5UURqL3ptRVUxNlh3WkxXYy9pcVg4WXdGeXhEUk1wYjVndkt2YzYrZmlQc2hEdz09Cg==",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.106/ClimbCenterManager_1.0.106_x64-setup.exe"
         }
     }
 }

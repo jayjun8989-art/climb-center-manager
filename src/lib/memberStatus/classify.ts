@@ -31,8 +31,15 @@ export function isPausedMember(member: MemberListItem): boolean {
   return member.status === "paused" || member.membership_status === "paused";
 }
 
-/** Active/paused membership row is absent from the local join. */
+/** Active/paused membership row is absent — works for both local and Supabase-direct paths.
+ *  membership_status is null only when computeMemberStatus found no membership at all.
+ *  Fall back to membership_id check for legacy local-only rows.
+ */
 export function hasNoMembership(member: MemberListItem): boolean {
+  // membership_status is null ↔ truly no membership (both paths agree)
+  if (member.membership_status !== null && member.membership_status !== undefined) return false;
+  // display_status set by Supabase path: if not "회원권없음", a membership exists
+  if (member.display_status && member.display_status !== "회원권없음") return false;
   return member.membership_id == null;
 }
 
