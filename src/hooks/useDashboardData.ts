@@ -1,89 +1,93 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Center } from "../types";
 import {
   fetchActiveMemberCounts,
-  fetchWeeklyStats,
-  fetchMonthlyTrend,
   fetchCenterGoals,
-  fetchCarePriority,
+  fetchFocusCareMembers,
+  fetchMonthlyTrend,
+  fetchWeeklyExpiredMembers,
+  fetchWeeklyNewMembers,
+  getSeoulWeekBounds,
   type ActiveMemberCounts,
-  type WeeklyStats,
+  type CenterGoal,
+  type FocusCareMember,
   type MonthlyTrendItem,
-  type CareGoal,
-  type CarePriorityMember,
+  type WeeklyMember,
 } from "../lib/supabase/dashboard";
-import { isSupabaseConfigured } from "../lib/supabase/config";
+import type { Center } from "../types";
 
 export interface DashboardData {
-  counts: ActiveMemberCounts | null;
-  weekly: WeeklyStats | null;
-  trend: MonthlyTrendItem[];
-  goals: CareGoal | null;
-  care: CarePriorityMember[];
-  loading: boolean;
-  error: string | null;
+  counts:         ActiveMemberCounts | null;
+  weeklyNew:      WeeklyMember[];
+  weeklyExpired:  WeeklyMember[];
+  trend:          MonthlyTrendItem[];
+  goals:          CenterGoal | null;
+  care:           FocusCareMember[];
+  weekStart:      string;
+  weekEnd:        string;
+  weekOffset:     number;
+  loading:        boolean;
+  error:          string | null;
   lastRefreshedAt: Date | null;
+  refresh:        () => Promise<void>;
+  setWeekOffset:  (offset: number) => void;
 }
 
-function getWeekBounds(): { weekStart: string; weekEnd: string } {
-  const now = new Date();
-  const day = now.getDay(); // 0=Sun
-  const diffToMon = (day === 0 ? -6 : 1 - day);
-  const mon = new Date(now);
-  mon.setDate(now.getDate() + diffToMon);
-  const sun = new Date(mon);
-  sun.setDate(mon.getDate() + 6);
-  const fmt = (d: Date) => d.toISOString().slice(0, 10);
-  return { weekStart: fmt(mon), weekEnd: fmt(sun) };
-}
-
-export function useDashboardData(center: Center, enabled: boolean): DashboardData & { refresh: () => void } {
-  const [counts, setCounts] = useState<ActiveMemberCounts | null>(null);
-  const [weekly, setWeekly] = useState<WeeklyStats | null>(null);
-  const [trend, setTrend] = useState<MonthlyTrendItem[]>([]);
-  const [goals, setGoals] = useState<CareGoal | null>(null);
-  const [care, setCare] = useState<CarePriorityMember[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export function useDashboardData(center: Center, enabled: boolean): DashboardData {
+  const [counts,        setCounts]        = useState<ActiveMemberCounts | null>(null);
+  const [weeklyNew,     setWeeklyNew]     = useState<WeeklyMember[]>([]);
+  const [weeklyExpired, setWeeklyExpired] = useState<WeeklyMember[]>([]);
+  const [trend,         setTrend]         = useState<MonthlyTrendItem[]>([]);
+  const [goals,         setGoals]         = useState<CenterGoal | null>(null);
+  const [care,          setCare]          = useState<FocusCareMember[]>([]);
+  const [weekOffset,    setWeekOffset]    = useState(0);
+  const [loading,       setLoading]       = useState(false);
+  const [error,         setError]         = useState<string | null>(null);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const load = useCallback(async () => {
-    if (!enabled || !isSupabaseConfigured()) return;
+  const { weekStart, weekEnd } = getSeoulWeekBounds(weekOffset);
+
+  const refresh = useCallback(async () => {
+    if (!enabled) return;
     abortRef.current?.abort();
-    const ctrl = new AbortController();
-    abortRef.current = ctrl;
+    abortRef.current = new AbortController();
 
     setLoading(true);
     setError(null);
     try {
-      const { weekStart, weekEnd } = getWeekBounds();
-      const [c, w, t, g, p] = await Promise.all([
+      const [c, wn, we, tr, g, ca] = await Promise.all([
         fetchActiveMemberCounts(center),
-        fetchWeeklyStats(center, weekStart, weekEnd),
+        fetchWeeklyNewMembers(center, weekStart, weekEnd),
+        fetchWeeklyExpiredMembers(center, weekStart, weekEnd),
         fetchMonthlyTrend(center, 6),
         fetchCenterGoals(center),
-        fetchCarePriority(center, 10),
+        fetchFocusCareMembers(center, 50),
       ]);
-      if (ctrl.signal.aborted) return;
       setCounts(c);
-      setWeekly(w);
-      setTrend(t);
+      setWeeklyNew(wn);
+      setWeeklyExpired(we);
+      setTrend(tr);
       setGoals(g);
-      setCare(p);
+      setCare(ca);
       setLastRefreshedAt(new Date());
-    } catch (err) {
-      if (ctrl.signal.aborted) return;
-      setError(err instanceof Error ? err.message : String(err));
+    } catch (e) {
+      if ((e as Error).name !== "AbortError") {
+        setError((e as Error).message);
+      }
     } finally {
-      if (!ctrl.signal.aborted) setLoading(false);
+      setLoading(false);
     }
-  }, [center, enabled]);
+  }, [enabled, center, weekStart, weekEnd]);
 
   useEffect(() => {
-    void load();
-    return () => abortRef.current?.abort();
-  }, [load]);
+    void refresh();
+  }, [refresh]);
 
-  return { counts, weekly, trend, goals, care, loading, error, lastRefreshedAt, refresh: load };
+  return {
+    counts, weeklyNew, weeklyExpired, trend, goals, care,
+    weekStart, weekEnd, weekOffset,
+    loading, error, lastRefreshedAt,
+    refresh,
+    setWeekOffset,
+  };
 }

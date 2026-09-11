@@ -1,11 +1,11 @@
 {
-    "version": "1.0.107",
+    "version": "1.0.108",
     "pub_date": "2026-09-11T00:00:00Z",
-    "notes": "v1.0.107: 동기화 내구성 강화 — client_mutation_id 멱등성, 지수 백오프 재시도, 네트워크 복구 자동 플러시, atomic pause/resume RPC, SyncStatusBar 4가지 상태 표시",
+    "notes": "v1.0.108: 대시보드 집계 완전 수정 — 성인 유효회원 정상 표시, 이번 주 신규/만료 명단 일치, 집중케어 관리자 지정, 목표 달성률 분리",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVVoZEJwYlJ2VUdCOEttT1FZRjZOZFp5MHpTQWloOHRLazhNTHViZGxqc1VndWNrVENxTnI2OUNvZlJpWFh4YnVrb3RGQ2pWUjdPOEZXaGJrZlp5akFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MTE1NDM3CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xMDdfeDY0LXNldHVwLmV4ZQpMaC92eTY2bS9IK3pqb3BCclUzY3pHU1RCcnVxUlMrbGVjNzNIYS8yUlRCT2o5QzV6YVpXUEVHa05vVHRydWIvZEJQWkZJeVNxZ0VnOTR2eWVBcWpEZz09Cg==",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.107/ClimbCenterManager_1.0.107_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVRLcVNlMUlDWGRySCt1TE1xcXpzbGFOcklpRUw4eHdsbWdvM3JZK3hiRkp1OGE2eWRnSFlVUHBPVkgvWElGYnVxNk42Sm5Wdm8yaklOSHRXcUg0OFFjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MTE3NzgzCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xMDhfeDY0LXNldHVwLmV4ZQorSjdrQVRVODQ1clBwemxxSWI2VHlKUVhlN3Y5YzhLTUZWd2xpTHlsZCtVVUorU0RXLy85M0FpeVlBb2ZXaTluNktIa2wyT09PN0Y5clR2b0R2V1NBUT09Cg==",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.108/ClimbCenterManager_1.0.108_x64-setup.exe"
         }
     }
 }
