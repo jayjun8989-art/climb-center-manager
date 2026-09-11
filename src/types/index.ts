@@ -95,6 +95,7 @@ export interface MemberListItem {
   pause_start_date?: string | null;
   member_no?: number | null;
   remote_id?: string | null;
+  is_focus_care?: boolean;
   created_at: string;
   updated_at: string;
 }

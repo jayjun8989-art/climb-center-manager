@@ -1,5 +1,5 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { CalendarCheck2, Pencil, Trash2 } from "lucide-react";
+import { CalendarCheck2, Heart, Pencil, Trash2 } from "lucide-react";
 import { useRef } from "react";
 import type { MemberGroupFilter, MemberListItem, PermissionSet } from "../types";
 import {
@@ -25,6 +25,7 @@ interface MemberListProps {
   onEdit: (member: MemberListItem) => void;
   onDelete: (member: MemberListItem) => void;
   onAttendance: (member: MemberListItem) => void;
+  onToggleFocusCare?: (member: MemberListItem) => void;
   permissions: PermissionSet;
 }
 
@@ -37,6 +38,7 @@ export function MemberList({
   onEdit,
   onDelete,
   onAttendance,
+  onToggleFocusCare,
   permissions,
 }: MemberListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
@@ -167,6 +169,18 @@ export function MemberList({
                     </>
                   )}
                   <div className="flex justify-end gap-2">
+                    {onToggleFocusCare && permissions.canEditMember && !isInactiveView && (
+                      <button
+                        className={`btn !px-3 !py-2 ${member.is_focus_care ? "btn-primary" : "btn-secondary"}`}
+                        title={member.is_focus_care ? "집중케어 해제" : "집중케어 지정"}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onToggleFocusCare(member);
+                        }}
+                      >
+                        <Heart size={15} fill={member.is_focus_care ? "currentColor" : "none"} />
+                      </button>
+                    )}
                     <button
                       className="btn btn-secondary !px-3 !py-2"
                       disabled={!permissions.canCheckAttendance}

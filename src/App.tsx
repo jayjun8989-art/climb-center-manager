@@ -4,7 +4,6 @@ import { api, isTauriApp } from "./api/client";
 import { AttendanceCheckPanel } from "./components/AttendanceCheckPanel";
 import { MemberStatusPanel } from "./components/MemberStatusPanel";
 import { Header } from "./components/Header";
-import { LockerManagementPanel } from "./components/LockerManagementPanel";
 import { LoginScreen } from "./components/LoginScreen";
 import { SelfCheckinPanel } from "./components/SelfCheckinPanel";
 import { MemberRosterPanel } from "./components/MemberRosterPanel";
@@ -34,14 +33,13 @@ import {
 import { normalizeCenterLoginId } from "./lib/supabase/credentials";
 import { fetchMyCenterRoles } from "./lib/supabase/roles";
 import { resolveCenterIdsForCenters } from "./lib/supabase/centers";
+import { setFocusCare } from "./lib/supabase/dashboard";
 import { checkForUpdate } from "./lib/updater";
 import { formatAppError, logAppError } from "./utils/errors";
 import { memberMatchesGroupFilter, resolveMemberLocalId } from "./utils/member";
 import type {
   Center,
   DashboardStats,
-  LockerFilter,
-  LockerListItem,
   MemberGroupFilter,
   MemberInput,
   MemberListItem,
@@ -84,10 +82,6 @@ export default function App() {
   const [attendanceSearch, setAttendanceSearch] = useState("");
   const [attendanceCheckinDate, setAttendanceCheckinDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [membershipSearch, setMembershipSearch] = useState("");
-  const [lockerSearch, setLockerSearch] = useState("");
-  const [lockerFilter, setLockerFilter] = useState<LockerFilter>("all");
-  const [lockers, setLockers] = useState<LockerListItem[]>([]);
-  const [lockersLoading, setLockersLoading] = useState(false);
   const [memberGroup, setMemberGroup] = useState<MemberGroupFilter>("all");
   const [statusFilter, setStatusFilter] = useState<MemberStatusFilter>("all");
   const [search, setSearch] = useState("");
@@ -236,22 +230,6 @@ export default function App() {
     setPage(1);
   }, [center, debouncedSearch, memberGroup, statusFilter, pageSize]);
 
-  const refreshLockers = useCallback(async () => {
-    if (!permissions.canManageLocker) {
-      setLockers([]);
-      return;
-    }
-    setLockersLoading(true);
-    try {
-      const items = await api.listLockers(center);
-      setLockers(items);
-    } catch (error) {
-      setToast(formatAppError(error));
-    } finally {
-      setLockersLoading(false);
-    }
-  }, [center, permissions.canManageLocker]);
-
   useEffect(() => {
     refreshMembers().catch((error) => setToast(String(error)));
   }, [refreshMembers]);
@@ -260,11 +238,10 @@ export default function App() {
     const onPullComplete = () => {
       refreshMembers().catch(() => undefined);
       refreshDashboard().catch(() => undefined);
-      refreshLockers().catch(() => undefined);
     };
     window.addEventListener("climb-sync-pull-complete", onPullComplete);
     return () => window.removeEventListener("climb-sync-pull-complete", onPullComplete);
-  }, [refreshMembers, refreshDashboard, refreshLockers]);
+  }, [refreshMembers, refreshDashboard]);
 
   useEffect(() => {
     const onSupabaseError = (e: Event) => {
@@ -274,11 +251,6 @@ export default function App() {
     return () => window.removeEventListener("climb-supabase-error", onSupabaseError);
   }, []);
 
-  useEffect(() => {
-    if (activeView === "lockers") {
-      refreshLockers().catch((error) => setToast(String(error)));
-    }
-  }, [activeView, refreshLockers]);
 
   useEffect(() => {
     refreshDashboard().catch((error) => setToast(String(error)));
@@ -339,43 +311,6 @@ export default function App() {
     [members, debouncedMembershipSearch, filterMembersByQuery],
   );
 
-  async function openMemberById(memberId: number) {
-    setActiveView("members");
-    const found = members.find((m) => m.id === memberId);
-    if (found) {
-      setSelectedMember(found);
-      return;
-    }
-    try {
-      const detail = await api.getMemberDetail(memberId);
-      const ms = detail.active_membership;
-      setSelectedMember({
-        id: detail.member.id,
-        name: detail.member.name,
-        phone: detail.member.phone,
-        member_type: detail.member.member_type,
-        center: detail.member.center,
-        memo: detail.member.memo,
-        status: detail.member.status,
-        membership_id: ms?.id ?? null,
-        membership_type: ms?.membership_type ?? null,
-        pass_type: ms?.pass_type ?? null,
-        start_date: ms?.start_date ?? null,
-        end_date: ms?.end_date ?? null,
-        total_count: ms?.total_count ?? null,
-        remaining_count: ms?.remaining_count ?? null,
-        membership_status: ms?.status ?? null,
-        display_status: detail.member.status,
-        remaining_text: "",
-        last_visit_at: detail.attendance[0]?.checkin_at ?? null,
-        pause_remaining_days: null,
-        created_at: detail.member.created_at,
-        updated_at: detail.member.updated_at,
-      });
-    } catch {
-      setToast("회원 정보를 불러오지 못했습니다.");
-    }
-  }
 
   async function handleSaveMember(input: MemberInput) {
     try {
@@ -820,6 +755,22 @@ export default function App() {
                   const updated = await handleAttendance(member);
                   if (updated) setToast(`${updated.name}님 출석 완료`);
                 }}
+                onToggleFocusCare={async (member) => {
+                  if (!member.remote_id) {
+                    setToast("동기화 후 이용 가능합니다.");
+                    return;
+                  }
+                  const newVal = !member.is_focus_care;
+                  const result = await setFocusCare(member.remote_id, newVal, center);
+                  if (!result.ok) {
+                    setToast(result.error ?? "집중케어 변경 실패");
+                    return;
+                  }
+                  setMembers((prev) =>
+                    prev.map((m) => m.id === member.id ? { ...m, is_focus_care: newVal } : m)
+                  );
+                  setToast(newVal ? `${member.name}님 집중케어 지정` : `${member.name}님 집중케어 해제`);
+                }}
               />
               <PaginationBar
                 page={page}
@@ -915,19 +866,6 @@ export default function App() {
           </div>
         )}
 
-        {activeView === "lockers" && permissions.canManageLocker && (
-          <LockerManagementPanel
-            lockers={lockers}
-            loading={lockersLoading}
-            filter={lockerFilter}
-            onFilterChange={setLockerFilter}
-            search={lockerSearch}
-            onSearch={setLockerSearch}
-            onLockerClick={(memberId) => {
-              openMemberById(memberId).catch((error) => setToast(String(error)));
-            }}
-          />
-        )}
 
         {activeView === "roster" && permissions.canViewRoster && (
           <MemberRosterPanel

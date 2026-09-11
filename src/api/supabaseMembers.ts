@@ -36,6 +36,7 @@ interface SupabaseMember {
   address: string | null;
   status: string;
   member_no: number | null;
+  is_focus_care: boolean | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -268,7 +269,7 @@ export async function fetchSupabaseMemberList(params: {
   const { data: rawMembers, error: membersError } = await supabase
     .from("members")
     .select(
-      "id, center_id, name, phone, member_type, parent_name, parent_phone, memo, address, status, member_no, created_at, updated_at, deleted_at",
+      "id, center_id, name, phone, member_type, parent_name, parent_phone, memo, address, status, member_no, is_focus_care, created_at, updated_at, deleted_at",
     )
     .eq("center_id", centerId)
     .is("deleted_at", null)
@@ -347,6 +348,7 @@ export async function fetchSupabaseMemberList(params: {
       pause_remaining_days: null,
       member_no: m.member_no,
       remote_id: m.id,
+      is_focus_care: m.is_focus_care ?? false,
       created_at: m.created_at,
       updated_at: m.updated_at,
     };
