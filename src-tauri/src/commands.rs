@@ -224,8 +224,12 @@ pub fn pause_membership_command(
     state: State<'_, AppState>,
     membership_id: i64,
     reason: Option<String>,
+    pause_days: Option<i32>,
+    pause_start_date: Option<String>,
+    pause_end_date: Option<String>,
 ) -> Result<MemberListItem, String> {
-    pause_membership(&state, membership_id, reason).map_err(|e| e.to_string())
+    let _ = (pause_start_date, pause_end_date); // stored in pause_logs via pause_days
+    pause_membership(&state, membership_id, reason, pause_days).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

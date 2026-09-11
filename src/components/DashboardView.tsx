@@ -240,14 +240,15 @@ export function DashboardView({ center, isAuthenticated, permissions, onNotify }
   const enabled = isAuthenticated && isSupabaseConfigured();
   const isAdmin = permissions.role === "owner" || permissions.role === "admin";
   const {
-    counts, weeklyNew, weeklyExpired, trend, goals, care,
+    counts, weeklyNew, weeklyReturning, weeklyExpired, trend, goals, care,
     weekStart, weekEnd, weekOffset,
     loading, error, lastRefreshedAt,
     refresh, setWeekOffset,
   } = useDashboardData(center, enabled);
 
   const [centerId, setCenterId] = useState<string | null>(null);
-  const [showNewList,     setShowNewList]     = useState(false);
+  const [showNewList,       setShowNewList]       = useState(false);
+  const [showReturningList, setShowReturningList] = useState(false);
   const [showExpiredList, setShowExpiredList] = useState(false);
   const [careModal,       setCareModal]       = useState<FocusCareMember | null>(null);
   const [editingGoal,     setEditingGoal]     = useState(false);
@@ -269,8 +270,6 @@ export function DashboardView({ center, isAuthenticated, permissions, onNotify }
   });
 
   // Derived counts
-  const newAdult   = weeklyNew.filter((m) => m.member_type === "regular").length;
-  const newJunior  = weeklyNew.filter((m) => m.member_type === "junior").length;
   const expAdult   = weeklyExpired.filter((m) => m.member_type === "regular").length;
   const expJunior  = weeklyExpired.filter((m) => m.member_type === "junior").length;
   const careAdult  = care.filter((m) => m.member_type === "regular").length;
@@ -401,7 +400,34 @@ export function DashboardView({ center, isAuthenticated, permissions, onNotify }
             <>
               <p className="text-3xl font-bold tabular-nums text-emerald-600">{weeklyNew.length}</p>
               <p className="mt-1 text-xs text-[var(--muted)]">
-                성인 {newAdult} · 주니어 {newJunior}
+                성인 {weeklyNew.filter((m) => m.member_type === "regular").length} · 주니어 {weeklyNew.filter((m) => m.member_type === "junior").length}
+              </p>
+            </>
+          )}
+        </button>
+
+        {/* 재등록 */}
+        <button
+          type="button"
+          className="glass-panel rounded-[1.5rem] p-5 text-left hover:border-teal-500/30 transition-colors"
+          onClick={() => setShowReturningList(true)}
+          disabled={loading}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2 text-xs font-medium text-[var(--muted)]">
+              <UserPlus size={14} />이번 주 재등록
+            </div>
+            <span className="rounded-xl p-1.5 bg-teal-500/15 text-teal-500">
+              <UserPlus size={14} />
+            </span>
+          </div>
+          {loading ? (
+            <div className="h-8 animate-pulse rounded-lg bg-[var(--border)]" />
+          ) : (
+            <>
+              <p className="text-3xl font-bold tabular-nums text-teal-600">{weeklyReturning.length}</p>
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                성인 {weeklyReturning.filter((m) => m.member_type === "regular").length} · 주니어 {weeklyReturning.filter((m) => m.member_type === "junior").length}
               </p>
             </>
           )}
@@ -679,6 +705,13 @@ export function DashboardView({ center, isAuthenticated, permissions, onNotify }
           title={`이번 주 신규 ${weeklyNew.length}명 · ${weekRangeLabel(weekStart, weekEnd)}`}
           members={weeklyNew}
           onClose={() => setShowNewList(false)}
+        />
+      )}
+      {showReturningList && (
+        <MemberListModal
+          title={`이번 주 재등록 ${weeklyReturning.length}명 · ${weekRangeLabel(weekStart, weekEnd)}`}
+          members={weeklyReturning}
+          onClose={() => setShowReturningList(false)}
         />
       )}
       {showExpiredList && (

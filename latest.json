@@ -1,11 +1,11 @@
 {
-    "version": "1.0.111",
+    "version": "1.0.112",
     "pub_date": "2026-09-11T00:00:00Z",
-    "notes": "v1.0.111: 회원 수정 오류 수정(member_type 'general'→'regular'), 정지 두 가지 방식 MemberDetailPanel 적용",
+    "notes": "v1.0.112: 정지 즉시 만료일 연장, 대시보드 이번 주 신규/재등록 분리",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVhWb0szWXI3dzZvVnMwVFhmYlhwVldsb3kvQnkwQ3pnTXkrbWRENi9sTUo4S2RZOFNtWVoxWmM2Y1F6WE5KcmNGQVRxSU53WU5EcnA0MWRGbEZLZWdrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MTIwMjM1CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xMTFfeDY0LXNldHVwLmV4ZQpjNnc2WkJUbTdrRmtOaW9PYlBRQ1V5MlNxZWtDbXhESkM3ZmhQYzZVMXh2U1hiYzZNZkFNVitwVWowNE96ck04QmFXbkswQXVVNitqejNUNTA1Q0FEZz09Cg==",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.111/ClimbCenterManager_1.0.111_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVRiYkJFV2dTbHNjbDZNVGRtdXdUaUp2akFkaUpSREVHRzdGTGg3SFE5RC80eFplcloxNVM2MTh3TVk3elFNbWhxaEY4TnB1LzJNSEM0RWdweE1xK2dnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MTIxMzAwCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xMTJfeDY0LXNldHVwLmV4ZQpnNVppNlM1VE5mYkNSZkhrd29ZcmlMWVEzbnh3eXNDMmhJV2U0ZURnWVlsYkJvVzBiRGRvNHp3SWJUVnpkTExQM2lmdjQ1cFB1MFlqNWxCTXU4b2dDZz09Cg==",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.112/ClimbCenterManager_1.0.112_x64-setup.exe"
         }
     }
 }

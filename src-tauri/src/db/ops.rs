@@ -1548,13 +1548,14 @@ pub fn pause_membership(
     state: &AppState,
     membership_id: i64,
     reason: Option<String>,
+    pause_days: Option<i32>,
 ) -> Result<MemberListItem, DbError> {
     let (member_id, _center) = state.with_conn(|conn| {
         let now = now_string();
         let today = today_string();
         let tx = conn.transaction()?;
 
-        let (member_id, pass_type, end_date, _remaining_count, center): (
+        let (member_id, _pass_type, end_date, _remaining_count, center): (
             i64,
             String,
             Option<String>,
@@ -1569,19 +1570,35 @@ pub fn pause_membership(
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
         )?;
 
-        let remaining_days = if pass_type == "period" {
-            end_date
-                .as_ref()
-                .and_then(|value| status::parse_date(value))
-                .map(|end| (end - today_date()).num_days() as i32)
+        // pause_days가 있으면 end_date를 즉시 연장, 없으면 기존 잔여일수 방식
+        let days_to_store = pause_days;
+        if let Some(days) = pause_days {
+            if let Some(ref ed) = end_date {
+                if let Some(parsed) = status::parse_date(ed) {
+                    let new_end = parsed + chrono::Duration::days(days as i64);
+                    tx.execute(
+                        "UPDATE memberships SET end_date = ?1, status = 'paused', updated_at = ?2 WHERE id = ?3",
+                        params![new_end.format("%Y-%m-%d").to_string(), now, membership_id],
+                    )?;
+                } else {
+                    tx.execute(
+                        "UPDATE memberships SET status = 'paused', updated_at = ?1 WHERE id = ?2",
+                        params![now, membership_id],
+                    )?;
+                }
+            } else {
+                tx.execute(
+                    "UPDATE memberships SET status = 'paused', updated_at = ?1 WHERE id = ?2",
+                    params![now, membership_id],
+                )?;
+            }
         } else {
-            None
-        };
+            tx.execute(
+                "UPDATE memberships SET status = 'paused', updated_at = ?1 WHERE id = ?2",
+                params![now, membership_id],
+            )?;
+        }
 
-        tx.execute(
-            "UPDATE memberships SET status = 'paused', updated_at = ?1 WHERE id = ?2",
-            params![now, membership_id],
-        )?;
         tx.execute(
             "UPDATE members SET status = 'paused', updated_at = ?1 WHERE id = ?2",
             params![now, member_id],
@@ -1591,7 +1608,7 @@ pub fn pause_membership(
                 member_id, membership_id, pause_start_date, pause_end_date,
                 remaining_days_at_pause, reason, created_at, updated_at
              ) VALUES (?1, ?2, ?3, NULL, ?4, ?5, ?6, ?6)",
-            params![member_id, membership_id, today, remaining_days, reason, now],
+            params![member_id, membership_id, today, days_to_store, reason, now],
         )?;
 
         tx.commit()?;
@@ -1610,30 +1627,21 @@ pub fn resume_membership(
     state: &AppState,
     membership_id: i64,
 ) -> Result<MemberListItem, DbError> {
-    let (member_id, _center, remaining_days) = state.with_conn(|conn| {
+    let (member_id, _center) = state.with_conn(|conn| {
         let now = now_string();
         let today = today_string();
         let tx = conn.transaction()?;
 
-        let (member_id, center, remaining_days): (i64, String, Option<i32>) = tx.query_row(
-            "SELECT m.id, m.center, pl.remaining_days_at_pause
+        let (member_id, center): (i64, String) = tx.query_row(
+            "SELECT m.id, m.center
              FROM memberships ms
              INNER JOIN members m ON m.id = ms.member_id
-             LEFT JOIN pause_logs pl ON pl.membership_id = ms.id AND pl.pause_end_date IS NULL
-             WHERE ms.id = ?1 AND ms.status = 'paused' AND m.deleted_at IS NULL
-             ORDER BY pl.id DESC LIMIT 1",
+             WHERE ms.id = ?1 AND ms.status = 'paused' AND m.deleted_at IS NULL",
             params![membership_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )?;
 
-        if let Some(days) = remaining_days {
-            let new_end = today_date() + chrono::Duration::days(days as i64);
-            tx.execute(
-                "UPDATE memberships SET end_date = ?1 WHERE id = ?2",
-                params![new_end.format("%Y-%m-%d").to_string(), membership_id],
-            )?;
-        }
-
+        // end_date는 정지 시점에 이미 연장됐으므로 재개 시 변경하지 않음
         tx.execute(
             "UPDATE pause_logs SET pause_end_date = ?1, updated_at = ?2
              WHERE membership_id = ?3 AND pause_end_date IS NULL",
@@ -1649,10 +1657,8 @@ pub fn resume_membership(
         )?;
 
         tx.commit()?;
-        Ok((member_id, center, remaining_days))
+        Ok((member_id, center))
     })?;
-
-    let _ = remaining_days;
 
     if let Ok(payload) = crate::db::sync_local::build_member_sync_payload_json(state, member_id) {
         let _ = crate::db::sync_local::enqueue_sync_item(state, "member", member_id, "update", &payload);
