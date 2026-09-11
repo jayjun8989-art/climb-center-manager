@@ -137,7 +137,7 @@ export function PauseModal({ memberName, onConfirm, onClose }: PauseModalProps) 
 
           {valid && (
             <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 px-4 py-2.5 text-xs text-amber-600 dark:text-amber-400">
-              {pauseDays}일 정지 · 재개 시 만료일이 {pauseDays}일 연장됩니다
+              {pauseDays}일 정지 · 정지 즉시 만료일이 {pauseDays}일 연장됩니다
             </div>
           )}
 

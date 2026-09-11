@@ -78,7 +78,7 @@ pub fn display_badge(
 ) -> String {
     if member_status == "paused" || membership_status == "paused" {
         if let Some(days) = pause_remaining_days {
-            return format!("\u{c815}\u{c9c0}\u{c911} / \u{b09a}\u{c740}\u{ae30}\u{ac04} {days}\u{c77c}");
+            return format!("정지중 / 남은기간 {days}일");
         }
         return "\u{c815}\u{c9c0}\u{c911}".to_string();
     }

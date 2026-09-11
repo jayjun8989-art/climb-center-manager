@@ -404,12 +404,27 @@ export default function App() {
           .update({ deleted_at: now, status: "inactive", updated_at: now })
           .eq("id", member.remote_id);
         if (error) throw new Error(error.message);
+        // memberships도 비활성화
+        await supabase
+          .from("memberships")
+          .update({ status: "cancelled", updated_at: now })
+          .eq("member_id", member.remote_id)
+          .in("status", ["active", "paused"]);
         if (selectedMember?.id === member.id) setSelectedMember(null);
         setToast("회원이 삭제되었습니다.");
       } else {
         const result = await api.removeMember(member.id);
         if (selectedMember?.id === member.id) setSelectedMember(null);
         showMutationToast(setToast, "회원이 삭제되었습니다.", result);
+        // Supabase에도 즉시 soft-delete (refreshMembers가 Supabase에서 가져오므로)
+        if (member.remote_id) {
+          const supabase = (await import("./lib/supabase/client")).getSupabaseClient();
+          if (supabase) {
+            const now2 = new Date().toISOString();
+            await supabase.from("members").update({ deleted_at: now2, status: "inactive", updated_at: now2 }).eq("id", member.remote_id);
+            await supabase.from("memberships").update({ status: "cancelled", updated_at: now2 }).eq("member_id", member.remote_id).in("status", ["active", "paused"]);
+          }
+        }
         sync.syncNow().catch(() => undefined);
       }
       await Promise.all([refreshMembers(), refreshDashboard(), refreshBackupInfo()]);
