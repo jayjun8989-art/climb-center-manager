@@ -14,6 +14,7 @@ import type { PullRunResult, SyncPhase, SyncRunResult, SyncStatus } from "../syn
 
 const SYNC_INTERVAL_MS = 60_000;
 const PULL_INTERVAL_MS = 60_000; // 1분마다 자동 pull
+const BACKOFF_MAX_MS = 5 * 60_000; // 최대 5분 백오프
 
 export function useSync(enabled: boolean, syncContext: SyncErrorContext, centerIds?: string[]) {
   const [configured] = useState(isSupabaseConfigured());
@@ -24,6 +25,7 @@ export function useSync(enabled: boolean, syncContext: SyncErrorContext, centerI
   const [lastPullResult, setLastPullResult] = useState<PullRunResult | null>(null);
   const runningRef = useRef(false);
   const autoPullAttemptedRef = useRef(false);
+  const backoffMsRef = useRef(5_000); // 재시도 초기 간격 5초
   const syncContextRef = useRef(syncContext);
   syncContextRef.current = syncContext;
 
@@ -52,7 +54,18 @@ export function useSync(enabled: boolean, syncContext: SyncErrorContext, centerI
     try {
       const result = await pushSyncQueue(syncContextRef.current);
       setLastResult(result);
-      setPhase(result.failed > 0 ? "error" : "idle");
+      if (result.failed > 0) {
+        setPhase("error");
+        // 지수 백오프 재시도 (대기열 삭제 없이)
+        const delay = backoffMsRef.current;
+        backoffMsRef.current = Math.min(delay * 2, BACKOFF_MAX_MS);
+        window.setTimeout(() => {
+          if (enabled && !runningRef.current) syncNow().catch(() => undefined);
+        }, delay);
+      } else {
+        setPhase("idle");
+        backoffMsRef.current = 5_000;
+      }
       await refreshStatus();
       return result;
     } catch (error) {
@@ -66,6 +79,12 @@ export function useSync(enabled: boolean, syncContext: SyncErrorContext, centerI
       };
       setLastResult(result);
       setPhase("error");
+      // 네트워크 오류: 백오프 재시도
+      const delay = backoffMsRef.current;
+      backoffMsRef.current = Math.min(delay * 2, BACKOFF_MAX_MS);
+      window.setTimeout(() => {
+        if (enabled && !runningRef.current) syncNow().catch(() => undefined);
+      }, delay);
       return result;
     } finally {
       runningRef.current = false;
@@ -153,10 +172,29 @@ export function useSync(enabled: boolean, syncContext: SyncErrorContext, centerI
     };
     window.addEventListener("climb-sync-push-now", onPushNow);
 
+    // 네트워크 복구 감지 → 즉시 큐 플러시 + pull
+    const onOnline = () => {
+      backoffMsRef.current = 5_000; // 백오프 리셋
+      if (!enabled || runningRef.current) return;
+      void refreshStatus().then(({ nextStatus }) => {
+        if ((nextStatus.pending_count ?? 0) > 0) {
+          syncNow().catch(() => undefined);
+        }
+        // Realtime 복구 후 누락 데이터 재조회
+        pullNow({ centerIds }).then((result) => {
+          if (result && (result.importedMembers > 0 || result.updatedMembers > 0)) {
+            window.dispatchEvent(new CustomEvent("climb-sync-pull-complete"));
+          }
+        }).catch(() => undefined);
+      });
+    };
+    window.addEventListener("online", onOnline);
+
     return () => {
       window.clearInterval(pushTimer);
       window.clearInterval(pullTimer);
       window.removeEventListener("climb-sync-push-now", onPushNow);
+      window.removeEventListener("online", onOnline);
     };
   }, [enabled, refreshStatus, syncNow, pullNow, centerIds]);
 
