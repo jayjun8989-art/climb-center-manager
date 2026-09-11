@@ -377,29 +377,29 @@ export function DashboardView({ center, isAuthenticated, permissions, onNotify }
         )}
       </div>
 
-      {/* ── 2+3. 이번 주 신규 / 만료 ──────────────────────── */}
-      <div className="grid grid-cols-2 gap-4">
+      {/* ── 2+3+4. 이번 주 신규 / 재등록 / 만료 ─ 한 줄 3칸 ─── */}
+      <div className="grid grid-cols-3 gap-3">
         {/* 신규 */}
         <button
           type="button"
-          className="glass-panel rounded-[1.5rem] p-5 text-left hover:border-emerald-500/30 transition-colors"
+          className="glass-panel rounded-[1.5rem] p-4 text-left hover:border-emerald-500/30 transition-colors"
           onClick={() => setShowNewList(true)}
           disabled={loading}
         >
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2 text-xs font-medium text-[var(--muted)]">
-              <UserPlus size={14} />이번 주 신규
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--muted)]">
+              <UserPlus size={12} />신규
             </div>
-            <span className="rounded-xl p-1.5 bg-emerald-500/15 text-emerald-500">
-              <UserPlus size={14} />
+            <span className="rounded-lg p-1 bg-emerald-500/15 text-emerald-500">
+              <UserPlus size={12} />
             </span>
           </div>
           {loading ? (
-            <div className="h-8 animate-pulse rounded-lg bg-[var(--border)]" />
+            <div className="h-7 animate-pulse rounded-lg bg-[var(--border)]" />
           ) : (
             <>
-              <p className="text-3xl font-bold tabular-nums text-emerald-600">{weeklyNew.length}</p>
-              <p className="mt-1 text-xs text-[var(--muted)]">
+              <p className="text-2xl font-bold tabular-nums text-emerald-600">{weeklyNew.length}</p>
+              <p className="mt-0.5 text-[10px] text-[var(--muted)]">
                 성인 {weeklyNew.filter((m) => m.member_type === "regular").length} · 주니어 {weeklyNew.filter((m) => m.member_type === "junior").length}
               </p>
             </>
@@ -409,24 +409,24 @@ export function DashboardView({ center, isAuthenticated, permissions, onNotify }
         {/* 재등록 */}
         <button
           type="button"
-          className="glass-panel rounded-[1.5rem] p-5 text-left hover:border-teal-500/30 transition-colors"
+          className="glass-panel rounded-[1.5rem] p-4 text-left hover:border-teal-500/30 transition-colors"
           onClick={() => setShowReturningList(true)}
           disabled={loading}
         >
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2 text-xs font-medium text-[var(--muted)]">
-              <UserPlus size={14} />이번 주 재등록
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--muted)]">
+              <UserPlus size={12} />재등록
             </div>
-            <span className="rounded-xl p-1.5 bg-teal-500/15 text-teal-500">
-              <UserPlus size={14} />
+            <span className="rounded-lg p-1 bg-teal-500/15 text-teal-500">
+              <UserPlus size={12} />
             </span>
           </div>
           {loading ? (
-            <div className="h-8 animate-pulse rounded-lg bg-[var(--border)]" />
+            <div className="h-7 animate-pulse rounded-lg bg-[var(--border)]" />
           ) : (
             <>
-              <p className="text-3xl font-bold tabular-nums text-teal-600">{weeklyReturning.length}</p>
-              <p className="mt-1 text-xs text-[var(--muted)]">
+              <p className="text-2xl font-bold tabular-nums text-teal-600">{weeklyReturning.length}</p>
+              <p className="mt-0.5 text-[10px] text-[var(--muted)]">
                 성인 {weeklyReturning.filter((m) => m.member_type === "regular").length} · 주니어 {weeklyReturning.filter((m) => m.member_type === "junior").length}
               </p>
             </>
@@ -436,24 +436,24 @@ export function DashboardView({ center, isAuthenticated, permissions, onNotify }
         {/* 만료 */}
         <button
           type="button"
-          className="glass-panel rounded-[1.5rem] p-5 text-left hover:border-red-500/30 transition-colors"
+          className="glass-panel rounded-[1.5rem] p-4 text-left hover:border-red-500/30 transition-colors"
           onClick={() => setShowExpiredList(true)}
           disabled={loading}
         >
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2 text-xs font-medium text-[var(--muted)]">
-              <UserMinus size={14} />이번 주 만료
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--muted)]">
+              <UserMinus size={12} />만료
             </div>
-            <span className="rounded-xl p-1.5 bg-red-500/15 text-red-500">
-              <UserMinus size={14} />
+            <span className="rounded-lg p-1 bg-red-500/15 text-red-500">
+              <UserMinus size={12} />
             </span>
           </div>
           {loading ? (
-            <div className="h-8 animate-pulse rounded-lg bg-[var(--border)]" />
+            <div className="h-7 animate-pulse rounded-lg bg-[var(--border)]" />
           ) : (
             <>
-              <p className="text-3xl font-bold tabular-nums text-red-500">{weeklyExpired.length}</p>
-              <p className="mt-1 text-xs text-[var(--muted)]">
+              <p className="text-2xl font-bold tabular-nums text-red-500">{weeklyExpired.length}</p>
+              <p className="mt-0.5 text-[10px] text-[var(--muted)]">
                 성인 {expAdult} · 주니어 {expJunior}
               </p>
             </>
