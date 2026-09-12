@@ -1,11 +1,11 @@
-{
-    "version": "1.0.120",
+﻿{
+    "version": "1.0.121",
     "pub_date": "2026-09-12T00:00:00Z",
-    "notes": "v1.0.120: 유효회원 기준 통일 — 횟수권도 end_date 기준으로 대시보드/회원관리/명부 모두 일치",
+    "notes": "v1.0.121: 유효회원 기준 완전 통일 — 횟수권 end_date 기준 회원관리/명부/대시보드 일치",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWFNQVZQcVF6Yld1cEZ6SUJGbUsySGg5UEhyTmY4ZXpieW5ocm91ZU05TzZDakVzV1J5ZW92L0orVjZjbzJpTUlzaVJ1M0oweVJsUlprTUZsZmtkN0FjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MjA0MDc0CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xMjBfeDY0LXNldHVwLmV4ZQpKOW1UYWhUN20zWm1tbVdHdDJHSXIwcms5MWFhVXdLWnh5UEZUN3NqMDMyWE1sRy9wQ2ppSHNocmNaVHlBc1dyd2p6eDVHSTdRTHlESXRTQ3RQNGJDZz09Cg==",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.120/ClimbCenterManager_1.0.120_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVFEQWJMWFdlbTFSUUNLYWlkYTM0bVdYQXc2RndCNE9lYS9mMVBMazRNMWc4VzdpZFRWQzAzajhRU2Q2MnZ3cC9zTDg1bTFMd3dyQzFrMmExOWxacEFNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MjA1NDQ0CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xMjFfeDY0LXNldHVwLmV4ZQpZSWFQZ0I1aFFBeE10TFo3S1ZvUmNJMDdIcXhzK2RuRmF6eGUvVXd2Q2ZiYzBPMzl5Y2JhTkVyc0J2dng1V0xqSDQ0UG00RjFsU1J4b1FheU02bVFCdz09Cg==",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.121/ClimbCenterManager_1.0.121_x64-setup.exe"
         }
     }
 }

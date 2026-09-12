@@ -110,33 +110,28 @@ function computeMemberStatus(
     return { display_status: "정지", remaining_text: "정지 중", membership_status: "paused" };
   }
 
-  if (membership.pass_type === "count") {
-    const rem = membership.remaining_count ?? 0;
-    if (membership.status === "finished" || rem <= 0) {
-      return { display_status: "만료", remaining_text: "소진", membership_status: "finished" };
-    }
-    return { display_status: "이용중", remaining_text: `${rem}회 남음`, membership_status: "active" };
-  }
-
-  // period-based
+  // All membership types: end_date is the validity criterion
   const end = membership.end_date;
   if (!end) {
-    return { display_status: "이용중", remaining_text: "기간 미설정", membership_status: "active" };
+    const rem = membership.remaining_count;
+    return { display_status: "이용중", remaining_text: rem != null ? `${rem}회 남음` : "기간 미설정", membership_status: "active" };
   }
 
   if (end < t) {
     const diffDays = Math.round((new Date(t).getTime() - new Date(end).getTime()) / 86400000);
+    const rem = membership.remaining_count;
     return {
       display_status: "만료",
-      remaining_text: `${diffDays}일 전 만료`,
+      remaining_text: rem != null ? `${diffDays}일 전 만료 (${rem}회 잔여)` : `${diffDays}일 전 만료`,
       membership_status: "expired",
     };
   }
 
   const remaining = Math.round((new Date(end).getTime() - new Date(t).getTime()) / 86400000);
+  const rem = membership.remaining_count;
   return {
     display_status: "이용중",
-    remaining_text: `${remaining}일 남음`,
+    remaining_text: rem != null ? `${remaining}일 남음 (${rem}회)` : `${remaining}일 남음`,
     membership_status: "active",
   };
 }
@@ -154,7 +149,6 @@ function pickBestMembership(memberships: SupabaseMembership[]): SupabaseMembersh
   const active = memberships.filter((m) => {
     if (m.status === "paused") return true;
     if (m.status === "active") {
-      if (m.pass_type === "count") return (m.remaining_count ?? 0) > 0;
       return !m.end_date || m.end_date >= t;
     }
     return false;
