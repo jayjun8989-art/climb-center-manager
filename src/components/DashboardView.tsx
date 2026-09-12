@@ -19,7 +19,7 @@ import { useDashboardData } from "../hooks/useDashboardData";
 import { useRealtimeUpdates, type RealtimeStatus } from "../hooks/useRealtimeUpdates";
 import { centerIdForCode } from "../lib/supabase/centers";
 import { isSupabaseConfigured } from "../lib/supabase/config";
-import { saveCareGuidelines, setCenterGoals, setFocusCare, type FocusCareMember, type MonthlyTrendItem, type WeeklyMember } from "../lib/supabase/dashboard";
+import { fetchActiveMembersByType, saveCareGuidelines, setCenterGoals, setFocusCare, type FocusCareMember, type MonthlyTrendItem, type WeeklyMember } from "../lib/supabase/dashboard";
 import { CareLogModal } from "./CareLogModal";
 import type { Center, PermissionSet } from "../types";
 
@@ -250,6 +250,9 @@ export function DashboardView({ center, isAuthenticated, permissions, onNotify }
   const [showNewList,       setShowNewList]       = useState(false);
   const [showReturningList, setShowReturningList] = useState(false);
   const [showExpiredList, setShowExpiredList] = useState(false);
+  const [activeTypeModal,   setActiveTypeModal]   = useState<"monthly" | "junior" | "session" | null>(null);
+  const [activeTypeMembers, setActiveTypeMembers] = useState<WeeklyMember[]>([]);
+  const [activeTypeLoading, setActiveTypeLoading] = useState(false);
   const [careModal,       setCareModal]       = useState<FocusCareMember | null>(null);
   const [editingGoal,       setEditingGoal]       = useState(false);
   const [goalAdult,         setGoalAdult]         = useState<number | "">(0);
@@ -279,6 +282,18 @@ export function DashboardView({ center, isAuthenticated, permissions, onNotify }
   const careAdult  = care.filter((m) => m.member_type === "regular").length;
   const careJunior = care.filter((m) => m.member_type === "junior").length;
   const careDue    = care.filter((m) => m.today_due).length;
+
+  const handleOpenActiveTypeModal = async (type: "monthly" | "junior" | "session") => {
+    setActiveTypeModal(type);
+    setActiveTypeLoading(true);
+    try {
+      const members = await fetchActiveMembersByType(center, type);
+      setActiveTypeMembers(members);
+    } catch {
+      setActiveTypeMembers([]);
+    }
+    setActiveTypeLoading(false);
+  };
 
   const handleOpenGoalEdit = () => {
     setGoalAdult(goals?.adult_goal ?? 0);
@@ -497,18 +512,30 @@ export function DashboardView({ center, isAuthenticated, permissions, onNotify }
               )}
             </div>
             <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-xl bg-[var(--border)]/60 px-3 py-2">
+              <button
+                type="button"
+                className="rounded-xl bg-[var(--border)]/60 px-3 py-2 text-left hover:bg-blue-500/10 transition-colors"
+                onClick={() => void handleOpenActiveTypeModal("monthly")}
+              >
                 <p className="text-[10px] text-[var(--muted)] mb-0.5">월권</p>
                 <p className="text-lg font-bold tabular-nums text-blue-500">{counts?.monthly_count ?? 0}<span className="text-xs font-normal text-[var(--muted)] ml-0.5">명</span></p>
-              </div>
-              <div className="rounded-xl bg-[var(--border)]/60 px-3 py-2">
+              </button>
+              <button
+                type="button"
+                className="rounded-xl bg-[var(--border)]/60 px-3 py-2 text-left hover:bg-orange-500/10 transition-colors"
+                onClick={() => void handleOpenActiveTypeModal("junior")}
+              >
                 <p className="text-[10px] text-[var(--muted)] mb-0.5">주니어</p>
                 <p className="text-lg font-bold tabular-nums text-orange-500">{counts?.junior_count ?? 0}<span className="text-xs font-normal text-[var(--muted)] ml-0.5">명</span></p>
-              </div>
-              <div className="rounded-xl bg-[var(--border)]/60 px-3 py-2">
+              </button>
+              <button
+                type="button"
+                className="rounded-xl bg-[var(--border)]/60 px-3 py-2 text-left hover:bg-teal-500/10 transition-colors"
+                onClick={() => void handleOpenActiveTypeModal("session")}
+              >
                 <p className="text-[10px] text-[var(--muted)] mb-0.5">횟수권</p>
                 <p className="text-lg font-bold tabular-nums text-teal-500">{counts?.session_count ?? 0}<span className="text-xs font-normal text-[var(--muted)] ml-0.5">명</span></p>
-              </div>
+              </button>
             </div>
           </>
         )}
@@ -783,6 +810,60 @@ export function DashboardView({ center, isAuthenticated, permissions, onNotify }
           );
         })()}
       </div>
+
+      {/* ── Active type modals ───────────────────────────────── */}
+      {activeTypeModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) setActiveTypeModal(null); }}
+        >
+          <div className="w-full max-w-md bg-[var(--surface)] rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl overflow-hidden max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[var(--border)]">
+              <h3 className="font-bold text-sm">
+                {activeTypeModal === "monthly" ? "월권" : activeTypeModal === "junior" ? "주니어" : "횟수권"} 유효회원
+              </h3>
+              {!activeTypeLoading && <span className="text-xs text-[var(--muted)]">{activeTypeMembers.length}명</span>}
+            </div>
+            <div className="overflow-y-auto flex-1 px-4 py-3 space-y-1">
+              {activeTypeLoading ? (
+                <div className="space-y-2 py-2">
+                  {[1,2,3].map((i) => <div key={i} className="h-10 animate-pulse rounded-xl bg-[var(--border)]" />)}
+                </div>
+              ) : activeTypeMembers.length === 0 ? (
+                <p className="text-sm text-[var(--muted)] text-center py-6">해당 회원이 없습니다.</p>
+              ) : (
+                activeTypeMembers.map((m) => (
+                  <div key={m.member_id} className="flex items-center justify-between rounded-xl px-3 py-2.5 hover:bg-[var(--border)]">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] rounded-full px-2 py-0.5 font-medium ${
+                        m.member_type === "junior" ? "bg-orange-500/15 text-orange-600" : "bg-blue-500/15 text-blue-600"
+                      }`}>
+                        {m.member_type === "junior" ? "주니어" : "성인"}
+                      </span>
+                      <span className="text-sm font-medium">{m.member_name}</span>
+                    </div>
+                    <div className="text-right text-xs text-[var(--muted)]">
+                      {m.end_date && (
+                        <span>
+                          {m.end_date.slice(5).replace("-", ".")} 만료
+                          {m.days_remaining !== undefined && (
+                            <span className={m.days_remaining <= 7 ? " text-amber-500 font-medium" : ""}>
+                              {" "}(D-{m.days_remaining})
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="px-5 py-4 border-t border-[var(--border)]">
+              <button type="button" className="btn btn-secondary w-full" onClick={() => setActiveTypeModal(null)}>닫기</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Weekly list modals ────────────────────────────────── */}
       {showNewList && (

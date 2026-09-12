@@ -140,6 +140,19 @@ export async function fetchWeeklyReturningMembers(
   return (data as WeeklyMember[]) ?? [];
 }
 
+export async function fetchActiveMembersByType(
+  center: Center,
+  type: "monthly" | "junior" | "session",
+): Promise<WeeklyMember[]> {
+  const centerId = centerIdForCode(center);
+  const { data, error } = await sb().rpc("rpc_active_members_by_type", {
+    p_center_id: centerId,
+    p_type: type,
+  });
+  if (error) throw new Error(error.message);
+  return (data as WeeklyMember[]) ?? [];
+}
+
 export async function fetchWeeklyExpiredMembers(
   center: Center,
   weekStart: string,

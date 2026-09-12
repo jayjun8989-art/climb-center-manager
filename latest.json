@@ -1,11 +1,11 @@
-﻿{
-    "version": "1.0.118",
+{
+    "version": "1.0.119",
     "pub_date": "2026-09-12T00:00:00Z",
-    "notes": "v1.0.118: 회원 삭제 수정 — memberships status 제약조건 오류 해결",
+    "notes": "v1.0.119: 대시보드 월권/주니어/횟수권 클릭 시 회원 목록 조회 기능 추가",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVdGZ0tiY0UzMnFSZ2crTFpBS3VMZGQybkhVblJrYWFTWjZnRHkyUmtjMjB4UW43TTdZQUdScnU0MWg3SEd0WDd6VjdzRitKblo0YmhDOUxHNjN2V1FnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MTkwODAzCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xMThfeDY0LXNldHVwLmV4ZQpMdzBMTXdWQ3lRZUhqZ05PbGM1WEZIalZSR3hsT1MzOEpTQm5QN3haQU4zYTdyczRnZi9qWklTN1BNeldFSEk2aUxxS3NGVDhxKzJ1Y25YWDVFN1ZDUT09Cg==",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.118/ClimbCenterManager_1.0.118_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWNvUFgreWlURkh6M3R6ak4rSmNXS0dIS2hYNFpkU2ZxTHV2Y3FvTUpUSHVWNUVaQ2xCZVY5ZnhlOHNUNVVIUFU0T0cyNTNxeXp2ZDRBNUViK0pMZndrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MjAyMjc4CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xMTlfeDY0LXNldHVwLmV4ZQptUlFITmtwaHlhZkM3RXFUd3VHN0JlL0E2ZTdleUV5ZUFNYUlrTk5NYW1vdkVZRmFkODAvckEvNTMvOFg3Lytsa24vUlN2clg3TFdHdVlhZzNWb3FDdz09Cg==",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.119/ClimbCenterManager_1.0.119_x64-setup.exe"
         }
     }
 }
