@@ -1,11 +1,11 @@
 {
-    "version": "1.0.116",
+    "version": "1.0.117",
     "pub_date": "2026-09-12T00:00:00Z",
-    "notes": "v1.0.116: 탭 통합 — 회원관리+회원권관리, 명단+현황 각 1개로 정리. 출석체크 탭 제거",
+    "notes": "v1.0.117: 강사 케어 지침 관리자 편집 기능 추가 (DB 저장, 항목 추가/삭제/수정)",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVVEbG45akx0NWlXdGd1Vmk5Q25SRE1aK0h1a3BRYmR6MmhIdmJXV0FEYTBXNWNxTC9UalhnSno3NUczSjR3NHVraGE2TnVBclg1dVM4aU4rQ2dCVVEwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MTg5Mjc4CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xMTZfeDY0LXNldHVwLmV4ZQpnVGM0VFVWaHc5eStNbzRRTS9WSndVVUl6OXVya21KUUVFWkU5TEJPbnB3WmdNMmFKVnZld2ErcnN0TEZzaG1Fc3NqU0FyNXgrZnNCSGFSMDJtL3dEdz09Cg==",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.116/ClimbCenterManager_1.0.116_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVp3dVNkQnRGVGlramtrd3FFdHJVZ3d5RjExUVFZQm96N1JHT2w4eU5LQytPS3RUZmU1d1BTNVF2UjdFVjJIOVlJUWR4b1lqNnMxcTRQWWRJaFE0bGdNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MTg5ODA0CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xMTdfeDY0LXNldHVwLmV4ZQorS1E1b1hZczFpbHdER1lMRjM2V0RFaTNGMGZYV0lRRzFvYWgvOXBCd0xNaS9FSCs0dTNpWC9POTdReTI0eGF5OG1LZzlZMSswUnh0ajRGdHd5ZTZEQT09Cg==",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.117/ClimbCenterManager_1.0.117_x64-setup.exe"
         }
     }
 }

@@ -19,7 +19,7 @@ import { useDashboardData } from "../hooks/useDashboardData";
 import { useRealtimeUpdates, type RealtimeStatus } from "../hooks/useRealtimeUpdates";
 import { centerIdForCode } from "../lib/supabase/centers";
 import { isSupabaseConfigured } from "../lib/supabase/config";
-import { setCenterGoals, setFocusCare, type FocusCareMember, type MonthlyTrendItem, type WeeklyMember } from "../lib/supabase/dashboard";
+import { saveCareGuidelines, setCenterGoals, setFocusCare, type FocusCareMember, type MonthlyTrendItem, type WeeklyMember } from "../lib/supabase/dashboard";
 import { CareLogModal } from "./CareLogModal";
 import type { Center, PermissionSet } from "../types";
 
@@ -240,7 +240,7 @@ export function DashboardView({ center, isAuthenticated, permissions, onNotify }
   const enabled = isAuthenticated && isSupabaseConfigured();
   const isAdmin = permissions.role === "owner" || permissions.role === "admin";
   const {
-    counts, weeklyNew, weeklyReturning, weeklyExpired, trend, goals, care,
+    counts, weeklyNew, weeklyReturning, weeklyExpired, trend, goals, care, guidelines,
     weekStart, weekEnd, weekOffset,
     loading, error, lastRefreshedAt,
     refresh, setWeekOffset,
@@ -251,10 +251,13 @@ export function DashboardView({ center, isAuthenticated, permissions, onNotify }
   const [showReturningList, setShowReturningList] = useState(false);
   const [showExpiredList, setShowExpiredList] = useState(false);
   const [careModal,       setCareModal]       = useState<FocusCareMember | null>(null);
-  const [editingGoal,     setEditingGoal]     = useState(false);
-  const [goalAdult,       setGoalAdult]       = useState<number | "">(0);
-  const [goalJunior,      setGoalJunior]      = useState<number | "">(0);
-  const [goalSaving,      setGoalSaving]      = useState(false);
+  const [editingGoal,       setEditingGoal]       = useState(false);
+  const [goalAdult,         setGoalAdult]         = useState<number | "">(0);
+  const [goalJunior,        setGoalJunior]        = useState<number | "">(0);
+  const [goalSaving,        setGoalSaving]        = useState(false);
+  const [editingGuidelines, setEditingGuidelines] = useState(false);
+  const [guidelineDraft,    setGuidelineDraft]    = useState<string[]>([]);
+  const [guidelineSaving,   setGuidelineSaving]   = useState(false);
 
   useEffect(() => { setCenterId(centerIdForCode(center)); }, [center]);
 
@@ -300,6 +303,16 @@ export function DashboardView({ center, isAuthenticated, permissions, onNotify }
     void refresh();
   };
 
+  const handleSaveGuidelines = async () => {
+    setGuidelineSaving(true);
+    const result = await saveCareGuidelines(center, guidelineDraft.filter((s) => s.trim() !== ""));
+    setGuidelineSaving(false);
+    if (!result.ok) { onNotify(`저장 실패: ${result.error}`); return; }
+    onNotify("케어 지침이 저장되었습니다.");
+    setEditingGuidelines(false);
+    void refresh();
+  };
+
   const handleFocusCareToggle = async (member: FocusCareMember) => {
     const result = await setFocusCare(member.member_id, false, center);
     if (result.ok) {
@@ -340,28 +353,68 @@ export function DashboardView({ center, isAuthenticated, permissions, onNotify }
       <div className="glass-panel rounded-[1.5rem] p-5 space-y-3 border border-rose-500/20">
         {/* 지침 */}
         <div className="rounded-xl bg-rose-500/8 border border-rose-500/15 px-4 py-3">
-          <div className="flex items-center gap-2 text-xs font-semibold text-rose-500 mb-2">
-            <Heart size={13} fill="currentColor" />
-            강사 케어 우선순위
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2 text-xs font-semibold text-rose-500">
+              <Heart size={13} fill="currentColor" />
+              강사 케어 우선순위
+            </div>
+            {isAdmin && !editingGuidelines && (
+              <button
+                type="button"
+                className="btn btn-secondary text-xs !py-1 !px-2"
+                onClick={() => { setGuidelineDraft([...(guidelines.length ? guidelines : [""])]);  setEditingGuidelines(true); }}
+              >
+                수정
+              </button>
+            )}
           </div>
-          <ol className="space-y-1 text-xs text-[var(--fg)] leading-relaxed list-none">
-            <li className="flex items-start gap-2">
-              <span className="mt-0.5 flex-shrink-0 w-4 h-4 rounded-full bg-rose-500/20 text-rose-500 flex items-center justify-center text-[10px] font-bold">1</span>
-              <span>혼자 있는 초보자 회원</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="mt-0.5 flex-shrink-0 w-4 h-4 rounded-full bg-rose-500/15 text-rose-500 flex items-center justify-center text-[10px] font-bold">2</span>
-              <span>최근 등록 회원</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="mt-0.5 flex-shrink-0 w-4 h-4 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center text-[10px] font-bold">3</span>
-              <span>케어는 단순 문제풀이가 아닌 <span className="font-medium">회원이 센터에 적응할 수 있도록 소통하는 것</span> — 지구력·볼더링·방문 빈도 등 다양한 대화와 운동으로 함께 적응을 돕기</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="mt-0.5 flex-shrink-0 w-4 h-4 rounded-full bg-rose-500/8 text-rose-300 flex items-center justify-center text-[10px] font-bold">4</span>
-              <span>지인·친한 회원과의 대화는 <span className="font-medium">근무시간 외</span>에 합니다</span>
-            </li>
-          </ol>
+
+          {/* 편집 모드 */}
+          {editingGuidelines ? (
+            <div className="space-y-2">
+              {guidelineDraft.map((item, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <span className="flex-shrink-0 w-4 h-4 rounded-full bg-rose-500/20 text-rose-500 flex items-center justify-center text-[10px] font-bold">{idx + 1}</span>
+                  <input
+                    type="text"
+                    className="input flex-1 text-xs py-1.5"
+                    value={item}
+                    onChange={(e) => setGuidelineDraft((prev) => prev.map((v, i) => i === idx ? e.target.value : v))}
+                  />
+                  <button
+                    type="button"
+                    className="text-[var(--muted)] hover:text-red-400 text-xs px-1"
+                    onClick={() => setGuidelineDraft((prev) => prev.filter((_, i) => i !== idx))}
+                  >✕</button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="text-xs text-rose-400 hover:text-rose-500 mt-1"
+                onClick={() => setGuidelineDraft((prev) => [...prev, ""])}
+              >+ 항목 추가</button>
+              <div className="flex gap-2 pt-1">
+                <button type="button" className="btn btn-secondary flex-1 text-xs" onClick={() => setEditingGuidelines(false)} disabled={guidelineSaving}>취소</button>
+                <button type="button" className="btn btn-primary flex-1 text-xs" onClick={() => void handleSaveGuidelines()} disabled={guidelineSaving}>
+                  {guidelineSaving ? "저장 중..." : "저장"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <ol className="space-y-1 text-xs text-[var(--fg)] leading-relaxed list-none">
+              {(guidelines.length ? guidelines : [
+                "혼자 있는 초보자 회원",
+                "최근 등록 회원",
+                "케어는 단순 문제풀이가 아닌 회원이 센터에 적응할 수 있도록 소통하는 것",
+                "지인·친한 회원과의 대화는 근무시간 외에 합니다",
+              ]).map((text, idx) => (
+                <li key={idx} className="flex items-start gap-2">
+                  <span className="mt-0.5 flex-shrink-0 w-4 h-4 rounded-full bg-rose-500/20 text-rose-500 flex items-center justify-center text-[10px] font-bold">{idx + 1}</span>
+                  <span>{text}</span>
+                </li>
+              ))}
+            </ol>
+          )}
         </div>
 
         {/* 집중케어 명단 */}
