@@ -400,7 +400,7 @@ export default function App() {
         // memberships도 비활성화
         await supabase
           .from("memberships")
-          .update({ status: "cancelled", updated_at: now })
+          .update({ status: "expired", updated_at: now })
           .eq("member_id", member.remote_id)
           .in("status", ["active", "paused"]);
         if (selectedMember?.id === member.id) setSelectedMember(null);
@@ -415,7 +415,7 @@ export default function App() {
           if (supabase) {
             const now2 = new Date().toISOString();
             await supabase.from("members").update({ deleted_at: now2, status: "inactive", updated_at: now2 }).eq("id", member.remote_id);
-            await supabase.from("memberships").update({ status: "cancelled", updated_at: now2 }).eq("member_id", member.remote_id).in("status", ["active", "paused"]);
+            await supabase.from("memberships").update({ status: "expired", updated_at: now2 }).eq("member_id", member.remote_id).in("status", ["active", "paused"]);
           }
         }
         sync.syncNow().catch(() => undefined);

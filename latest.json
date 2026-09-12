@@ -1,11 +1,11 @@
-{
-    "version": "1.0.117",
+﻿{
+    "version": "1.0.118",
     "pub_date": "2026-09-12T00:00:00Z",
-    "notes": "v1.0.117: 강사 케어 지침 관리자 편집 기능 추가 (DB 저장, 항목 추가/삭제/수정)",
+    "notes": "v1.0.118: 회원 삭제 수정 — memberships status 제약조건 오류 해결",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVp3dVNkQnRGVGlramtrd3FFdHJVZ3d5RjExUVFZQm96N1JHT2w4eU5LQytPS3RUZmU1d1BTNVF2UjdFVjJIOVlJUWR4b1lqNnMxcTRQWWRJaFE0bGdNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MTg5ODA0CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xMTdfeDY0LXNldHVwLmV4ZQorS1E1b1hZczFpbHdER1lMRjM2V0RFaTNGMGZYV0lRRzFvYWgvOXBCd0xNaS9FSCs0dTNpWC9POTdReTI0eGF5OG1LZzlZMSswUnh0ajRGdHd5ZTZEQT09Cg==",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.117/ClimbCenterManager_1.0.117_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVdGZ0tiY0UzMnFSZ2crTFpBS3VMZGQybkhVblJrYWFTWjZnRHkyUmtjMjB4UW43TTdZQUdScnU0MWg3SEd0WDd6VjdzRitKblo0YmhDOUxHNjN2V1FnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MTkwODAzCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xMThfeDY0LXNldHVwLmV4ZQpMdzBMTXdWQ3lRZUhqZ05PbGM1WEZIalZSR3hsT1MzOEpTQm5QN3haQU4zYTdyczRnZi9qWklTN1BNeldFSEk2aUxxS3NGVDhxKzJ1Y25YWDVFN1ZDUT09Cg==",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.118/ClimbCenterManager_1.0.118_x64-setup.exe"
         }
     }
 }
