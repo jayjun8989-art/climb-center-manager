@@ -1,11 +1,11 @@
 {
-    "version": "1.0.119",
+    "version": "1.0.120",
     "pub_date": "2026-09-12T00:00:00Z",
-    "notes": "v1.0.119: 대시보드 월권/주니어/횟수권 클릭 시 회원 목록 조회 기능 추가",
+    "notes": "v1.0.120: 유효회원 기준 통일 — 횟수권도 end_date 기준으로 대시보드/회원관리/명부 모두 일치",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWNvUFgreWlURkh6M3R6ak4rSmNXS0dIS2hYNFpkU2ZxTHV2Y3FvTUpUSHVWNUVaQ2xCZVY5ZnhlOHNUNVVIUFU0T0cyNTNxeXp2ZDRBNUViK0pMZndrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MjAyMjc4CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xMTlfeDY0LXNldHVwLmV4ZQptUlFITmtwaHlhZkM3RXFUd3VHN0JlL0E2ZTdleUV5ZUFNYUlrTk5NYW1vdkVZRmFkODAvckEvNTMvOFg3Lytsa24vUlN2clg3TFdHdVlhZzNWb3FDdz09Cg==",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.119/ClimbCenterManager_1.0.119_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWFNQVZQcVF6Yld1cEZ6SUJGbUsySGg5UEhyTmY4ZXpieW5ocm91ZU05TzZDakVzV1J5ZW92L0orVjZjbzJpTUlzaVJ1M0oweVJsUlprTUZsZmtkN0FjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MjA0MDc0CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xMjBfeDY0LXNldHVwLmV4ZQpKOW1UYWhUN20zWm1tbVdHdDJHSXIwcms5MWFhVXdLWnh5UEZUN3NqMDMyWE1sRy9wQ2ppSHNocmNaVHlBc1dyd2p6eDVHSTdRTHlESXRTQ3RQNGJDZz09Cg==",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.120/ClimbCenterManager_1.0.120_x64-setup.exe"
         }
     }
 }

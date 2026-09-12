@@ -45,9 +45,6 @@ export function hasNoMembership(member: MemberListItem): boolean {
 
 export function isValidMember(member: MemberListItem, today = seoulToday()): boolean {
   if (hasNoMembership(member)) return false;
-  if (isCountMembership(member)) {
-    return (member.remaining_count ?? 0) >= 1;
-  }
   const end = dateOnly(member.end_date);
   if (!end) return true;
   return daysFromToday(end, today) >= 0;
@@ -68,9 +65,6 @@ export function isExpiringMember(
 
 export function isExpiredMember(member: MemberListItem, today = seoulToday()): boolean {
   if (hasNoMembership(member)) return true;
-  if (isCountMembership(member)) {
-    return (member.remaining_count ?? 0) <= 0;
-  }
   const end = dateOnly(member.end_date);
   if (!end) return false;
   return daysFromToday(end, today) < 0;
