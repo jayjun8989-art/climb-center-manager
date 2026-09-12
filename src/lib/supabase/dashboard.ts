@@ -255,6 +255,26 @@ export async function saveCareLog(params: {
   return (data as { ok: boolean; id?: string; error?: string }) ?? { ok: true };
 }
 
+export async function fetchCareGuidelines(center: Center): Promise<string[]> {
+  const centerId = centerIdForCode(center);
+  const { data, error } = await sb().rpc("rpc_get_care_guidelines", { p_center_id: centerId });
+  if (error) throw new Error(error.message);
+  return (data as string[]) ?? [];
+}
+
+export async function saveCareGuidelines(
+  center: Center,
+  items: string[],
+): Promise<{ ok: boolean; error?: string }> {
+  const centerId = centerIdForCode(center);
+  const { error } = await sb().rpc("rpc_set_care_guidelines", {
+    p_center_id: centerId,
+    p_items: items,
+  });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
 export async function fetchCareHistory(
   memberId: string,
   limit = 20,

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { api, isTauriApp } from "./api/client";
-import { AttendanceCheckPanel } from "./components/AttendanceCheckPanel";
 import { MemberStatusPanel } from "./components/MemberStatusPanel";
 import { Header } from "./components/Header";
 import { LoginScreen } from "./components/LoginScreen";
@@ -78,15 +77,14 @@ export default function App() {
   const access = useCenterPermissions(center, auth.user, auth.isAuthenticated);
   const { permissions, accessibleCenters, roleLabel, roles, loading: rolesLoading, error: rolesError } = access;
   const [activeView, setActiveView] = useState<AppView>("dashboard");
+  const [memberSubTab, setMemberSubTab] = useState<"list" | "memberships">("list");
+  const [rosterSubTab, setRosterSubTab] = useState<"roster" | "expiring">("roster");
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [attendanceSearch, setAttendanceSearch] = useState("");
-  const [attendanceCheckinDate, setAttendanceCheckinDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [membershipSearch, setMembershipSearch] = useState("");
   const [memberGroup, setMemberGroup] = useState<MemberGroupFilter>("all");
   const [statusFilter, setStatusFilter] = useState<MemberStatusFilter>("all");
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 200);
-  const debouncedAttendanceSearch = useDebouncedValue(attendanceSearch, 200);
   const debouncedMembershipSearch = useDebouncedValue(membershipSearch, 200);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -299,11 +297,6 @@ export default function App() {
       );
     },
     [],
-  );
-
-  const attendanceMembers = useMemo(
-    () => filterMembersByQuery(members, debouncedAttendanceSearch),
-    [members, debouncedAttendanceSearch, filterMembersByQuery],
   );
 
   const membershipMembers = useMemo(
@@ -667,8 +660,8 @@ export default function App() {
           backupInfo={backupInfo}
           permissions={permissions}
           accessibleCenters={accessibleCenters}
-          showMemberFilters={activeView === "members" || activeView === "memberships"}
-          showStats={activeView === "members" || activeView === "expiring" || activeView === "dashboard"}
+          showMemberFilters={activeView === "members"}
+          showStats={activeView === "members" || activeView === "dashboard"}
         />
 
         <MainNav
@@ -749,6 +742,26 @@ export default function App() {
         )}
 
         {activeView === "members" && (
+          <div className="space-y-4">
+            {/* 서브탭 */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className={`btn ${memberSubTab === "list" ? "btn-primary" : "btn-secondary"}`}
+                onClick={() => setMemberSubTab("list")}
+              >
+                회원 관리
+              </button>
+              <button
+                type="button"
+                className={`btn ${memberSubTab === "memberships" ? "btn-primary" : "btn-secondary"}`}
+                onClick={() => setMemberSubTab("memberships")}
+              >
+                회원권 관리
+              </button>
+            </div>
+
+            {memberSubTab === "list" && (
           <div className="grid gap-5 xl:grid-cols-[1.7fr_1fr]">
             <div className="space-y-4">
               <MemberList
@@ -812,43 +825,9 @@ export default function App() {
               />
             </div>
           </div>
-        )}
+            )}
 
-        {activeView === "attendance" && (
-          <div className="grid gap-5 xl:grid-cols-[1.7fr_1fr]">
-            <AttendanceCheckPanel
-              members={attendanceMembers}
-              loading={loading}
-              search={attendanceSearch}
-              onSearch={setAttendanceSearch}
-              permissions={permissions}
-              selectedId={selectedMember?.id ?? null}
-              onSelect={setSelectedMember}
-              checkinDate={attendanceCheckinDate}
-              onCheckinDateChange={setAttendanceCheckinDate}
-              onAttendance={(member, checkinDate) => {
-                const today = new Date().toISOString().slice(0, 10);
-                void handleAttendance(member, { checkinDate: checkinDate === today ? null : checkinDate }).then((updated) => {
-                  if (updated) setToast(`${updated.name}님 출석 완료${checkinDate !== today ? ` (${checkinDate})` : ""}`);
-                });
-              }}
-            />
-            <MemberDetailPanel
-              member={selectedMember}
-              permissions={permissions}
-              onAttendance={(member, checkinDate) => handleAttendance(member, { checkinDate })}
-                editor={currentLoginId}
-              onUpdated={(updated) => {
-                setSelectedMember(updated);
-                setMembers((current) =>
-                  current.map((item) => (item.id === updated.id ? updated : item)),
-                );
-              }}
-            />
-          </div>
-        )}
-
-        {activeView === "memberships" && (
+            {memberSubTab === "memberships" && (
           <div className="grid gap-5 xl:grid-cols-[1.7fr_1fr]">
             <MembershipManagementPanel
               members={membershipMembers}
@@ -871,7 +850,7 @@ export default function App() {
               member={selectedMember}
               permissions={permissions}
               onAttendance={(member, checkinDate) => handleAttendance(member, { checkinDate })}
-                editor={currentLoginId}
+              editor={currentLoginId}
               onUpdated={(updated) => {
                 setSelectedMember(updated);
                 setMembers((current) =>
@@ -880,24 +859,47 @@ export default function App() {
               }}
             />
           </div>
+            )}
+          </div>
         )}
 
 
         {activeView === "roster" && permissions.canViewRoster && (
-          <MemberRosterPanel
-            permissions={permissions}
-            roles={roles}
-            accessibleCenters={accessibleCenters}
-            onNotify={setToast}
-          />
-        )}
+          <div className="space-y-4">
+            {/* 서브탭 */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className={`btn ${rosterSubTab === "roster" ? "btn-primary" : "btn-secondary"}`}
+                onClick={() => setRosterSubTab("roster")}
+              >
+                회원 명부
+              </button>
+              <button
+                type="button"
+                className={`btn ${rosterSubTab === "expiring" ? "btn-primary" : "btn-secondary"}`}
+                onClick={() => setRosterSubTab("expiring")}
+              >
+                회원 현황
+              </button>
+            </div>
 
-        {activeView === "expiring" && permissions.canViewRoster && (
-          <MemberStatusPanel
-            permissions={permissions}
-            roles={roles}
-            accessibleCenters={accessibleCenters}
-          />
+            {rosterSubTab === "roster" && (
+              <MemberRosterPanel
+                permissions={permissions}
+                roles={roles}
+                accessibleCenters={accessibleCenters}
+                onNotify={setToast}
+              />
+            )}
+            {rosterSubTab === "expiring" && (
+              <MemberStatusPanel
+                permissions={permissions}
+                roles={roles}
+                accessibleCenters={accessibleCenters}
+              />
+            )}
+          </div>
         )}
       </div>
 

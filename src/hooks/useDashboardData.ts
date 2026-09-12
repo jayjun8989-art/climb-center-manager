@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   fetchActiveMemberCounts,
+  fetchCareGuidelines,
   fetchCenterGoals,
   fetchFocusCareMembers,
   fetchMonthlyTrend,
@@ -24,6 +25,7 @@ export interface DashboardData {
   trend:            MonthlyTrendItem[];
   goals:            CenterGoal | null;
   care:             FocusCareMember[];
+  guidelines:       string[];
   weekStart:        string;
   weekEnd:          string;
   weekOffset:       number;
@@ -42,6 +44,7 @@ export function useDashboardData(center: Center, enabled: boolean): DashboardDat
   const [trend,           setTrend]           = useState<MonthlyTrendItem[]>([]);
   const [goals,           setGoals]           = useState<CenterGoal | null>(null);
   const [care,            setCare]            = useState<FocusCareMember[]>([]);
+  const [guidelines,      setGuidelines]      = useState<string[]>([]);
   const [weekOffset,      setWeekOffset]      = useState(0);
   const [loading,         setLoading]         = useState(false);
   const [error,           setError]           = useState<string | null>(null);
@@ -58,7 +61,7 @@ export function useDashboardData(center: Center, enabled: boolean): DashboardDat
     setLoading(true);
     setError(null);
     try {
-      const [c, wn, wr, we, tr, g, ca] = await Promise.all([
+      const [c, wn, wr, we, tr, g, ca, gl] = await Promise.all([
         fetchActiveMemberCounts(center),
         fetchWeeklyNewMembers(center, weekStart, weekEnd),
         fetchWeeklyReturningMembers(center, weekStart, weekEnd),
@@ -66,6 +69,7 @@ export function useDashboardData(center: Center, enabled: boolean): DashboardDat
         fetchMonthlyTrend(center, 6),
         fetchCenterGoals(center),
         fetchFocusCareMembers(center, 50),
+        fetchCareGuidelines(center),
       ]);
       setCounts(c);
       setWeeklyNew(wn);
@@ -74,6 +78,7 @@ export function useDashboardData(center: Center, enabled: boolean): DashboardDat
       setTrend(tr);
       setGoals(g);
       setCare(ca);
+      setGuidelines(gl);
       setLastRefreshedAt(new Date());
     } catch (e) {
       if ((e as Error).name !== "AbortError") {
@@ -89,7 +94,7 @@ export function useDashboardData(center: Center, enabled: boolean): DashboardDat
   }, [refresh]);
 
   return {
-    counts, weeklyNew, weeklyReturning, weeklyExpired, trend, goals, care,
+    counts, weeklyNew, weeklyReturning, weeklyExpired, trend, goals, care, guidelines,
     weekStart, weekEnd, weekOffset,
     loading, error, lastRefreshedAt,
     refresh,
