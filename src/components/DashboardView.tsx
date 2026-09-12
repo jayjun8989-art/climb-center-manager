@@ -270,6 +270,7 @@ export function DashboardView({ center, isAuthenticated, permissions, onNotify }
   });
 
   // Derived counts
+  const adultCount = (counts?.monthly_count ?? 0) + (counts?.session_count ?? 0);
   const expAdult   = weeklyExpired.filter((m) => m.member_type === "regular").length;
   const expJunior  = weeklyExpired.filter((m) => m.member_type === "junior").length;
   const careAdult  = care.filter((m) => m.member_type === "regular").length;
@@ -335,6 +336,89 @@ export function DashboardView({ center, isAuthenticated, permissions, onNotify }
         </div>
       </div>
 
+      {/* ── 강사 케어 지침 + 집중케어 명단 ───────────────────── */}
+      <div className="glass-panel rounded-[1.5rem] p-5 space-y-3 border border-rose-500/20">
+        {/* 지침 */}
+        <div className="rounded-xl bg-rose-500/8 border border-rose-500/15 px-4 py-3">
+          <div className="flex items-center gap-2 text-xs font-semibold text-rose-500 mb-2">
+            <Heart size={13} fill="currentColor" />
+            강사 케어 우선순위
+          </div>
+          <ol className="space-y-1 text-xs text-[var(--fg)] leading-relaxed list-none">
+            <li className="flex items-start gap-2">
+              <span className="mt-0.5 flex-shrink-0 w-4 h-4 rounded-full bg-rose-500/20 text-rose-500 flex items-center justify-center text-[10px] font-bold">1</span>
+              <span>혼자 있는 초보자 회원</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="mt-0.5 flex-shrink-0 w-4 h-4 rounded-full bg-rose-500/15 text-rose-500 flex items-center justify-center text-[10px] font-bold">2</span>
+              <span>최근 등록 회원</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="mt-0.5 flex-shrink-0 w-4 h-4 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center text-[10px] font-bold">3</span>
+              <span>케어는 단순 문제풀이가 아닌 <span className="font-medium">회원이 센터에 적응할 수 있도록 소통하는 것</span> — 지구력·볼더링·방문 빈도 등 다양한 대화와 운동으로 함께 적응을 돕기</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="mt-0.5 flex-shrink-0 w-4 h-4 rounded-full bg-rose-500/8 text-rose-300 flex items-center justify-center text-[10px] font-bold">4</span>
+              <span>지인·친한 회원과의 대화는 <span className="font-medium">근무시간 외</span>에 합니다</span>
+            </li>
+          </ol>
+        </div>
+
+        {/* 집중케어 명단 */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <Heart size={15} className="text-rose-500" />
+              집중케어 명단
+            </div>
+            {care.length > 0 && (
+              <div className="flex gap-2 text-xs text-[var(--muted)]">
+                <span>전체 {care.length}명</span>
+                <span>·</span>
+                <span>성인 {careAdult}</span>
+                <span>·</span>
+                <span>주니어 {careJunior}</span>
+                {careDue > 0 && (
+                  <>
+                    <span>·</span>
+                    <span className="text-red-500 font-medium">오늘 확인 {careDue}명</span>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+          {loading && care.length === 0 ? (
+            <div className="space-y-2">
+              {[1, 2].map((i) => (
+                <div key={i} className="h-14 animate-pulse rounded-2xl bg-[var(--border)]" />
+              ))}
+            </div>
+          ) : care.length === 0 ? (
+            <p className="text-sm text-[var(--muted)] py-3 text-center">
+              집중케어 지정 회원이 없습니다.
+              <br />
+              <span className="text-xs">회원명단에서 ♥ 버튼으로 지정하세요.</span>
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {care.map((member) => (
+                <div key={member.member_id} className="relative">
+                  <CareRow member={member} onClickName={setCareModal} />
+                  <button
+                    type="button"
+                    className="absolute top-2 right-2 text-[10px] text-[var(--muted)] hover:text-red-400 px-1.5 py-0.5 rounded"
+                    title="집중케어 해제"
+                    onClick={() => void handleFocusCareToggle(member)}
+                  >
+                    해제
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       {error && (
         <div className="flex items-center gap-2 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-500">
           <AlertCircle size={15} />
@@ -352,26 +436,26 @@ export function DashboardView({ center, isAuthenticated, permissions, onNotify }
           <div className="h-16 animate-pulse rounded-2xl bg-[var(--border)]" />
         ) : (
           <>
-            <div className="flex items-end gap-1 mb-1">
+            <div className="flex items-end gap-1 mb-3">
               <span className="text-4xl font-bold tabular-nums">{counts?.total_count ?? 0}</span>
               <span className="text-base text-[var(--muted)] mb-1">명</span>
-            </div>
-            <div className="flex flex-wrap gap-3 text-sm">
-              <span className="flex items-center gap-1.5 text-blue-500">
-                <span className="inline-block w-2 h-2 rounded-full bg-blue-500" />
-                성인 <strong>{counts?.adult_count ?? 0}명</strong>
-              </span>
-              <span className="text-[var(--muted)]">·</span>
-              <span className="flex items-center gap-1.5 text-orange-500">
-                <span className="inline-block w-2 h-2 rounded-full bg-orange-400" />
-                주니어 <strong>{counts?.junior_count ?? 0}명</strong>
-              </span>
               {(counts?.paused_count ?? 0) > 0 && (
-                <>
-                  <span className="text-[var(--muted)]">·</span>
-                  <span className="text-amber-500">정지 중 {counts?.paused_count}명</span>
-                </>
+                <span className="ml-2 text-xs text-amber-500 mb-1">정지 중 {counts?.paused_count}명</span>
               )}
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-xl bg-[var(--border)]/60 px-3 py-2">
+                <p className="text-[10px] text-[var(--muted)] mb-0.5">월권</p>
+                <p className="text-lg font-bold tabular-nums text-blue-500">{counts?.monthly_count ?? 0}<span className="text-xs font-normal text-[var(--muted)] ml-0.5">명</span></p>
+              </div>
+              <div className="rounded-xl bg-[var(--border)]/60 px-3 py-2">
+                <p className="text-[10px] text-[var(--muted)] mb-0.5">주니어</p>
+                <p className="text-lg font-bold tabular-nums text-orange-500">{counts?.junior_count ?? 0}<span className="text-xs font-normal text-[var(--muted)] ml-0.5">명</span></p>
+              </div>
+              <div className="rounded-xl bg-[var(--border)]/60 px-3 py-2">
+                <p className="text-[10px] text-[var(--muted)] mb-0.5">횟수권</p>
+                <p className="text-lg font-bold tabular-nums text-teal-500">{counts?.session_count ?? 0}<span className="text-xs font-normal text-[var(--muted)] ml-0.5">명</span></p>
+              </div>
             </div>
           </>
         )}
@@ -570,13 +654,13 @@ export function DashboardView({ center, isAuthenticated, permissions, onNotify }
                 <td className="py-2 flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />성인
                 </td>
-                <td className="text-right tabular-nums font-semibold">{counts?.adult_count ?? 0}명</td>
+                <td className="text-right tabular-nums font-semibold">{adultCount}명</td>
                 <td className="text-right tabular-nums text-[var(--muted)]">
                   {goals && goals.adult_goal > 0 ? `${goals.adult_goal}명` : "—"}
                 </td>
                 <td className="text-right tabular-nums">
                   {goals && goals.adult_goal > 0
-                    ? <span className="font-semibold text-blue-500">{Math.round(((counts?.adult_count ?? 0) / goals.adult_goal) * 100)}%</span>
+                    ? <span className="font-semibold text-blue-500">{Math.round(((adultCount) / goals.adult_goal) * 100)}%</span>
                     : <span className="text-xs text-[var(--muted)]">목표 미설정</span>}
                 </td>
               </tr>
@@ -601,7 +685,7 @@ export function DashboardView({ center, isAuthenticated, permissions, onNotify }
           <div className="space-y-3 pt-1">
             <GoalBar
               label="성인 유효회원"
-              current={counts?.adult_count ?? 0}
+              current={adultCount}
               goal={goals.adult_goal}
               color="bg-blue-500"
             />
@@ -615,59 +699,7 @@ export function DashboardView({ center, isAuthenticated, permissions, onNotify }
         )}
       </div>
 
-      {/* ── 5. 집중케어 ──────────────────────────────────────── */}
-      <div className="glass-panel rounded-[1.5rem] p-5 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <Heart size={16} />
-            집중케어
-          </div>
-          {care.length > 0 && (
-            <div className="flex gap-2 text-xs text-[var(--muted)]">
-              <span>전체 {care.length}명</span>
-              <span>·</span>
-              <span>성인 {careAdult}</span>
-              <span>·</span>
-              <span>주니어 {careJunior}</span>
-              {careDue > 0 && (
-                <>
-                  <span>·</span>
-                  <span className="text-red-500 font-medium">오늘 확인 {careDue}명</span>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-        {loading && care.length === 0 ? (
-          <div className="space-y-2">
-            {[1, 2].map((i) => (
-              <div key={i} className="h-14 animate-pulse rounded-2xl bg-[var(--border)]" />
-            ))}
-          </div>
-        ) : care.length === 0 ? (
-          <p className="text-sm text-[var(--muted)] py-4 text-center">
-            집중케어 지정 회원이 없습니다.
-            <br />
-            <span className="text-xs">회원명단에서 회원을 선택해 지정하세요.</span>
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {care.map((member) => (
-              <div key={member.member_id} className="relative">
-                <CareRow member={member} onClickName={setCareModal} />
-                <button
-                  type="button"
-                  className="absolute top-2 right-2 text-[10px] text-[var(--muted)] hover:text-red-400 px-1.5 py-0.5 rounded"
-                  title="집중케어 해제"
-                  onClick={() => void handleFocusCareToggle(member)}
-                >
-                  해제
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* placeholder — 케어 섹션은 상단으로 이동 */}
 
       {/* ── 6. 월간 추이 ──────────────────────────────────────── */}
       <div className="glass-panel rounded-[1.5rem] p-5 space-y-3">

@@ -1,11 +1,11 @@
 {
-    "version": "1.0.114",
-    "pub_date": "2026-09-11T00:00:00Z",
-    "notes": "v1.0.114: 신규/재등록 이름 표시 수정, 3개 카드 한 줄 표시",
+    "version": "1.0.115",
+    "pub_date": "2026-09-12T00:00:00Z",
+    "notes": "v1.0.115: 케어 지침 상단 배치, 유효회원 월권·주니어·횟수권 분류, 강사 케어 우선순위 4개 지침 추가",
     "platforms": {
         "windows-x86_64": {
-            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdVZyekVPUVFUYUZGMndhcTRRVVNjb0tsM0krVXlwODVKNVRJL2JBVXJZYTd2UVc3RmtMVHFJaTBaY2cwbWhQNFJFYWh0WWFOdXN4djJrVklqYUc4L0FZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MTI1ODc2CWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xMTRfeDY0LXNldHVwLmV4ZQpRYzNtRHRpa0I5YTZuY08vZmNsS0t4czZ5MkJxT2pNZ3dvb2diOE4wSzVUZGk0b0ZiOW82T0R3Z1RZZndNdE9hbWtFOUZQUGJrUUM4K0NmZW53MWVCdz09Cg==",
-            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.114/ClimbCenterManager_1.0.114_x64-setup.exe"
+            "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUFQNTlJaUFWdWF4YjJpejBMaWdhUjRETC9kUlpRYXZWN0x5WXI1RlhidGRJZDE0R29jMysvbis4Y24wV3c0ZUE1ZFgzeEt3aFRiN3p1cVNKQUpEOEk0SGhHMTZ2OVFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MTg3NDExCWZpbGU6Q2xpbWJDZW50ZXJNYW5hZ2VyXzEuMC4xMTVfeDY0LXNldHVwLmV4ZQoxVlg0SEoxL0U5RFN3UStMTTM2ckI5SzIzMTA4TytsckVNWXpiR2ZPcjZ5dkh4blNtMkNDMklxdFBBN1ROYnJoODdDM0REQmlkc2xKMThybmVZb3BCZz09Cg==",
+            "url": "https://github.com/jayjun8989-art/climb-center-manager/releases/download/v1.0.115/ClimbCenterManager_1.0.115_x64-setup.exe"
         }
     }
 }

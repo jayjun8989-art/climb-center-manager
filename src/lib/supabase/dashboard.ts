@@ -4,10 +4,11 @@ import { centerIdForCode } from "./centers";
 
 // ── Types ─────────────────────────────────────────────────────────
 export interface ActiveMemberCounts {
-  total_count: number;
-  adult_count: number;
-  junior_count: number;
-  paused_count: number;
+  total_count:   number;
+  monthly_count: number;
+  junior_count:  number;
+  session_count: number;
+  paused_count:  number;
 }
 
 export interface WeeklyMember {
@@ -101,10 +102,11 @@ export async function fetchActiveMemberCounts(
   if (error) throw new Error(error.message);
   const row = Array.isArray(data) ? data[0] : data;
   return {
-    total_count:  Number(row?.total_count  ?? 0),
-    adult_count:  Number(row?.adult_count  ?? 0),
-    junior_count: Number(row?.junior_count ?? 0),
-    paused_count: Number(row?.paused_count ?? 0),
+    total_count:   Number(row?.total_count   ?? 0),
+    monthly_count: Number(row?.monthly_count ?? 0),
+    junior_count:  Number(row?.junior_count  ?? 0),
+    session_count: Number(row?.session_count ?? 0),
+    paused_count:  Number(row?.paused_count  ?? 0),
   };
 }
 
