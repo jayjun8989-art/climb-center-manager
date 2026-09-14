@@ -19,6 +19,7 @@ import { getSupabaseClient } from "../lib/supabase/client";
 import { isSupabaseConfigured } from "../lib/supabase/config";
 import { resolveCenterId, centerCodeFromId } from "../lib/supabase/centers";
 import { safeInvoke } from "../lib/tauri";
+import { seoulToday } from "../lib/roster/time";
 
 // ---------------------------------------------------------------------------
 // Types for raw Supabase rows
@@ -94,7 +95,7 @@ function serverTypeToDisplayType(
 // ---------------------------------------------------------------------------
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return seoulToday();
 }
 
 function computeMemberStatus(
