@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>그랩온 QR</title>
+    <meta name="description" content="주소를 QR로 바꿔서 보여주는 페이지" />
+    <style>
+      :root {
+        --bg: #0b1120;
+        --card: #151c2c;
+        --border: #2a3446;
+        --text: #e6eaf1;
+        --sub: #a3adbd;
+        --muted: #6f7a8c;
+        --rose: #e11d48;
+        --oncle: #3b82f6;
+        --grabit: #f97316;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 28px 16px 56px;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Pretendard", "Malgun Gothic", system-ui, sans-serif;
+      }
+      header { text-align: center; margin-bottom: 26px; }
+      .brand { font-size: 28px; font-weight: 900; letter-spacing: 2px; color: var(--rose); }
+      .lead { margin: 8px 0 0; font-size: 15px; color: var(--sub); }
+      .wrap {
+        max-width: 880px;
+        margin: 0 auto;
+        display: grid;
+        gap: 18px;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-top: 6px solid var(--accent, var(--border));
+        border-radius: 22px;
+        padding: 22px 20px 24px;
+        text-align: center;
+      }
+      .card.oncle { --accent: var(--oncle); }
+      .card.grabit { --accent: var(--grabit); }
+      .name { font-size: 24px; font-weight: 900; letter-spacing: 1px; color: var(--accent, var(--text)); }
+      .desc { margin: 6px 0 16px; font-size: 14px; color: var(--sub); }
+      .qr {
+        background: #fff;
+        border-radius: 16px;
+        padding: 14px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 240px;
+        min-width: 240px;
+      }
+      .qr img, .qr canvas { display: block; width: 240px; height: 240px; }
+      .url {
+        margin: 16px 0 0;
+        font-size: 12px;
+        line-height: 1.6;
+        color: var(--muted);
+        word-break: break-all;
+        user-select: all;
+      }
+      .copy {
+        margin-top: 12px;
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--sub);
+        border-radius: 12px;
+        padding: 10px 18px;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .copy:active { background: #1b2436; }
+      .maker {
+        max-width: 880px;
+        margin: 26px auto 0;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 22px;
+        padding: 20px;
+      }
+      .maker h2 { margin: 0 0 6px; font-size: 17px; font-weight: 800; }
+      .maker p { margin: 0 0 14px; font-size: 13px; color: var(--sub); }
+      .row { display: flex; gap: 10px; flex-wrap: wrap; }
+      .row input {
+        flex: 1 1 240px;
+        min-width: 0;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: #0f1728;
+        color: var(--text);
+        padding: 13px 14px;
+        font-size: 15px;
+      }
+      .row button {
+        border: none;
+        border-radius: 12px;
+        background: var(--rose);
+        color: #fff;
+        font-size: 15px;
+        font-weight: 800;
+        padding: 13px 22px;
+        cursor: pointer;
+      }
+      .made { margin-top: 18px; text-align: center; }
+      .note { max-width: 880px; margin: 22px auto 0; font-size: 13px; color: var(--muted); text-align: center; line-height: 1.7; }
+      @media print {
+        body { background: #fff; color: #000; padding: 0; }
+        .maker, .note, .copy { display: none; }
+        .card { background: #fff; border-color: #ddd; }
+        .url { color: #444; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand">GRABON</div>
+      <p class="lead">주소를 QR로 보여줍니다. 카카오톡으로 이 주소만 보내면 상대방 화면에 QR이 뜹니다.</p>
+    </header>
+
+    <main class="wrap" id="cards"></main>
+
+    <section class="maker">
+      <h2>다른 주소를 QR로 만들기</h2>
+      <p>주소를 넣고 만들기를 누르면 QR이 나옵니다. 그때 브라우저 주소를 그대로 보내도 상대방에게 같은 QR이 보입니다.</p>
+      <div class="row">
+        <input id="url-input" type="url" inputmode="url" placeholder="https://..." />
+        <button id="make">만들기</button>
+      </div>
+      <div class="made" id="made"></div>
+    </section>
+
+    <p class="note">
+      셀프 출석은 센터마다 주소가 다릅니다. ONCLE 태블릿은 ONCLE QR, GRABIT 태블릿은 GRABIT QR로 열어주세요.<br />
+      태블릿에서 연 뒤 크롬 메뉴 → 홈 화면에 추가 → 처음 한 번만 직원 계정으로 로그인하면 됩니다.
+    </p>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script>
+      var BASE = "https://jayjun8989-art.github.io/climb-center-manager/selfcheckin/";
+      var CENTERS = [
+        { id: "oncle", name: "ONCLE", desc: "온클 셀프 출석", url: BASE + "?center=ONCLE", png: "../selfcheckin-oncle-qr.png" },
+        { id: "grabit", name: "GRABIT", desc: "그랩잇 셀프 출석", url: BASE + "?center=GRABIT", png: "../selfcheckin-grabit-qr.png" }
+      ];
+
+      function drawQr(box, text) {
+        box.innerHTML = "";
+        if (typeof QRCode === "undefined") return false;
+        try {
+          new QRCode(box, { text: text, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.M });
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      function card(center) {
+        var el = document.createElement("div");
+        el.className = "card " + center.id;
+        el.innerHTML =
+          '<div class="name">' + center.name + "</div>" +
+          '<p class="desc">' + center.desc + "</p>" +
+          '<div class="qr"></div>' +
+          '<p class="url">' + center.url + "</p>" +
+          '<button class="copy">주소 복사</button>';
+
+        var box = el.querySelector(".qr");
+        if (!drawQr(box, center.url)) {
+          var img = document.createElement("img");
+          img.src = center.png;
+          img.alt = center.name + " 셀프 출석 QR";
+          box.appendChild(img);
+        }
+
+        el.querySelector(".copy").addEventListener("click", function () {
+          var btn = this;
+          navigator.clipboard.writeText(center.url).then(
+            function () {
+              btn.textContent = "복사됨";
+              setTimeout(function () { btn.textContent = "주소 복사"; }, 1500);
+            },
+            function () { btn.textContent = "복사 실패"; }
+          );
+        });
+        return el;
+      }
+
+      var cards = document.getElementById("cards");
+      var asked = new URLSearchParams(location.search).get("url");
+
+      if (asked) {
+        // 주소를 받은 경우: 그 주소의 QR만 크게 보여준다.
+        var one = document.createElement("div");
+        one.className = "card";
+        one.innerHTML = '<div class="name">QR</div><p class="desc">아래 QR을 찍으면 이 주소로 연결됩니다</p><div class="qr"></div><p class="url">' + asked + "</p>";
+        cards.appendChild(one);
+        if (!drawQr(one.querySelector(".qr"), asked)) {
+          one.querySelector(".qr").textContent = "QR을 만들지 못했습니다";
+          one.querySelector(".qr").style.color = "#333";
+        }
+      }
+
+      CENTERS.forEach(function (c) { cards.appendChild(card(c)); });
+
+      document.getElementById("make").addEventListener("click", function () {
+        var value = document.getElementById("url-input").value.trim();
+        var made = document.getElementById("made");
+        made.innerHTML = "";
+        if (!value) return;
+        var box = document.createElement("div");
+        box.className = "qr";
+        made.appendChild(box);
+        if (!drawQr(box, value)) {
+          box.textContent = "QR을 만들지 못했습니다";
+          box.style.color = "#333";
+          return;
+        }
+        var link = document.createElement("p");
+        link.className = "url";
+        link.textContent = location.origin + location.pathname + "?url=" + encodeURIComponent(value);
+        made.appendChild(link);
+        history.replaceState(null, "", "?url=" + encodeURIComponent(value));
+      });
+    </script>
+  </body>
+</html>
