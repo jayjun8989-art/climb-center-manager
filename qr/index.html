@@ -45,6 +45,7 @@
       }
       .card.oncle { --accent: var(--oncle); }
       .card.grabit { --accent: var(--grabit); }
+      .card.pc { --accent: var(--rose); }
       .name { font-size: 24px; font-weight: 900; letter-spacing: 1px; color: var(--accent, var(--text)); }
       .desc { margin: 6px 0 16px; font-size: 14px; color: var(--sub); }
       .qr {
@@ -147,7 +148,8 @@
       var BASE = "https://jayjun8989-art.github.io/climb-center-manager/selfcheckin/";
       var CENTERS = [
         { id: "oncle", name: "ONCLE", desc: "온클 셀프 출석", url: BASE + "?center=ONCLE", png: "../selfcheckin-oncle-qr.png" },
-        { id: "grabit", name: "GRABIT", desc: "그랩잇 셀프 출석", url: BASE + "?center=GRABIT", png: "../selfcheckin-grabit-qr.png" }
+        { id: "grabit", name: "GRABIT", desc: "그랩잇 셀프 출석", url: BASE + "?center=GRABIT", png: "../selfcheckin-grabit-qr.png" },
+        { id: "pc", name: "PC 프로그램", desc: "회원관리 프로그램 설치 (윈도우)", url: "https://jayjun8989-art.github.io/climb-center-manager/pc/", png: "" }
       ];
 
       function drawQr(box, text) {
@@ -172,10 +174,10 @@
           '<button class="copy">주소 복사</button>';
 
         var box = el.querySelector(".qr");
-        if (!drawQr(box, center.url)) {
+        if (!drawQr(box, center.url) && center.png) {
           var img = document.createElement("img");
           img.src = center.png;
-          img.alt = center.name + " 셀프 출석 QR";
+          img.alt = center.name + " QR";
           box.appendChild(img);
         }
 
