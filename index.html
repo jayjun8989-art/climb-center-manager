@@ -51,6 +51,7 @@
       .card.oncle { --accent: var(--oncle); }
       .card.grabit { --accent: var(--grabit); }
       .card.pc { --accent: var(--rose); }
+      .card.app { --accent: #22c55e; }
       .name { font-size: 24px; font-weight: 900; letter-spacing: 1px; color: var(--accent, var(--text)); }
       .desc { margin: 6px 0 16px; font-size: 14px; color: var(--sub); }
       .qr {
@@ -129,7 +130,8 @@
     <section class="note">
       <b>셀프 출석 (태블릿)</b> — 센터에 맞는 QR로 열고, 크롬 메뉴 → 홈 화면에 추가. 처음 한 번만 직원 계정으로 로그인하면 됩니다.
       ONCLE 태블릿은 <b>oncle</b>, GRABIT 태블릿은 <b>grabit</b> 계정으로 로그인하세요 — 그래야 다른 센터 출석을 서버가 막아줍니다.<br />
-      <b>PC 프로그램</b> — 누르면 최신 설치파일이 바로 내려받아집니다. 기존 프로그램 위에 덮어쓰기 설치하면 되고, 회원 자료는 서버에 있어 그대로입니다.
+      <b>PC 프로그램</b> — 누르면 최신 설치파일이 바로 내려받아집니다. 기존 프로그램 위에 덮어쓰기 설치하면 되고, 회원 자료는 서버에 있어 그대로입니다.<br />
+      <b>핸드폰 앱</b> — 안드로이드 관리자용입니다. 설치할 때 "이 출처의 앱 설치"를 한 번 허용해야 합니다.
     </section>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -138,7 +140,8 @@
       var ITEMS = [
         { id: "oncle", name: "ONCLE 셀프 출석", desc: "온클 태블릿에서 여세요", url: SELF + "?center=ONCLE", png: "./selfcheckin-oncle-qr.png", open: "열기" },
         { id: "grabit", name: "GRABIT 셀프 출석", desc: "그랩잇 태블릿에서 여세요", url: SELF + "?center=GRABIT", png: "./selfcheckin-grabit-qr.png", open: "열기" },
-        { id: "pc", name: "PC 프로그램", desc: "윈도우 회원관리 프로그램 설치", url: "https://jayjun8989-art.github.io/climb-center-manager/pc/", png: "", open: "다운로드" }
+        { id: "pc", name: "PC 프로그램", desc: "윈도우 회원관리 프로그램 설치", url: "https://jayjun8989-art.github.io/climb-center-manager/pc/", png: "", open: "다운로드" },
+        { id: "app", name: "핸드폰 앱", desc: "안드로이드 관리자용 앱 설치", url: "https://jayjun8989-art.github.io/climb-center-manager/app/", png: "", open: "다운로드" }
       ];
 
       function drawQr(box, text, png, alt) {

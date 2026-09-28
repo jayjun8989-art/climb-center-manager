@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>그랩온 핸드폰 앱</title>
+    <meta name="description" content="그랩온 관리자용 안드로이드 앱을 내려받습니다" />
+    <meta property="og:title" content="그랩온 핸드폰 앱" />
+    <meta property="og:description" content="눌러서 안드로이드 앱을 설치하세요" />
+    <style>
+      :root { --bg:#0b1120; --card:#151c2c; --border:#2a3446; --text:#e6eaf1; --sub:#a3adbd; --muted:#6f7a8c; --rose:#e11d48; --green:#22c55e; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100vh; padding: 32px 18px;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--bg); color: var(--text);
+        font-family: "Pretendard", "Malgun Gothic", system-ui, sans-serif;
+      }
+      .card {
+        width: 100%; max-width: 420px; text-align: center;
+        background: var(--card); border: 1px solid var(--border);
+        border-radius: 24px; padding: 32px 24px 28px;
+      }
+      .brand { font-size: 30px; font-weight: 900; letter-spacing: 2px; color: var(--rose); }
+      h1 { margin: 14px 0 6px; font-size: 21px; font-weight: 800; }
+      p { margin: 0; font-size: 14px; line-height: 1.7; color: var(--sub); }
+      .btn {
+        display: block; margin-top: 22px; padding: 18px;
+        border-radius: 16px; background: var(--green); color: #05230f;
+        font-size: 18px; font-weight: 800; text-decoration: none;
+      }
+      .steps { margin-top: 20px; text-align: left; font-size: 13px; color: var(--muted); line-height: 1.9; }
+      .steps b { color: var(--sub); }
+      .foot { margin-top: 18px; font-size: 12px; color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="brand">GRABON</div>
+      <h1>관리자 핸드폰 앱</h1>
+      <p>안드로이드 전용입니다.<br />잠시 후 설치파일 내려받기가 시작됩니다.</p>
+      <a class="btn" id="dl" href="https://github.com/jayjun8989-art/climb-center-manager/releases/download/mobile/GrabonMobile.apk">지금 다운로드</a>
+      <div class="steps">
+        <b>설치 방법</b><br />
+        1. 받은 파일을 눌러 설치합니다<br />
+        2. "이 출처의 앱 설치" 경고가 뜨면 <b>설정 → 허용</b> 후 다시 설치<br />
+        3. 기존 앱 위에 덮어쓰기 설치됩니다<br />
+        4. 회원 자료는 서버에 있어 그대로 유지됩니다
+      </div>
+      <p class="foot">다운로드가 시작되지 않으면 위 버튼을 눌러주세요.</p>
+    </div>
+    <script>
+      setTimeout(function () {
+        window.location.href = document.getElementById("dl").href;
+      }, 600);
+    </script>
+  </body>
+</html>
