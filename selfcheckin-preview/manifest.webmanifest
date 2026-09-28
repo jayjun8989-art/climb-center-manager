@@ -1,0 +1,15 @@
+{
+  "name": "그랩온 셀프 출석",
+  "short_name": "셀프 출석",
+  "description": "회원번호로 출석하고 잔여 횟수와 방문 기록을 확인합니다",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#0b1120",
+  "theme_color": "#0b1120",
+  "icons": [
+    { "src": "./icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icon.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
