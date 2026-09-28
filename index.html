@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>그랩온</title>
+    <meta name="description" content="그랩온 셀프 출석과 회원관리 프로그램을 한 곳에서" />
+    <meta property="og:title" content="그랩온" />
+    <meta property="og:description" content="셀프 출석 · 회원관리 프로그램 설치" />
+    <link rel="icon" href="./selfcheckin/icon.png" />
+    <style>
+      :root {
+        --bg: #0b1120;
+        --card: #151c2c;
+        --border: #2a3446;
+        --text: #e6eaf1;
+        --sub: #a3adbd;
+        --muted: #6f7a8c;
+        --rose: #e11d48;
+        --oncle: #3b82f6;
+        --grabit: #f97316;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 30px 16px 60px;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Pretendard", "Malgun Gothic", system-ui, sans-serif;
+      }
+      header { text-align: center; margin-bottom: 26px; }
+      .brand { font-size: 32px; font-weight: 900; letter-spacing: 2px; color: var(--rose); }
+      .lead { margin: 10px 0 0; font-size: 15px; color: var(--sub); line-height: 1.7; }
+      .wrap {
+        max-width: 1000px;
+        margin: 0 auto;
+        display: grid;
+        gap: 18px;
+        grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-top: 6px solid var(--accent, var(--border));
+        border-radius: 22px;
+        padding: 22px 20px 24px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+      }
+      .card.oncle { --accent: var(--oncle); }
+      .card.grabit { --accent: var(--grabit); }
+      .card.pc { --accent: var(--rose); }
+      .name { font-size: 24px; font-weight: 900; letter-spacing: 1px; color: var(--accent, var(--text)); }
+      .desc { margin: 6px 0 16px; font-size: 14px; color: var(--sub); }
+      .qr {
+        background: #fff;
+        border-radius: 16px;
+        padding: 12px;
+        align-self: center;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 224px;
+        min-width: 224px;
+      }
+      .qr img, .qr canvas { display: block; width: 200px; height: 200px; }
+      .open {
+        margin-top: 16px;
+        display: block;
+        border-radius: 14px;
+        background: var(--accent, var(--rose));
+        color: #fff;
+        text-decoration: none;
+        font-size: 16px;
+        font-weight: 800;
+        padding: 14px;
+      }
+      .url {
+        margin: 12px 0 0;
+        font-size: 11px;
+        line-height: 1.6;
+        color: var(--muted);
+        word-break: break-all;
+        user-select: all;
+      }
+      .copy {
+        margin-top: 10px;
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--sub);
+        border-radius: 12px;
+        padding: 9px 16px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .note {
+        max-width: 1000px;
+        margin: 26px auto 0;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 18px 20px;
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.9;
+      }
+      .note b { color: var(--sub); }
+      @media print {
+        body { background: #fff; color: #000; padding: 0; }
+        .copy, .note, .open { display: none; }
+        .card { background: #fff; border-color: #ddd; }
+        .url { color: #444; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand">GRABON</div>
+      <p class="lead">
+        이 주소 하나만 보내면 됩니다.<br />
+        필요한 QR을 찍거나 버튼을 누르세요.
+      </p>
+    </header>
+
+    <main class="wrap" id="cards"></main>
+
+    <section class="note">
+      <b>셀프 출석 (태블릿)</b> — 센터에 맞는 QR로 열고, 크롬 메뉴 → 홈 화면에 추가. 처음 한 번만 직원 계정으로 로그인하면 됩니다.
+      ONCLE 태블릿은 <b>oncle</b>, GRABIT 태블릿은 <b>grabit</b> 계정으로 로그인하세요 — 그래야 다른 센터 출석을 서버가 막아줍니다.<br />
+      <b>PC 프로그램</b> — 누르면 최신 설치파일이 바로 내려받아집니다. 기존 프로그램 위에 덮어쓰기 설치하면 되고, 회원 자료는 서버에 있어 그대로입니다.
+    </section>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script>
+      var SELF = "https://jayjun8989-art.github.io/climb-center-manager/selfcheckin/";
+      var ITEMS = [
+        { id: "oncle", name: "ONCLE 셀프 출석", desc: "온클 태블릿에서 여세요", url: SELF + "?center=ONCLE", png: "./selfcheckin-oncle-qr.png", open: "열기" },
+        { id: "grabit", name: "GRABIT 셀프 출석", desc: "그랩잇 태블릿에서 여세요", url: SELF + "?center=GRABIT", png: "./selfcheckin-grabit-qr.png", open: "열기" },
+        { id: "pc", name: "PC 프로그램", desc: "윈도우 회원관리 프로그램 설치", url: "https://jayjun8989-art.github.io/climb-center-manager/pc/", png: "", open: "다운로드" }
+      ];
+
+      function drawQr(box, text, png, alt) {
+        box.innerHTML = "";
+        try {
+          if (typeof QRCode !== "undefined") {
+            new QRCode(box, { text: text, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M });
+            return;
+          }
+        } catch (e) {}
+        if (png) {
+          var img = document.createElement("img");
+          img.src = png;
+          img.alt = alt;
+          box.appendChild(img);
+        }
+      }
+
+      var cards = document.getElementById("cards");
+      ITEMS.forEach(function (item) {
+        var el = document.createElement("div");
+        el.className = "card " + item.id;
+        el.innerHTML =
+          '<div class="name">' + item.name + "</div>" +
+          '<p class="desc">' + item.desc + "</p>" +
+          '<div class="qr"></div>' +
+          '<a class="open" href="' + item.url + '">' + item.open + "</a>" +
+          '<p class="url">' + item.url + "</p>" +
+          '<button class="copy">주소 복사</button>';
+        drawQr(el.querySelector(".qr"), item.url, item.png, item.name + " QR");
+        el.querySelector(".copy").addEventListener("click", function () {
+          var btn = this;
+          navigator.clipboard.writeText(item.url).then(
+            function () {
+              btn.textContent = "복사됨";
+              setTimeout(function () { btn.textContent = "주소 복사"; }, 1500);
+            },
+            function () { btn.textContent = "복사 실패"; }
+          );
+        });
+        cards.appendChild(el);
+      });
+    </script>
+  </body>
+</html>
