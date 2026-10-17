@@ -57,7 +57,7 @@ svg.spark{width:100%;height:46px}
 <body>
 <div id="login" class="hide">
   <h1>내 하루</h1><p class="sub">그랩온 · 입툭 · 일정을 한 번에</p>
-  <input id="em" type="email" placeholder="이메일" autocomplete="username">
+  <input id="em" type="text" placeholder="아이디 (그랩온 관리자와 동일)" autocomplete="username" autocapitalize="none">
   <input id="pw" type="password" placeholder="비밀번호" autocomplete="current-password">
   <div id="err"></div>
   <button class="btn" id="go" style="width:100%">로그인</button>
@@ -190,7 +190,8 @@ function show(authed){
 }
 $("#go").onclick=async()=>{
   $("#err").textContent="";
-  const {error}=await sb.auth.signInWithPassword({email:$("#em").value.trim(),password:$("#pw").value});
+  let id=$("#em").value.trim();if(id&&!id.includes("@"))id+="@oncle.local";
+  const {error}=await sb.auth.signInWithPassword({email:id,password:$("#pw").value});
   if(error)$("#err").textContent="이메일 또는 비밀번호를 확인해주세요";else show(true);
 };
 $("#pw").addEventListener("keydown",e=>{if(e.key==="Enter")$("#go").click()});
